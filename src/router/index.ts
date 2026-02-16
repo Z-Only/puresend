@@ -3,9 +3,15 @@ import { createRouter, createWebHistory } from 'vue-router'
 const routes = [
     {
         path: '/',
-        name: 'Transfer',
-        component: () => import('@/views/TransferView.vue'),
-        meta: { title: '文件传输' },
+        name: 'Send',
+        component: () => import('@/views/SendView.vue'),
+        meta: { title: '发送文件' },
+    },
+    {
+        path: '/receive',
+        name: 'Receive',
+        component: () => import('@/views/ReceiveView.vue'),
+        meta: { title: '接收文件' },
     },
     {
         path: '/history',

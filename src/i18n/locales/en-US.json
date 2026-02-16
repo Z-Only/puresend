@@ -4,7 +4,8 @@
     "title": "File Transfer"
   },
   "nav": {
-    "transfer": "Transfer",
+    "send": "Send",
+    "receive": "Receive",
     "history": "History",
     "settings": "Settings"
   },

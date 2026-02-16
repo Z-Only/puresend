@@ -15,6 +15,7 @@ declare module 'vue' {
     FileTypeIcon: typeof import('./src/components/transfer/FileTypeIcon.vue')['default']
     LanguageSelector: typeof import('./src/components/settings/LanguageSelector.vue')['default']
     ModeSwitcher: typeof import('./src/components/transfer/ModeSwitcher.vue')['default']
+    NetworkInfo: typeof import('./src/components/transfer/NetworkInfo.vue')['default']
     PeerList: typeof import('./src/components/transfer/PeerList.vue')['default']
     ProgressDisplay: typeof import('./src/components/transfer/ProgressDisplay.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

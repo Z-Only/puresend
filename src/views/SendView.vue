@@ -1,6 +1,6 @@
-<!-- 主传输页面 -->
+<!-- 文件发送页面 -->
 <template>
-    <v-container fluid class="transfer-view">
+    <v-container fluid class="send-view">
         <v-row>
             <!-- 左侧：文件选择和传输设置 -->
             <v-col cols="12" md="6">
@@ -30,15 +30,15 @@
                 />
             </v-col>
 
-            <!-- 右侧：传输进度 -->
+            <!-- 右侧：发送任务进度 -->
             <v-col cols="12" md="6">
                 <v-card class="mb-4">
                     <v-card-title
                         class="d-flex align-center justify-space-between"
                     >
-                        <span>传输任务</span>
+                        <span>发送任务</span>
                         <v-btn
-                            v-if="transferStore.taskList.length > 0"
+                            v-if="transferStore.sendTasks.length > 0"
                             color="primary"
                             variant="text"
                             size="small"
@@ -51,22 +51,22 @@
 
                 <!-- 空状态 -->
                 <div
-                    v-if="transferStore.taskList.length === 0"
+                    v-if="transferStore.sendTasks.length === 0"
                     class="d-flex flex-column align-center justify-center py-8"
                 >
                     <v-icon
-                        icon="mdi-inbox-arrow-down"
+                        icon="mdi-inbox-arrow-up"
                         size="64"
                         color="grey"
                         class="mb-4"
                     />
-                    <div class="text-h6 text-grey">暂无传输任务</div>
-                    <div class="text-body-2 text-grey">选择文件开始传输</div>
+                    <div class="text-h6 text-grey">暂无发送任务</div>
+                    <div class="text-body-2 text-grey">选择文件开始发送</div>
                 </div>
 
                 <!-- 任务列表 -->
                 <ProgressDisplay
-                    v-for="task in transferStore.taskList"
+                    v-for="task in transferStore.sendTasks"
                     :key="task.id"
                     :task="task"
                     class="mb-4"
@@ -96,7 +96,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref } from 'vue'
 import {
     FileSelector,
     ProgressDisplay,
@@ -185,7 +185,7 @@ async function handleSend() {
         }
     } catch (error) {
         showError.value = true
-        errorMessage.value = `发送失败: ${error}`
+        errorMessage.value = `发送失败：${error}`
     } finally {
         sending.value = false
     }
@@ -210,27 +210,17 @@ async function handleRetry(task: TransferTask) {
 }
 
 function handleRemove(taskId: string) {
-    // 从列表中移除任务（需要在 store 中实现）
+    // 从列表中移除任务
     transferStore.tasks.delete(taskId)
 }
 
 async function handleCleanup() {
     await transferStore.cleanup()
 }
-
-onMounted(async () => {
-    await transferStore.initialize()
-    await discoveryStore.initialize()
-})
-
-onUnmounted(() => {
-    transferStore.destroy()
-    discoveryStore.destroy()
-})
 </script>
 
 <style scoped>
-.transfer-view {
+.send-view {
     min-height: calc(100vh - 64px);
 }
 </style>

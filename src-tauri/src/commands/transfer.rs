@@ -18,6 +18,21 @@ pub struct TransferState {
     chunker: FileChunker,
     /// 校验器
     checker: IntegrityChecker,
+    /// 接收状态
+    receiving_state: Arc<Mutex<ReceivingState>>,
+}
+
+/// 接收状态
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub struct ReceivingState {
+    /// 是否正在接收
+    pub is_receiving: bool,
+    /// 监听端口
+    pub port: u16,
+    /// 网络地址
+    pub network_address: String,
+    /// 分享码
+    pub share_code: String,
 }
 
 impl TransferState {
@@ -27,6 +42,7 @@ impl TransferState {
             active_tasks: Arc::new(Mutex::new(HashMap::new())),
             chunker: FileChunker::default_chunker(),
             checker: IntegrityChecker::new(),
+            receiving_state: Arc::new(Mutex::new(ReceivingState::default())),
         }
     }
 }
@@ -309,33 +325,186 @@ pub async fn verify_file_integrity(
     expected_hash: String,
 ) -> Result<bool, String> {
     let path = PathBuf::from(&file_path);
-    
-    if !path.exists() {
-        return Err(format!("文件不存在: {}", file_path));
-    }
-    
-    state
-        .checker
-        .verify_file(&path, &expected_hash)
-        .map_err(|e| e.to_string())
+    state.checker.verify_file(&path, &expected_hash).map_err(|e| e.to_string())
 }
 
-/// 清理已完成任务
+/// 清理已完成的任务
 #[tauri::command]
 pub async fn cleanup_completed_tasks(
     state: State<'_, TransferState>,
 ) -> Result<usize, String> {
     let mut active_tasks = state.active_tasks.lock().await;
-    let initial_count = active_tasks.len();
+    let before_count = active_tasks.len();
     
     active_tasks.retain(|_, task| {
-        !matches!(
-            task.status,
-            crate::models::TaskStatus::Completed
-                | crate::models::TaskStatus::Failed
-                | crate::models::TaskStatus::Cancelled
-        )
+        task.status != crate::models::TaskStatus::Completed 
+            && task.status != crate::models::TaskStatus::Cancelled
     });
     
-    Ok(initial_count - active_tasks.len())
+    Ok(before_count - active_tasks.len())
+}
+
+/// 启动接收监听服务器（内部实现）
+async fn start_receiving_impl(
+    state: &State<'_, TransferState>,
+) -> Result<ReceivingState, String> {
+    use std::net::IpAddr;
+    use std::str::FromStr;
+    
+    let mut receiving_state = state.receiving_state.lock().await;
+    
+    if receiving_state.is_receiving {
+        return Err("接收服务已在运行".to_string());
+    }
+    
+    // 获取本机 IP 地址
+    let network_address = get_local_ip().unwrap_or_else(|| IpAddr::from_str("127.0.0.1").unwrap());
+    let network_address_str = network_address.to_string();
+    
+    // 生成随机端口（10000-20000 范围）
+    let port = 10000 + (std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() % 10000) as u16;
+    
+    // 生成分享码（6 位随机数字）
+    let share_code = format!("{:06}", port % 10000);
+    
+    receiving_state.is_receiving = true;
+    receiving_state.port = port;
+    receiving_state.network_address = network_address_str.clone();
+    receiving_state.share_code = share_code.clone();
+    
+    Ok(ReceivingState {
+        is_receiving: true,
+        port,
+        network_address: network_address_str,
+        share_code,
+    })
+}
+
+/// 启动接收监听服务器
+#[tauri::command]
+pub async fn start_receiving(
+    app: AppHandle,
+    state: State<'_, TransferState>,
+) -> Result<ReceivingState, String> {
+    let receiving_state = start_receiving_impl(&state).await?;
+    
+    // 启动接收监听（后台任务）
+    let _receiving_state_clone = state.receiving_state.clone();
+    let app_handle = app.clone();
+    
+    tokio::spawn(async move {
+        // TODO: 实现接收监听逻辑
+        // 这里需要启动 TCP 监听器，等待发送方连接
+        let _ = app_handle.emit("receiving-started", &*_receiving_state_clone.lock().await);
+    });
+    
+    Ok(receiving_state)
+}
+
+/// 停止接收监听服务器
+#[tauri::command]
+pub async fn stop_receiving(
+    state: State<'_, TransferState>,
+) -> Result<(), String> {
+    let mut receiving_state = state.receiving_state.lock().await;
+    
+    if !receiving_state.is_receiving {
+        return Err("接收服务未运行".to_string());
+    }
+    
+    receiving_state.is_receiving = false;
+    receiving_state.port = 0;
+    receiving_state.network_address = String::new();
+    receiving_state.share_code = String::new();
+    
+    Ok(())
+}
+
+/// 获取接收目录
+#[tauri::command]
+pub async fn get_receive_directory() -> Result<String, String> {
+    let home_dir = std::env::var("HOME")
+        .map_err(|_| "无法获取主目录".to_string())?;
+    let receive_dir = std::path::PathBuf::from(home_dir)
+        .join("Downloads")
+        .join("PureSend");
+    
+    // 确保目录存在
+    std::fs::create_dir_all(&receive_dir)
+        .map_err(|e| format!("创建目录失败：{}", e))?;
+    
+    Ok(receive_dir.to_string_lossy().to_string())
+}
+
+/// 设置接收目录
+#[tauri::command]
+pub async fn set_receive_directory(directory: String) -> Result<(), String> {
+    let path = PathBuf::from(&directory);
+    
+    if !path.exists() {
+        std::fs::create_dir_all(&path)
+            .map_err(|e| format!("创建目录失败：{}", e))?;
+    }
+    
+    // TODO: 保存到配置文件
+    Ok(())
+}
+
+/// 获取本机 IP 地址
+fn get_local_ip() -> Option<std::net::IpAddr> {
+    // 尝试获取本机 IP 地址
+    if let Ok(socket) = std::net::UdpSocket::bind("0.0.0.0:0") {
+        if socket.connect("8.8.8.8:80").is_ok() {
+            if let Ok(addr) = socket.local_addr() {
+                return Some(addr.ip());
+            }
+        }
+    }
+    None
+}
+
+/// 获取网络信息（不启动接收服务）
+#[tauri::command]
+pub async fn get_network_info(
+    state: State<'_, TransferState>,
+) -> Result<ReceivingState, String> {
+    use std::net::IpAddr;
+    use std::str::FromStr;
+    
+    let receiving_state = state.receiving_state.lock().await;
+    
+    // 如果已经在接收，返回当前的接收状态
+    if receiving_state.is_receiving {
+        return Ok(ReceivingState {
+            is_receiving: receiving_state.is_receiving,
+            port: receiving_state.port,
+            network_address: receiving_state.network_address.clone(),
+            share_code: receiving_state.share_code.clone(),
+        });
+    }
+    
+    // 否则，生成临时的网络信息（不启动接收服务）
+    let network_address = get_local_ip().unwrap_or_else(|| IpAddr::from_str("127.0.0.1").unwrap());
+    let network_address_str = network_address.to_string();
+    
+    // 生成随机端口（10000-20000 范围）
+    let port = 10000 + (std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() % 10000) as u16;
+    
+    // 生成分享码（6 位随机数字）
+    let share_code = format!("{:06}", port % 10000);
+    
+    drop(receiving_state);
+    
+    Ok(ReceivingState {
+        is_receiving: false,
+        port,
+        network_address: network_address_str,
+        share_code,
+    })
 }

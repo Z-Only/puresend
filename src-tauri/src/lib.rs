@@ -28,6 +28,11 @@ pub fn run() {
             commands::get_active_tasks,
             commands::verify_file_integrity,
             commands::cleanup_completed_tasks,
+            commands::get_network_info,
+            commands::start_receiving,
+            commands::stop_receiving,
+            commands::get_receive_directory,
+            commands::set_receive_directory,
             // 设备发现命令
             commands::init_discovery,
             commands::stop_discovery,

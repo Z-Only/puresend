@@ -4,7 +4,8 @@
     "title": "文件传输"
   },
   "nav": {
-    "transfer": "文件传输",
+    "send": "发送文件",
+    "receive": "接收文件",
     "history": "传输历史",
     "settings": "设置"
   },

@@ -162,6 +162,12 @@ impl LocalTransport {
         }
     }
 
+    /// 获取监听器（用于接收文件）
+    #[allow(dead_code)]
+    pub async fn get_listener(&self) -> TransferResult<Arc<Mutex<Option<TcpListener>>>> {
+        Ok(self.listener.clone())
+    }
+
     /// 发送文件到指定地址
     async fn send_file_to(
         &self,

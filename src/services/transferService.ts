@@ -10,22 +10,24 @@ import type { FileMetadata, TransferTask, TransferProgress } from '../types'
  * 初始化传输服务
  */
 export async function initTransfer(): Promise<void> {
-  return invoke('init_transfer')
+    return invoke('init_transfer')
 }
 
 /**
  * 获取本机监听端口
  */
 export async function getTransferPort(): Promise<number> {
-  return invoke('get_transfer_port')
+    return invoke('get_transfer_port')
 }
 
 /**
  * 准备文件传输（计算元数据和哈希）
  * @param filePath 文件路径
  */
-export async function prepareFileTransfer(filePath: string): Promise<FileMetadata> {
-  return invoke('prepare_file_transfer', { filePath })
+export async function prepareFileTransfer(
+    filePath: string
+): Promise<FileMetadata> {
+    return invoke('prepare_file_transfer', { filePath })
 }
 
 /**
@@ -36,17 +38,17 @@ export async function prepareFileTransfer(filePath: string): Promise<FileMetadat
  * @param peerPort 目标设备端口
  */
 export async function sendFile(
-  fileMetadata: FileMetadata,
-  peerId: string,
-  peerIp: string,
-  peerPort: number
+    fileMetadata: FileMetadata,
+    peerId: string,
+    peerIp: string,
+    peerPort: number
 ): Promise<string> {
-  return invoke('send_file', {
-    fileMetadata,
-    peerId,
-    peerIp,
-    peerPort
-  })
+    return invoke('send_file', {
+        fileMetadata,
+        peerId,
+        peerIp,
+        peerPort,
+    })
 }
 
 /**
@@ -57,17 +59,17 @@ export async function sendFile(
  * @param peerPort 目标设备端口
  */
 export async function sendFileAsync(
-  fileMetadata: FileMetadata,
-  peerId: string,
-  peerIp: string,
-  peerPort: number
+    fileMetadata: FileMetadata,
+    peerId: string,
+    peerIp: string,
+    peerPort: number
 ): Promise<string> {
-  return invoke('send_file_async', {
-    fileMetadata,
-    peerId,
-    peerIp,
-    peerPort
-  })
+    return invoke('send_file_async', {
+        fileMetadata,
+        peerId,
+        peerIp,
+        peerPort,
+    })
 }
 
 /**
@@ -75,22 +77,24 @@ export async function sendFileAsync(
  * @param taskId 任务ID
  */
 export async function cancelTransfer(taskId: string): Promise<void> {
-  return invoke('cancel_transfer', { taskId })
+    return invoke('cancel_transfer', { taskId })
 }
 
 /**
  * 获取传输进度
  * @param taskId 任务ID
  */
-export async function getTransferProgress(taskId: string): Promise<TransferProgress> {
-  return invoke('get_transfer_progress', { taskId })
+export async function getTransferProgress(
+    taskId: string
+): Promise<TransferProgress> {
+    return invoke('get_transfer_progress', { taskId })
 }
 
 /**
  * 获取所有活跃任务
  */
 export async function getActiveTasks(): Promise<TransferTask[]> {
-  return invoke('get_active_tasks')
+    return invoke('get_active_tasks')
 }
 
 /**
@@ -99,10 +103,10 @@ export async function getActiveTasks(): Promise<TransferTask[]> {
  * @param expectedHash 期望的哈希值
  */
 export async function verifyFileIntegrity(
-  filePath: string,
-  expectedHash: string
+    filePath: string,
+    expectedHash: string
 ): Promise<boolean> {
-  return invoke('verify_file_integrity', { filePath, expectedHash })
+    return invoke('verify_file_integrity', { filePath, expectedHash })
 }
 
 /**
@@ -110,7 +114,53 @@ export async function verifyFileIntegrity(
  * @returns 清理的任务数量
  */
 export async function cleanupCompletedTasks(): Promise<number> {
-  return invoke('cleanup_completed_tasks')
+    return invoke('cleanup_completed_tasks')
+}
+
+/**
+ * 获取网络信息（不启动接收服务）
+ */
+export async function getNetworkInfo(): Promise<{
+    port: number
+    network_address: string
+    share_code: string
+    is_receiving: boolean
+}> {
+    return invoke('get_network_info')
+}
+
+/**
+ * 启动接收监听服务器
+ * @param port 可选的指定端口，不传则自动分配
+ */
+export async function startReceiving(port?: number): Promise<{
+    port: number
+    network_address: string
+    share_code: string
+}> {
+    return invoke('start_receiving', { port })
+}
+
+/**
+ * 停止接收监听服务器
+ */
+export async function stopReceiving(): Promise<void> {
+    return invoke('stop_receiving')
+}
+
+/**
+ * 获取接收目录
+ */
+export async function getReceiveDirectory(): Promise<string> {
+    return invoke('get_receive_directory')
+}
+
+/**
+ * 设置接收目录
+ * @param directory 目录路径
+ */
+export async function setReceiveDirectory(directory: string): Promise<void> {
+    return invoke('set_receive_directory', { directory })
 }
 
 // ============ 事件监听 ============
@@ -129,10 +179,12 @@ export type TransferCompleteListener = (progress: TransferProgress) => void
  * @param listener 监听器函数
  * @returns 取消监听函数
  */
-export function onTransferProgress(listener: TransferProgressListener): Promise<UnlistenFn> {
-  return listen<TransferProgress>('transfer-progress', (event) => {
-    listener(event.payload)
-  })
+export function onTransferProgress(
+    listener: TransferProgressListener
+): Promise<UnlistenFn> {
+    return listen<TransferProgress>('transfer-progress', (event) => {
+        listener(event.payload)
+    })
 }
 
 /**
@@ -140,10 +192,12 @@ export function onTransferProgress(listener: TransferProgressListener): Promise<
  * @param listener 监听器函数
  * @returns 取消监听函数
  */
-export function onTransferError(listener: TransferErrorListener): Promise<UnlistenFn> {
-  return listen<TransferProgress>('transfer-error', (event) => {
-    listener(event.payload)
-  })
+export function onTransferError(
+    listener: TransferErrorListener
+): Promise<UnlistenFn> {
+    return listen<TransferProgress>('transfer-error', (event) => {
+        listener(event.payload)
+    })
 }
 
 /**
@@ -151,8 +205,10 @@ export function onTransferError(listener: TransferErrorListener): Promise<Unlist
  * @param listener 监听器函数
  * @returns 取消监听函数
  */
-export function onTransferComplete(listener: TransferCompleteListener): Promise<UnlistenFn> {
-  return listen<TransferProgress>('transfer-complete', (event) => {
-    listener(event.payload)
-  })
+export function onTransferComplete(
+    listener: TransferCompleteListener
+): Promise<UnlistenFn> {
+    return listen<TransferProgress>('transfer-complete', (event) => {
+        listener(event.payload)
+    })
 }

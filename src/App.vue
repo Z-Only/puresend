@@ -16,9 +16,14 @@ const currentRoute = computed(() => route.name as string)
 
 const navigationItems = computed(() => [
     {
-        title: t('nav.transfer'),
-        icon: 'mdi-swap-horizontal',
-        route: 'Transfer',
+        title: t('nav.send'),
+        icon: 'mdi-send',
+        route: 'Send',
+    },
+    {
+        title: t('nav.receive'),
+        icon: 'mdi-wifi-plus',
+        route: 'Receive',
     },
     { title: t('nav.history'), icon: 'mdi-history', route: 'History' },
     { title: t('nav.settings'), icon: 'mdi-cog', route: 'Settings' },
