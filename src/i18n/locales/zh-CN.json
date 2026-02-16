@@ -1,0 +1,52 @@
+{
+  "app": {
+    "name": "PureSend",
+    "title": "文件传输"
+  },
+  "nav": {
+    "transfer": "文件传输",
+    "history": "传输历史",
+    "settings": "设置"
+  },
+  "settings": {
+    "title": "设置",
+    "appearance": "外观",
+    "theme": {
+      "label": "主题",
+      "light": "浅色",
+      "dark": "深色",
+      "system": "跟随系统"
+    },
+    "language": {
+      "label": "语言",
+      "zhCN": "中文",
+      "enUS": "English",
+      "system": "跟随系统"
+    }
+  },
+  "transfer": {
+    "title": "文件传输",
+    "selectFile": "选择文件",
+    "dragDropHint": "拖拽文件到此处",
+    "send": "发送",
+    "receive": "接收",
+    "progress": "传输进度",
+    "completed": "已完成",
+    "failed": "传输失败",
+    "cancelled": "已取消"
+  },
+  "history": {
+    "title": "传输历史",
+    "empty": "暂无传输记录",
+    "clear": "清空历史"
+  },
+  "common": {
+    "confirm": "确认",
+    "cancel": "取消",
+    "save": "保存",
+    "reset": "重置",
+    "loading": "加载中...",
+    "error": "发生错误",
+    "success": "操作成功"
+  }
+}

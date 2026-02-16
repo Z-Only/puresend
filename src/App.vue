@@ -1,20 +1,61 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import { useSettingsStore } from '@/stores/settings'
+import { setI18nLanguage, type AppLocale } from '@/i18n'
+import { useTheme } from 'vuetify'
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
+const settingsStore = useSettingsStore()
+const vuetifyTheme = useTheme()
 
 const currentRoute = computed(() => route.name as string)
 
-const navigationItems = [
-    { title: '文件传输', icon: 'mdi-swap-horizontal', route: 'Transfer' },
-    { title: '传输历史', icon: 'mdi-history', route: 'History' },
-]
+const navigationItems = computed(() => [
+    {
+        title: t('nav.transfer'),
+        icon: 'mdi-swap-horizontal',
+        route: 'Transfer',
+    },
+    { title: t('nav.history'), icon: 'mdi-history', route: 'History' },
+    { title: t('nav.settings'), icon: 'mdi-cog', route: 'Settings' },
+])
 
 function navigateTo(routeName: string) {
     router.push({ name: routeName })
 }
+
+// 系统主题变化回调
+let cleanupThemeWatcher: (() => void) | null = null
+
+function handleSystemThemeChange(theme: 'light' | 'dark') {
+    vuetifyTheme.global.name.value = theme
+}
+
+onMounted(async () => {
+    // 应用保存的设置
+    await settingsStore.loadSettings()
+
+    // 设置语言
+    setI18nLanguage(settingsStore.actualLanguage as AppLocale)
+
+    // 设置主题
+    vuetifyTheme.global.name.value = settingsStore.actualTheme
+
+    // 监听系统主题变化
+    cleanupThemeWatcher = settingsStore.watchSystemTheme(
+        handleSystemThemeChange
+    )
+})
+
+onUnmounted(() => {
+    if (cleanupThemeWatcher) {
+        cleanupThemeWatcher()
+    }
+})
 </script>
 
 <template>

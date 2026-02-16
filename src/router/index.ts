@@ -13,6 +13,12 @@ const routes = [
         component: () => import('@/views/HistoryView.vue'),
         meta: { title: '传输历史' },
     },
+    {
+        path: '/settings',
+        name: 'Settings',
+        component: () => import('@/views/SettingsView.vue'),
+        meta: { title: '设置' },
+    },
 ]
 
 const router = createRouter({

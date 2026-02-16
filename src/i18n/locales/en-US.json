@@ -1,0 +1,52 @@
+{
+  "app": {
+    "name": "PureSend",
+    "title": "File Transfer"
+  },
+  "nav": {
+    "transfer": "Transfer",
+    "history": "History",
+    "settings": "Settings"
+  },
+  "settings": {
+    "title": "Settings",
+    "appearance": "Appearance",
+    "theme": {
+      "label": "Theme",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "language": {
+      "label": "Language",
+      "zhCN": "中文",
+      "enUS": "English",
+      "system": "System"
+    }
+  },
+  "transfer": {
+    "title": "File Transfer",
+    "selectFile": "Select File",
+    "dragDropHint": "Drag and drop files here",
+    "send": "Send",
+    "receive": "Receive",
+    "progress": "Progress",
+    "completed": "Completed",
+    "failed": "Failed",
+    "cancelled": "Cancelled"
+  },
+  "history": {
+    "title": "Transfer History",
+    "empty": "No transfer records",
+    "clear": "Clear History"
+  },
+  "common": {
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "save": "Save",
+    "reset": "Reset",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "success": "Success"
+  }
+}

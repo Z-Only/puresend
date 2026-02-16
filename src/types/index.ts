@@ -5,3 +5,4 @@
 export * from './file'
 export * from './transfer'
 export * from './peer'
+export * from './settings'

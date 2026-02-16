@@ -13,10 +13,13 @@ declare module 'vue' {
   export interface GlobalComponents {
     FileSelector: typeof import('./src/components/transfer/FileSelector.vue')['default']
     FileTypeIcon: typeof import('./src/components/transfer/FileTypeIcon.vue')['default']
+    LanguageSelector: typeof import('./src/components/settings/LanguageSelector.vue')['default']
     ModeSwitcher: typeof import('./src/components/transfer/ModeSwitcher.vue')['default']
     PeerList: typeof import('./src/components/transfer/PeerList.vue')['default']
     ProgressDisplay: typeof import('./src/components/transfer/ProgressDisplay.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SettingsGroup: typeof import('./src/components/settings/SettingsGroup.vue')['default']
+    ThemeSelector: typeof import('./src/components/settings/ThemeSelector.vue')['default']
   }
 }
