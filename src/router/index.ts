@@ -1,11 +1,17 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import App from '@/App.vue'
 
 const routes = [
     {
         path: '/',
-        name: 'Home',
-        component: App,
+        name: 'Transfer',
+        component: () => import('@/views/TransferView.vue'),
+        meta: { title: '文件传输' },
+    },
+    {
+        path: '/history',
+        name: 'History',
+        component: () => import('@/views/HistoryView.vue'),
+        meta: { title: '传输历史' },
     },
 ]
 

@@ -23,3 +23,24 @@ tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+# 异步运行时
+tokio = { version = "1", features = ["full"] }
+
+# 异步 trait
+async-trait = "0.1"
+
+# UUID 生成
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# 哈希计算
+sha2 = "0.10"
+
+# 错误处理
+thiserror = "1"
+
+# 获取主机名
+hostname = "0.4"
+
+[dev-dependencies]
+tempfile = "3"
+

@@ -1,0 +1,236 @@
+<!-- 主传输页面 -->
+<template>
+    <v-container fluid class="transfer-view">
+        <v-row>
+            <!-- 左侧：文件选择和传输设置 -->
+            <v-col cols="12" md="6">
+                <!-- 文件选择 -->
+                <FileSelector
+                    @select="handleFileSelect"
+                    @clear="handleFileClear"
+                />
+
+                <!-- 传输模式选择 -->
+                <ModeSwitcher
+                    v-model="transferMode"
+                    :online-peer-count="discoveryStore.onlineCount"
+                    class="mt-4"
+                />
+
+                <!-- 设备列表（本地网络模式） -->
+                <PeerList
+                    v-if="transferMode === 'local'"
+                    :peers="discoveryStore.peerList"
+                    :selected-peer-id="selectedPeerId"
+                    :loading="discoveryStore.scanning"
+                    class="mt-4"
+                    @select="handlePeerSelect"
+                    @refresh="handlePeerRefresh"
+                    @add-manual="handleAddManual"
+                />
+            </v-col>
+
+            <!-- 右侧：传输进度 -->
+            <v-col cols="12" md="6">
+                <v-card class="mb-4">
+                    <v-card-title
+                        class="d-flex align-center justify-space-between"
+                    >
+                        <span>传输任务</span>
+                        <v-btn
+                            v-if="transferStore.taskList.length > 0"
+                            color="primary"
+                            variant="text"
+                            size="small"
+                            @click="handleCleanup"
+                        >
+                            清理已完成
+                        </v-btn>
+                    </v-card-title>
+                </v-card>
+
+                <!-- 空状态 -->
+                <div
+                    v-if="transferStore.taskList.length === 0"
+                    class="d-flex flex-column align-center justify-center py-8"
+                >
+                    <v-icon
+                        icon="mdi-inbox-arrow-down"
+                        size="64"
+                        color="grey"
+                        class="mb-4"
+                    />
+                    <div class="text-h6 text-grey">暂无传输任务</div>
+                    <div class="text-body-2 text-grey">选择文件开始传输</div>
+                </div>
+
+                <!-- 任务列表 -->
+                <ProgressDisplay
+                    v-for="task in transferStore.taskList"
+                    :key="task.id"
+                    :task="task"
+                    class="mb-4"
+                    @cancel="handleCancel"
+                    @retry="handleRetry"
+                    @remove="handleRemove"
+                />
+            </v-col>
+        </v-row>
+
+        <!-- 发送按钮 -->
+        <v-fab
+            v-if="selectedFile && selectedPeerId"
+            color="primary"
+            icon="mdi-send"
+            location="bottom right"
+            size="large"
+            :loading="sending"
+            @click="handleSend"
+        />
+
+        <!-- 错误提示 -->
+        <v-snackbar v-model="showError" color="error" :timeout="5000">
+            {{ errorMessage }}
+        </v-snackbar>
+    </v-container>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted, onUnmounted } from 'vue'
+import {
+    FileSelector,
+    ProgressDisplay,
+    ModeSwitcher,
+    PeerList,
+} from '../components/transfer'
+import { useTransferStore, useDiscoveryStore } from '../stores'
+import type { TransferMode, TransferTask } from '../types'
+
+const transferStore = useTransferStore()
+const discoveryStore = useDiscoveryStore()
+
+const selectedFile = ref<{
+    path: string
+    name: string
+    size: number
+    type: string
+} | null>(null)
+const selectedPeerId = ref('')
+const transferMode = ref<TransferMode>('local')
+const sending = ref(false)
+const showError = ref(false)
+const errorMessage = ref('')
+
+async function handleFileSelect(file: {
+    path: string
+    name: string
+    size: number
+    type: string
+}) {
+    selectedFile.value = file
+}
+
+function handleFileClear() {
+    selectedFile.value = null
+}
+
+function handlePeerSelect(peerId: string) {
+    selectedPeerId.value = peerId
+}
+
+async function handlePeerRefresh() {
+    await discoveryStore.refresh()
+}
+
+async function handleAddManual(ip: string, port: number) {
+    const peer = await discoveryStore.addManual(ip, port)
+    if (peer) {
+        selectedPeerId.value = peer.id
+    }
+}
+
+async function handleSend() {
+    if (!selectedFile.value || !selectedPeerId.value) return
+
+    const peer = discoveryStore.selectedPeer
+    if (!peer) {
+        showError.value = true
+        errorMessage.value = '请选择目标设备'
+        return
+    }
+
+    sending.value = true
+
+    try {
+        // 准备文件传输（计算哈希等）
+        const metadata = await transferStore.prepareTransfer(
+            selectedFile.value.path
+        )
+        if (!metadata) {
+            throw new Error('准备传输失败')
+        }
+
+        // 发送文件
+        const taskId = await transferStore.send(
+            metadata,
+            peer.id,
+            peer.ip,
+            peer.port
+        )
+
+        if (taskId) {
+            // 清除选择
+            selectedFile.value = null
+            selectedPeerId.value = ''
+        }
+    } catch (error) {
+        showError.value = true
+        errorMessage.value = `发送失败: ${error}`
+    } finally {
+        sending.value = false
+    }
+}
+
+async function handleCancel(taskId: string) {
+    await transferStore.cancel(taskId)
+}
+
+async function handleRetry(task: TransferTask) {
+    if (task.peer && task.file.path) {
+        const metadata = await transferStore.prepareTransfer(task.file.path)
+        if (metadata) {
+            await transferStore.send(
+                metadata,
+                task.peer.id,
+                task.peer.ip,
+                task.peer.port
+            )
+        }
+    }
+}
+
+function handleRemove(taskId: string) {
+    // 从列表中移除任务（需要在 store 中实现）
+    transferStore.tasks.delete(taskId)
+}
+
+async function handleCleanup() {
+    await transferStore.cleanup()
+}
+
+onMounted(async () => {
+    await transferStore.initialize()
+    await discoveryStore.initialize()
+})
+
+onUnmounted(() => {
+    transferStore.destroy()
+    discoveryStore.destroy()
+})
+</script>
+
+<style scoped>
+.transfer-view {
+    min-height: calc(100vh - 64px);
+}
+</style>
