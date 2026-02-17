@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 
 .aone_copilot
+
+# Tauri build artifacts
+src-tauri/target/
