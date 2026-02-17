@@ -1,0 +1,26 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "mobile",
+  "description": "Capability for mobile platforms (Android/iOS)",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:event:allow-emit",
+    "core:event:allow-listen",
+    "opener:default",
+    "clipboard-manager:default",
+    "clipboard-manager:allow-read-text",
+    "clipboard-manager:allow-write-text",
+    "dialog:default",
+    "dialog:allow-open",
+    "fs:default",
+    "fs:allow-read"
+  ],
+  "platforms": [
+    "android",
+    "iOS"
+  ]
+}

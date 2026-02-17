@@ -27,3 +27,13 @@ dist-ssr
 
 # Tauri build artifacts
 src-tauri/target/
+
+# Android local configuration
+src-tauri/gen/android/local.properties
+*.keystore
+*.jks
+
+# Android build
+src-tauri/gen/android/app/build/
+src-tauri/gen/android/build/
+.gradle/
