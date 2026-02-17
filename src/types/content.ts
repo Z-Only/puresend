@@ -20,6 +20,91 @@ export type ContentType =
     | 'media'
     | 'app'
 
+/** 文件来源类型 */
+export type FileSourceType = ContentType
+
+/** 缩略图尺寸 */
+export interface ThumbnailSize {
+    /** 宽度（像素） */
+    width: number
+    /** 高度（像素） */
+    height: number
+}
+
+/** 缩略图配置 */
+export interface ThumbnailConfig {
+    /** 小尺寸缩略图 */
+    small: ThumbnailSize
+    /** 中等尺寸缩略图 */
+    medium: ThumbnailSize
+    /** 大尺寸缩略图 */
+    large: ThumbnailSize
+}
+
+/** 默认缩略图配置 */
+export const DEFAULT_THUMBNAIL_CONFIG: ThumbnailConfig = {
+    small: { width: 64, height: 64 },
+    medium: { width: 128, height: 128 },
+    large: { width: 256, height: 256 },
+}
+
+/** 缩略图信息 */
+export interface ThumbnailInfo {
+    /** 缩略图路径（base64 或文件路径） */
+    path: string
+    /** 尺寸 */
+    size: ThumbnailSize
+    /** 是否已加载 */
+    loaded: boolean
+    /** 加载错误信息 */
+    error?: string
+}
+
+/** 已选文件项 */
+export interface SelectedFileItem {
+    /** 唯一标识（使用路径作为 ID，便于去重） */
+    id: string
+    /** 文件路径 */
+    path: string
+    /** 显示名称 */
+    name: string
+    /** 文件大小（字节） */
+    size: number
+    /** MIME 类型 */
+    mimeType: string
+    /** 来源类型 */
+    sourceType: FileSourceType
+    /** 是否为媒体文件 */
+    isMedia: boolean
+    /** 缩略图信息（媒体文件专用） */
+    thumbnail?: ThumbnailInfo
+    /** 相对路径（文件夹展开时保留目录结构） */
+    relativePath?: string
+    /** 是否为临时文件（剪贴板/文本生成） */
+    isTemp?: boolean
+    /** 创建时间戳 */
+    createdAt: number
+    /** 额外元数据 */
+    metadata?: Record<string, unknown>
+}
+
+/** 已选文件列表统计信息 */
+export interface SelectedFilesStats {
+    /** 文件总数 */
+    count: number
+    /** 总大小（字节） */
+    totalSize: number
+    /** 格式化的总大小 */
+    formattedSize: string
+    /** 媒体文件数量 */
+    mediaCount: number
+    /** 是否达到上限 */
+    isAtLimit: boolean
+}
+
+/** 文件数量上限 */
+export const FILE_COUNT_LIMIT = 1000
+
 /** 内容项 */
 export interface ContentItem {
     /** 内容类型 */

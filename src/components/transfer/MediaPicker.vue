@@ -40,50 +40,6 @@
                 >
                     {{ errorMessage }}
                 </v-alert>
-
-                <!-- 已选择的媒体文件预览 -->
-                <div v-if="selectedFiles.length > 0" class="mt-4">
-                    <v-divider class="mb-3" />
-                    <div class="text-subtitle-2 mb-2">
-                        {{
-                            t('mediaPicker.selectedCount', {
-                                count: selectedFiles.length,
-                            })
-                        }}
-                    </div>
-                    <v-row>
-                        <v-col
-                            v-for="file in selectedFiles"
-                            :key="file.path"
-                            cols="6"
-                            md="4"
-                            lg="3"
-                        >
-                            <v-card
-                                variant="outlined"
-                                class="media-preview-card"
-                            >
-                                <v-img
-                                    v-if="isImage(file.mimeType)"
-                                    :src="file.path"
-                                    height="100"
-                                    cover
-                                />
-                                <v-icon
-                                    v-else
-                                    :icon="getMediaIcon(file.mimeType)"
-                                    size="48"
-                                    class="ma-4"
-                                />
-                                <v-card-text class="pa-2">
-                                    <div class="text-caption text-truncate">
-                                        {{ file.name }}
-                                    </div>
-                                </v-card-text>
-                            </v-card>
-                        </v-col>
-                    </v-row>
-                </div>
             </v-card-text>
         </v-card>
     </div>
@@ -96,14 +52,7 @@ import { open } from '@tauri-apps/plugin-dialog'
 import { getFileMetadata } from '../../services/transferService'
 import type { ContentItem } from '../../types'
 import { getContentFilterNameKey } from '../../types'
-import {
-    mdiImageMultiple,
-    mdiFolderOpen,
-    mdiFileImage,
-    mdiFileVideo,
-    mdiFileMusic,
-    mdiFile,
-} from '@mdi/js'
+import { mdiImageMultiple, mdiFolderOpen } from '@mdi/js'
 
 const { t } = useI18n()
 
@@ -112,7 +61,6 @@ const emit = defineEmits<{
 }>()
 
 const loading = ref(false)
-const selectedFiles = ref<ContentItem[]>([])
 const errorMessage = ref('')
 
 async function pickMedia() {
@@ -149,8 +97,8 @@ async function pickMedia() {
         })
 
         if (selected && Array.isArray(selected)) {
-            // 并行获取所有文件的元数据
-            selectedFiles.value = await Promise.all(
+            // 并行获取所有文件的元数据并逐个发送
+            await Promise.all(
                 selected.map(async (path) => {
                     const name = path.split(/[/\\]/).pop() || path
                     const extension = name.split('.').pop()?.toLowerCase() || ''
@@ -166,21 +114,16 @@ async function pickMedia() {
                         console.warn(`获取文件 ${name} 元数据失败：`, metaError)
                     }
 
-                    return {
+                    emit('select', {
                         type: 'media' as const,
                         path,
                         name,
                         size,
                         mimeType,
                         createdAt: Date.now(),
-                    }
+                    })
                 })
             )
-
-            // 如果有文件，发送第一个（后续可改为多选）
-            if (selectedFiles.value.length > 0) {
-                emit('select', selectedFiles.value[0])
-            }
         }
         // 用户取消选择时不显示错误信息，静默关闭即可
     } catch (error) {
@@ -190,17 +133,6 @@ async function pickMedia() {
     } finally {
         loading.value = false
     }
-}
-
-function isImage(mimeType: string): boolean {
-    return mimeType.startsWith('image/')
-}
-
-function getMediaIcon(mimeType: string) {
-    if (mimeType.startsWith('image/')) return mdiFileImage
-    if (mimeType.startsWith('video/')) return mdiFileVideo
-    if (mimeType.startsWith('audio/')) return mdiFileMusic
-    return mdiFile
 }
 
 function getMimeType(extension: string): string {
@@ -229,10 +161,6 @@ function getMimeType(extension: string): string {
 </script>
 
 <style scoped>
-.media-preview-card {
-    height: 100%;
-}
-
 .picker-btn {
     display: grid !important;
     grid-template-columns: auto 1fr auto;

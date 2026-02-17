@@ -536,3 +536,127 @@ pub async fn get_file_metadata(file_path: String) -> Result<FileMetadata, String
 
     Ok(file_metadata)
 }
+
+/// 文件信息
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct FileInfo {
+    /// 文件路径
+    pub path: String,
+    /// 文件名
+    pub name: String,
+    /// 文件大小
+    pub size: u64,
+    /// 相对路径
+    pub relative_path: String,
+}
+/// 递归获取文件夹下的所有文件
+#[tauri::command]
+pub async fn get_files_in_folder(folder_path: String) -> Result<Vec<FileInfo>, String> {
+    let folder = PathBuf::from(&folder_path);
+
+    if !folder.exists() {
+        return Err(format!("文件夹不存在：{}", folder_path));
+    }
+
+    if !folder.is_dir() {
+        return Err(format!("路径不是文件夹：{}", folder_path));
+    }
+
+    // 验证路径合法性（防止路径遍历攻击）
+    let canonical_folder = folder
+        .canonicalize()
+        .map_err(|e| format!("路径验证失败：{}", e))?;
+
+    let mut files = Vec::new();
+    collect_files_recursive(&canonical_folder, &canonical_folder, &mut files)
+        .map_err(|e| e.to_string())?;
+
+    Ok(files)
+}
+
+/// 递归收集文件
+fn collect_files_recursive(
+    current_dir: &PathBuf,
+    base_dir: &PathBuf,
+    files: &mut Vec<FileInfo>,
+) -> std::io::Result<()> {
+    for entry in std::fs::read_dir(current_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        // 计算相对路径
+        let relative_path = path
+            .strip_prefix(base_dir)
+            .unwrap_or(&path)
+            .to_string_lossy()
+            .to_string();
+
+        if path.is_dir() {
+            // 递归处理子目录
+            collect_files_recursive(&path, base_dir, files)?;
+        } else if path.is_file() {
+            // 添加文件信息
+            let name = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("unknown")
+                .to_string();
+
+            let metadata = std::fs::metadata(&path)?;
+            let size = metadata.len();
+
+            files.push(FileInfo {
+                path: path.to_string_lossy().to_string(),
+                name,
+                size,
+                relative_path,
+            });
+        }
+    }
+
+    Ok(())
+}
+
+/// 将剪贴板内容保存为临时文件
+#[tauri::command]
+pub async fn save_clipboard_to_temp(content: String) -> Result<String, String> {
+    // 获取系统临时目录
+    let temp_dir = std::env::temp_dir().join("puresend");
+
+    // 确保临时目录存在
+    std::fs::create_dir_all(&temp_dir).map_err(|e| format!("创建临时目录失败：{}", e))?;
+
+    // 生成唯一文件名
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| format!("获取时间戳失败：{}", e))?;
+    let file_name = format!("clipboard_{}.txt", timestamp.as_millis());
+    let temp_file = temp_dir.join(&file_name);
+
+    // 写入内容
+    std::fs::write(&temp_file, &content).map_err(|e| format!("写入文件失败：{}", e))?;
+
+    Ok(temp_file.to_string_lossy().to_string())
+}
+
+/// 清理临时文件
+#[tauri::command]
+pub async fn cleanup_temp_file(file_path: String) -> Result<(), String> {
+    let path = PathBuf::from(&file_path);
+
+    // 验证路径在临时目录内（安全检查）
+    let temp_dir = std::env::temp_dir().join("puresend");
+    let canonical_path = path
+        .canonicalize()
+        .map_err(|e| format!("路径验证失败：{}", e))?;
+
+    if !canonical_path.starts_with(&temp_dir) {
+        return Err("只能清理临时目录中的文件".to_string());
+    }
+
+    if canonical_path.exists() {
+        std::fs::remove_file(&canonical_path).map_err(|e| format!("删除文件失败：{}", e))?;
+    }
+
+    Ok(())
+}

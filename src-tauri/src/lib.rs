@@ -16,6 +16,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(TransferState::new())
         .manage(DiscoveryState::new())
@@ -36,6 +37,9 @@ pub fn run() {
             commands::stop_receiving,
             commands::get_receive_directory,
             commands::set_receive_directory,
+            commands::get_files_in_folder,
+            commands::save_clipboard_to_temp,
+            commands::cleanup_temp_file,
             // 设备发现命令
             commands::init_discovery,
             commands::stop_discovery,

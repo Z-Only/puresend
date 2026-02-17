@@ -202,7 +202,7 @@
     "title": "Enter Text Content",
     "placeholder": "Enter or paste text content",
     "charCount": "Characters",
-    "confirmSend": "Confirm Send",
+    "addToSend": "Add Text",
     "content": "Text Content"
   },
   "mediaPicker": {
@@ -228,5 +228,20 @@
     "error": "An error occurred",
     "success": "Success",
     "add": "Add"
+  },
+  "selectedFiles": {
+    "title": "Selected Files",
+    "count": "{count} files",
+    "stats": "{count} files selected, total {size}",
+    "mediaCount": "{count} media files",
+    "empty": "No files selected. Please select files to send",
+    "clearAll": "Clear All",
+    "tempFile": "Temp File",
+    "limitReached": "File limit reached ({limit} files)",
+    "added": "{count} file(s) added",
+    "duplicate": "File already exists, skipped",
+    "duplicates": "{count} file(s) already exist, skipped",
+    "limitExceeded": "{count} file(s) exceeded limit, not added",
+    "noFilesAdded": "No files were added"
   }
 }

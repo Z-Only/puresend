@@ -202,7 +202,7 @@
     "title": "输入文本内容",
     "placeholder": "输入或粘贴文本内容",
     "charCount": "字符数",
-    "confirmSend": "确认发送",
+    "addToSend": "添加文本",
     "content": "文本内容"
   },
   "mediaPicker": {
@@ -228,5 +228,20 @@
     "error": "发生错误",
     "success": "操作成功",
     "add": "添加"
+  },
+  "selectedFiles": {
+    "title": "已选文件",
+    "count": "{count} 个文件",
+    "stats": "已选择 {count} 个文件，共 {size}",
+    "mediaCount": "其中 {count} 个媒体文件",
+    "empty": "暂无已选文件，请选择要发送的文件",
+    "clearAll": "全部清空",
+    "tempFile": "临时文件",
+    "limitReached": "已达到文件数量上限（{limit} 个）",
+    "added": "已添加 {count} 个文件",
+    "duplicate": "文件已存在，已跳过",
+    "duplicates": "{count} 个文件已存在，已跳过",
+    "limitExceeded": "{count} 个文件超出上限，未添加",
+    "noFilesAdded": "没有文件被添加"
   }
 }

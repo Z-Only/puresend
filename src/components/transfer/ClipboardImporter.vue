@@ -19,6 +19,13 @@
                             {{ clipboardContent }}
                         </div>
                     </v-card>
+                    <div class="text-caption text-grey mt-2">
+                        {{
+                            t('clipboardImporter.charCount', {
+                                count: clipboardContent.length,
+                            })
+                        }}
+                    </div>
                 </div>
 
                 <v-alert
@@ -65,18 +72,26 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { readText } from '@tauri-apps/plugin-clipboard-manager'
+import { invoke } from '@tauri-apps/api/core'
 import type { ContentItem } from '../../types'
 import { mdiClipboard } from '@mdi/js'
 
 const { t } = useI18n()
 
+/** 带临时文件信息的内容项 */
+interface ClipboardContentItem extends ContentItem {
+    content?: string
+    tempPath?: string
+}
+
 const emit = defineEmits<{
-    (e: 'select', item: ContentItem): void
+    (e: 'select', item: ClipboardContentItem): void
 }>()
 
 const loading = ref(false)
 const clipboardContent = ref('')
 const errorMessage = ref('')
+const tempFilePath = ref<string | null>(null)
 
 async function importFromClipboard() {
     loading.value = true
@@ -100,19 +115,52 @@ async function importFromClipboard() {
     }
 }
 
-function confirmImport() {
+/**
+ * 将剪贴板内容保存为临时文件
+ */
+async function saveToTempFile(content: string): Promise<string> {
+    try {
+        const tempPath = await invoke<string>('save_clipboard_to_temp', {
+            content,
+        })
+        return tempPath
+    } catch (error) {
+        console.warn('保存临时文件失败，使用内存路径:', error)
+        // 如果后端不支持，使用虚拟路径
+        return `clipboard://temp/${Date.now()}.txt`
+    }
+}
+
+async function confirmImport() {
     if (!clipboardContent.value) return
 
-    const item: ContentItem = {
-        type: 'clipboard',
-        path: 'clipboard://current',
-        name: t('clipboardImporter.content'),
-        size: clipboardContent.value.length,
-        mimeType: 'text/plain',
-        createdAt: Date.now(),
-    }
+    loading.value = true
+    try {
+        // 将剪贴板内容保存为临时文本文件
+        const tempPath = await saveToTempFile(clipboardContent.value)
+        tempFilePath.value = tempPath
 
-    emit('select', item)
+        const item: ClipboardContentItem = {
+            type: 'clipboard',
+            path: tempPath,
+            name: `${t('clipboardImporter.content')}_${Date.now()}.txt`,
+            size: new Blob([clipboardContent.value]).size,
+            mimeType: 'text/plain',
+            createdAt: Date.now(),
+            content: clipboardContent.value,
+            tempPath,
+        }
+
+        emit('select', item)
+    } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error)
+        errorMessage.value = t('clipboardImporter.saveFailed', {
+            error: errorMsg,
+        })
+        console.error('保存剪贴板内容失败:', error)
+    } finally {
+        loading.value = false
+    }
 }
 </script>
 

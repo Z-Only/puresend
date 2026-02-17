@@ -30,7 +30,7 @@
                     class="text-center"
                     @click="confirmText"
                 >
-                    {{ t('textInput.confirmSend') }}
+                    {{ t('textInput.addToSend') }}
                 </v-btn>
             </v-card-text>
         </v-card>

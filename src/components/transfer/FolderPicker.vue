@@ -34,27 +34,6 @@
                 >
                     {{ errorMessage }}
                 </v-alert>
-
-                <!-- 已选择的文件夹信息 -->
-                <div v-if="selectedFolder" class="mt-4">
-                    <v-divider class="mb-3" />
-                    <div class="d-flex align-center">
-                        <v-icon
-                            :icon="mdiFolder"
-                            size="40"
-                            color="primary"
-                            class="mr-3"
-                        />
-                        <div class="flex-grow-1">
-                            <div class="text-subtitle-1">
-                                {{ selectedFolder.name }}
-                            </div>
-                            <div class="text-body-2 text-grey">
-                                {{ selectedFolder.path }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </v-card-text>
         </v-card>
     </div>
@@ -64,19 +43,48 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { open } from '@tauri-apps/plugin-dialog'
-import { getFileMetadata } from '../../services/transferService'
+import { invoke } from '@tauri-apps/api/core'
 import type { ContentItem } from '../../types'
 import { mdiFolder, mdiFolderOpen } from '@mdi/js'
 
 const { t } = useI18n()
 
+/** 文件信息接口 */
+interface FileInfo {
+    path: string
+    name: string
+    size: number
+    relative_path: string
+}
+
+/** 带文件列表的内容项 */
+interface FolderContentItem extends ContentItem {
+    files?: FileInfo[]
+}
+
 const emit = defineEmits<{
-    (e: 'select', item: ContentItem): void
+    (e: 'select', item: FolderContentItem): void
 }>()
 
 const loading = ref(false)
-const selectedFolder = ref<ContentItem | null>(null)
+const selectedFolder = ref<FolderContentItem | null>(null)
 const errorMessage = ref('')
+const fileCount = ref(0)
+
+/**
+ * 递归获取文件夹下的所有文件
+ */
+async function getFilesInFolder(folderPath: string): Promise<FileInfo[]> {
+    try {
+        const files = await invoke<FileInfo[]>('get_files_in_folder', {
+            folderPath,
+        })
+        return files || []
+    } catch (error) {
+        console.warn('获取文件夹文件列表失败:', error)
+        return []
+    }
+}
 
 async function pickFolder() {
     loading.value = true
@@ -91,22 +99,33 @@ async function pickFolder() {
         if (selected && typeof selected === 'string') {
             const name = selected.split(/[/\\]/).pop() || selected
 
-            // 获取文件夹元数据
-            let size = 0
-            try {
-                const metadata = await getFileMetadata(selected)
-                size = metadata.size
-            } catch (metaError) {
-                console.warn('获取文件夹元数据失败:', metaError)
-            }
+            // 获取文件夹下的所有文件
+            const files = await getFilesInFolder(selected)
+            fileCount.value = files.length
+
+            // 计算总大小
+            const totalSize = files.reduce((sum, f) => sum + f.size, 0)
+
+            // 验证路径合法性（防止路径遍历攻击）
+            const normalizedPath = selected.replace(/\\/g, '/')
 
             selectedFolder.value = {
                 type: 'folder',
-                path: selected,
+                path: normalizedPath,
                 name,
-                size,
+                size: totalSize,
                 mimeType: 'application/x-directory',
                 createdAt: Date.now(),
+                files: files.map((f) => ({
+                    ...f,
+                    path: f.path?.replace(/\\/g, '/') || f.path,
+                    relative_path: f.relative_path?.replace(/\\/g, '/') || '',
+                })),
+            }
+
+            // 如果文件夹为空，显示提示但仍发送事件
+            if (files.length === 0) {
+                errorMessage.value = t('folderPicker.emptyFolder')
             }
 
             emit('select', selectedFolder.value)

@@ -50,32 +50,6 @@
             >
                 {{ errorMessage }}
             </v-alert>
-
-            <!-- 已选择的文件 -->
-            <div v-if="selectedFile" class="mt-6 w-100">
-                <v-divider class="mb-4" />
-                <div class="d-flex align-center">
-                    <v-icon
-                        :icon="getFileIcon(selectedFile.type)"
-                        size="40"
-                        class="mr-3"
-                    />
-                    <div class="flex-grow-1 overflow-hidden">
-                        <div class="text-subtitle-1 text-truncate">
-                            {{ selectedFile.name }}
-                        </div>
-                        <div class="text-body-2 text-grey">
-                            {{ formatSize(selectedFile.size) }}
-                        </div>
-                    </div>
-                    <v-btn
-                        :icon="mdiClose"
-                        variant="text"
-                        size="small"
-                        @click.stop="clearFile"
-                    />
-                </div>
-            </div>
         </v-card-text>
     </v-card>
 </template>
@@ -84,13 +58,9 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { open } from '@tauri-apps/plugin-dialog'
-import {
-    formatFileSize as formatSize,
-    getFileIcon,
-    inferMimeType,
-} from '../../types'
+import { inferMimeType } from '../../types'
 import { getFileMetadata } from '../../services/transferService'
-import { mdiCloudUpload, mdiFilePlus, mdiFolderOpen, mdiClose } from '@mdi/js'
+import { mdiCloudUpload, mdiFilePlus, mdiFolderOpen } from '@mdi/js'
 
 const { t } = useI18n()
 
@@ -195,12 +165,6 @@ async function openFileDialog() {
         // 确保加载状态一定会重置
         loading.value = false
     }
-}
-
-function clearFile() {
-    selectedFile.value = null
-    errorMessage.value = ''
-    emit('clear')
 }
 </script>
 
