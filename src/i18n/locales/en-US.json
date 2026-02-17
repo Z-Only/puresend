@@ -31,15 +31,193 @@
     "dragDropHint": "Drag and drop files here",
     "send": "Send",
     "receive": "Receive",
-    "progress": "Progress",
     "completed": "Completed",
     "failed": "Failed",
-    "cancelled": "Cancelled"
+    "cancelled": "Cancelled",
+    "mode": {
+      "title": "Select Transfer Mode",
+      "local": {
+        "title": "Local Network",
+        "description": "Direct transfer via LAN, fast speed"
+      },
+      "cloud": {
+        "title": "Cloud Relay",
+        "description": "Transfer via cloud, cross-network"
+      },
+      "noDeviceHint": "No available devices found. Please ensure the target device has PureSend open",
+      "cloudComingSoon": "Cloud relay feature coming soon"
+    },
+    "status": {
+      "pending": "Pending",
+      "transferring": "Transferring",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    },
+    "progress": {
+      "transferred": "Transferred",
+      "speed": "Speed",
+      "timeRemaining": "Time Remaining",
+      "mode": "Transfer Mode",
+      "localNetwork": "Local Network",
+      "cloudTransfer": "Cloud Relay",
+      "cancelTransfer": "Cancel Transfer",
+      "retry": "Retry",
+      "remove": "Remove",
+      "unknownFile": "Unknown File"
+    },
+    "time": {
+      "seconds": "{count} seconds",
+      "minutesSeconds": "{minutes} min {seconds} sec",
+      "hoursMinutes": "{hours} hr {minutes} min"
+    }
   },
   "history": {
     "title": "Transfer History",
-    "empty": "No transfer records",
-    "clear": "Clear History"
+    "empty": "No transfer history",
+    "emptyHint": "Completed transfers will appear here",
+    "clear": "Clear History",
+    "unknownDevice": "Unknown Device"
+  },
+  "peer": {
+    "nearbyDevices": "Nearby Devices",
+    "noDevices": "No devices found",
+    "noDevicesHint": "Please ensure the target device has PureSend open",
+    "addManual": "Add Device Manually",
+    "addDevice": "Add Device",
+    "ipAddress": "IP Address",
+    "port": "Port",
+    "status": {
+      "available": "Online",
+      "busy": "Busy",
+      "offline": "Offline"
+    },
+    "deviceType": {
+      "desktop": "Desktop",
+      "mobile": "Mobile",
+      "web": "Web",
+      "unknown": "Unknown"
+    },
+    "validation": {
+      "enterIp": "Please enter an IP address",
+      "invalidIp": "Please enter a valid IP address"
+    }
+  },
+  "content": {
+    "type": {
+      "file": {
+        "label": "File",
+        "description": "Select a single file to transfer"
+      },
+      "folder": {
+        "label": "Folder",
+        "description": "Select an entire folder to transfer"
+      },
+      "clipboard": {
+        "label": "Clipboard",
+        "description": "Import text content from clipboard"
+      },
+      "text": {
+        "label": "Text",
+        "description": "Enter or paste text content"
+      },
+      "media": {
+        "label": "Media",
+        "description": "Select images, videos, or audio files"
+      },
+      "app": {
+        "label": "App",
+        "description": "Select installed applications"
+      }
+    },
+    "filter": {
+      "media": "Media Files",
+      "app": "Applications"
+    }
+  },
+  "send": {
+    "tasks": "Send Tasks",
+    "cleanup": "Clear Completed",
+    "noTasks": "No send tasks",
+    "selectFileToStart": "Select a file to start sending",
+    "selectTargetDevice": "Please select a target device",
+    "prepareFailed": "Failed to prepare transfer",
+    "sendFailed": "Send failed: {error}"
+  },
+  "receive": {
+    "networkInfo": "Network Info",
+    "viewNetworkInfo": "View Network Info",
+    "clickToViewNetwork": "Click \"View Network Info\" to get network information",
+    "mode": "Receive Mode",
+    "localNetwork": "Local Network",
+    "cloudTransferDev": "Cloud Relay (In Development)",
+    "receiveDirectory": "Receive Directory",
+    "saveLocation": "File Save Location",
+    "startReceiving": "Start Receiving",
+    "stopReceiving": "Stop Receiving",
+    "tasks": "Receive Tasks",
+    "noTasks": "No receive tasks",
+    "waitingForSender": "Waiting for sender to connect",
+    "clickToStart": "Click start receiving to wait for connection",
+    "getNetworkInfoFailed": "Failed to get network info: {error}",
+    "startFailed": "Failed to start receiving: {error}",
+    "stopFailed": "Failed to stop receiving: {error}"
+  },
+  "network": {
+    "title": "Network Info",
+    "listeningAddress": "Listening Address",
+    "scanToConnect": "Scan to Connect",
+    "shareCode": "Share Code",
+    "connectionHint": "Other devices can connect to your device by scanning the QR code or entering the share code",
+    "copiedToClipboard": "Copied to clipboard"
+  },
+  "fileSelector": {
+    "releaseToUpload": "Release to upload",
+    "dragDropHint": "Drag and drop files here",
+    "orClickToSelect": "or click to select files",
+    "selectFile": "Select File",
+    "noFileDetected": "No file detected from drag",
+    "handleDragFailed": "Failed to handle dragged file: {error}",
+    "selectFileToTransfer": "Select a file to transfer",
+    "openDialogFailed": "Failed to open file dialog: {error}"
+  },
+  "clipboardImporter": {
+    "title": "Import from Clipboard",
+    "preview": "Preview",
+    "reRead": "Re-read",
+    "readClipboard": "Read Clipboard",
+    "confirmImport": "Confirm Import",
+    "clipboardEmpty": "Clipboard is empty. Please copy some text content first",
+    "readFailed": "Failed to read clipboard: {error}",
+    "content": "Clipboard Content"
+  },
+  "folderPicker": {
+    "title": "Select Folder",
+    "description": "Select an entire folder to transfer",
+    "selectFolder": "Select Folder",
+    "noFolderSelected": "No folder selected",
+    "selectFailed": "Failed to select folder: {error}"
+  },
+  "textInput": {
+    "title": "Enter Text Content",
+    "placeholder": "Enter or paste text content",
+    "charCount": "Characters",
+    "confirmSend": "Confirm Send",
+    "content": "Text Content"
+  },
+  "mediaPicker": {
+    "title": "Select Media Files",
+    "description": "Supports images, videos, and audio files",
+    "selectMedia": "Select Media Files",
+    "selectedCount": "{count} files selected",
+    "selectFailed": "Failed to select media files: {error}"
+  },
+  "appPicker": {
+    "title": "Select Application",
+    "description": "Select installed applications to transfer",
+    "selectApp": "Select App",
+    "version": "Version: {version}",
+    "selectFailed": "Failed to select app: {error}"
   },
   "common": {
     "confirm": "Confirm",
@@ -48,6 +226,7 @@
     "reset": "Reset",
     "loading": "Loading...",
     "error": "An error occurred",
-    "success": "Success"
+    "success": "Success",
+    "add": "Add"
   }
 }

@@ -9,13 +9,13 @@
                         class="mr-2"
                         color="primary"
                     />
-                    <span class="text-subtitle-1 font-weight-bold"
-                        >选择媒体文件</span
-                    >
+                    <span class="text-subtitle-1 font-weight-bold">
+                        {{ t('mediaPicker.title') }}
+                    </span>
                 </div>
 
                 <div class="text-body-2 text-grey mb-3">
-                    支持图片、视频、音频文件
+                    {{ t('mediaPicker.description') }}
                 </div>
 
                 <v-btn
@@ -26,7 +26,9 @@
                     @click="pickMedia"
                 >
                     <v-icon :icon="mdiFolderOpen" />
-                    <span class="btn-text">选择媒体文件</span>
+                    <span class="btn-text">{{
+                        t('mediaPicker.selectMedia')
+                    }}</span>
                 </v-btn>
 
                 <v-alert
@@ -43,7 +45,11 @@
                 <div v-if="selectedFiles.length > 0" class="mt-4">
                     <v-divider class="mb-3" />
                     <div class="text-subtitle-2 mb-2">
-                        已选择 {{ selectedFiles.length }} 个文件
+                        {{
+                            t('mediaPicker.selectedCount', {
+                                count: selectedFiles.length,
+                            })
+                        }}
                     </div>
                     <v-row>
                         <v-col
@@ -85,9 +91,11 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { open } from '@tauri-apps/plugin-dialog'
 import { getFileMetadata } from '../../services/transferService'
 import type { ContentItem } from '../../types'
+import { getContentFilterNameKey } from '../../types'
 import {
     mdiImageMultiple,
     mdiFolderOpen,
@@ -96,6 +104,8 @@ import {
     mdiFileMusic,
     mdiFile,
 } from '@mdi/js'
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
     (e: 'select', item: ContentItem): void
@@ -113,7 +123,10 @@ async function pickMedia() {
             multiple: true,
             filters: [
                 {
-                    name: '媒体文件',
+                    name: t(
+                        getContentFilterNameKey('media') ||
+                            'content.filter.media'
+                    ),
                     extensions: [
                         'jpg',
                         'jpeg',
@@ -172,7 +185,7 @@ async function pickMedia() {
         // 用户取消选择时不显示错误信息，静默关闭即可
     } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error)
-        errorMessage.value = `选择媒体文件失败：${errorMsg}`
+        errorMessage.value = t('mediaPicker.selectFailed', { error: errorMsg })
         console.error('选择媒体文件失败:', error)
     } finally {
         loading.value = false

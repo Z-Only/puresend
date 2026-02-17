@@ -81,6 +81,11 @@ export function getStatusText(status: TaskStatus): string {
     return statusTexts[status]
 }
 
+/** 获取状态 i18n 键 */
+export function getStatusKey(status: TaskStatus): string {
+    return `transfer.status.${status}`
+}
+
 /** 获取状态颜色 */
 export function getStatusColor(status: TaskStatus): string {
     const statusColors: Record<TaskStatus, string> = {

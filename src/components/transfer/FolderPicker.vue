@@ -5,13 +5,13 @@
             <v-card-text>
                 <div class="d-flex align-center mb-3">
                     <v-icon :icon="mdiFolder" class="mr-2" color="primary" />
-                    <span class="text-subtitle-1 font-weight-bold"
-                        >选择文件夹</span
-                    >
+                    <span class="text-subtitle-1 font-weight-bold">
+                        {{ t('folderPicker.title') }}
+                    </span>
                 </div>
 
                 <div class="text-body-2 text-grey mb-3">
-                    选择整个文件夹进行传输
+                    {{ t('folderPicker.description') }}
                 </div>
 
                 <v-btn
@@ -22,7 +22,7 @@
                     @click="pickFolder"
                 >
                     <v-icon :icon="mdiFolderOpen" class="mr-2" />
-                    选择文件夹
+                    {{ t('folderPicker.selectFolder') }}
                 </v-btn>
 
                 <v-alert
@@ -62,10 +62,13 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { open } from '@tauri-apps/plugin-dialog'
 import { getFileMetadata } from '../../services/transferService'
 import type { ContentItem } from '../../types'
 import { mdiFolder, mdiFolderOpen } from '@mdi/js'
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
     (e: 'select', item: ContentItem): void
@@ -82,7 +85,7 @@ async function pickFolder() {
         const selected = await open({
             multiple: false,
             directory: true,
-            title: '选择文件夹',
+            title: t('folderPicker.selectFolder'),
         })
 
         if (selected && typeof selected === 'string') {
@@ -108,11 +111,11 @@ async function pickFolder() {
 
             emit('select', selectedFolder.value)
         } else {
-            errorMessage.value = '未选择任何文件夹'
+            errorMessage.value = t('folderPicker.noFolderSelected')
         }
     } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error)
-        errorMessage.value = `选择文件夹失败：${errorMsg}`
+        errorMessage.value = t('folderPicker.selectFailed', { error: errorMsg })
         console.error('选择文件夹失败:', error)
     } finally {
         loading.value = false

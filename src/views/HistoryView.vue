@@ -3,7 +3,7 @@
     <v-container fluid class="history-view">
         <v-card>
             <v-card-title class="d-flex align-center justify-space-between">
-                <span>传输历史</span>
+                <span>{{ t('history.title') }}</span>
                 <v-btn
                     v-if="history.length > 0"
                     color="error"
@@ -11,7 +11,7 @@
                     size="small"
                     @click="handleClearAll"
                 >
-                    清空历史
+                    {{ t('history.clear') }}
                 </v-btn>
             </v-card-title>
 
@@ -28,9 +28,9 @@
                     color="grey"
                     class="mb-4"
                 />
-                <div class="text-h6 text-grey">暂无传输历史</div>
+                <div class="text-h6 text-grey">{{ t('history.empty') }}</div>
                 <div class="text-body-2 text-grey">
-                    完成文件传输后将显示在此处
+                    {{ t('history.emptyHint') }}
                 </div>
             </v-card-text>
 
@@ -59,7 +59,9 @@
                                 formatSize(item.fileSize)
                             }}</span>
                             <span class="mr-2">•</span>
-                            <span class="mr-2">{{ item.peerName }}</span>
+                            <span class="mr-2">{{
+                                item.peerName || t('history.unknownDevice')
+                            }}</span>
                             <span class="mr-2">•</span>
                             <span>{{ formatTime(item.completedAt) }}</span>
                         </v-list-item-subtitle>
@@ -70,7 +72,7 @@
                                 size="small"
                                 variant="flat"
                             >
-                                {{ getStatusText(item.status) }}
+                                {{ t(getStatusKey(item.status)) }}
                             </v-chip>
                         </template>
                     </v-list-item>
@@ -84,9 +86,12 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { TaskStatus, TransferDirection } from '../types'
-import { getStatusText as getStatusTextFn, formatFileSize } from '../types'
+import { getStatusKey, formatFileSize } from '../types'
 import { mdiHistory, mdiArrowUp, mdiArrowDown } from '@mdi/js'
+
+const { t } = useI18n()
 
 interface HistoryItem {
     id: string
@@ -109,10 +114,6 @@ function getStatusColor(status: TaskStatus): string {
         cancelled: 'warning',
     }
     return colors[status]
-}
-
-function getStatusText(status: TaskStatus): string {
-    return getStatusTextFn(status)
 }
 
 function getDirectionIcon(direction: TransferDirection): string {
@@ -163,7 +164,7 @@ function setupHistoryListener() {
                     id: task.id,
                     fileName: task.file.name,
                     fileSize: task.file.size,
-                    peerName: task.peer?.name || '未知设备',
+                    peerName: task.peer?.name || t('history.unknownDevice'),
                     status: task.status,
                     direction: task.direction,
                     completedAt: task.completedAt || Date.now(),

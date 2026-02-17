@@ -2,7 +2,7 @@
 <template>
     <v-card class="peer-list">
         <v-card-title class="d-flex align-center justify-space-between">
-            <span class="text-subtitle-1">附近设备</span>
+            <span class="text-subtitle-1">{{ t('peer.nearbyDevices') }}</span>
             <v-btn
                 :icon="mdiRefresh"
                 variant="text"
@@ -24,9 +24,11 @@
                     color="grey"
                     class="mb-2"
                 />
-                <div class="text-body-1 text-grey">未发现设备</div>
+                <div class="text-body-1 text-grey">
+                    {{ t('peer.noDevices') }}
+                </div>
                 <div class="text-body-2 text-grey mt-1">
-                    请确保目标设备已打开 PureSend
+                    {{ t('peer.noDevicesHint') }}
                 </div>
             </div>
 
@@ -62,7 +64,7 @@
                             size="x-small"
                             variant="flat"
                         >
-                            {{ getStatusText(peer.status) }}
+                            {{ t(getPeerStatusKey(peer.status)) }}
                         </v-chip>
                     </template>
                 </v-list-item>
@@ -79,40 +81,40 @@
                 @click="showAddDialog = true"
             >
                 <v-icon :icon="mdiPlus" class="mr-1" />
-                手动添加设备
+                {{ t('peer.addManual') }}
             </v-btn>
         </v-card-actions>
 
         <!-- 手动添加对话框 -->
         <v-dialog v-model="showAddDialog" max-width="400">
             <v-card>
-                <v-card-title>添加设备</v-card-title>
+                <v-card-title>{{ t('peer.addDevice') }}</v-card-title>
                 <v-card-text>
                     <v-text-field
                         v-model="manualIp"
-                        label="IP 地址"
+                        :label="t('peer.ipAddress')"
                         placeholder="192.168.1.100"
                         :rules="[validateIp]"
                     />
                     <v-text-field
                         v-model.number="manualPort"
-                        label="端口"
+                        :label="t('peer.port')"
                         placeholder="5353"
                         type="number"
                     />
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer />
-                    <v-btn variant="text" @click="showAddDialog = false"
-                        >取消</v-btn
-                    >
+                    <v-btn variant="text" @click="showAddDialog = false">{{
+                        t('common.cancel')
+                    }}</v-btn>
                     <v-btn
                         color="primary"
                         variant="flat"
                         :disabled="!manualIp"
                         @click="handleAddManual"
                     >
-                        添加
+                        {{ t('common.add') }}
                     </v-btn>
                 </v-card-actions>
             </v-card>
@@ -122,8 +124,9 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { PeerInfo, PeerStatus, DeviceType } from '../../types'
-import { getPeerStatusText, getPeerStatusColor } from '../../types'
+import { getPeerStatusColor, getPeerStatusKey } from '../../types'
 import {
     mdiRefresh,
     mdiWifiOff,
@@ -133,6 +136,8 @@ import {
     mdiHelpCircle,
     mdiPlus,
 } from '@mdi/js'
+
+const { t } = useI18n()
 
 defineProps<{
     peers: PeerInfo[]
@@ -149,10 +154,6 @@ const emit = defineEmits<{
 const showAddDialog = ref(false)
 const manualIp = ref('')
 const manualPort = ref(5353)
-
-function getStatusText(status: PeerStatus): string {
-    return getPeerStatusText(status)
-}
 
 function getStatusColor(status: PeerStatus): string {
     return getPeerStatusColor(status)
@@ -177,9 +178,9 @@ function handleRefresh() {
 }
 
 function validateIp(value: string): boolean | string {
-    if (!value) return '请输入 IP 地址'
+    if (!value) return t('peer.validation.enterIp')
     const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/
-    if (!ipRegex.test(value)) return '请输入有效的 IP 地址'
+    if (!ipRegex.test(value)) return t('peer.validation.invalidIp')
     return true
 }
 

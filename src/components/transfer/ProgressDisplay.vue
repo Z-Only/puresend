@@ -13,10 +13,13 @@
                 />
                 <div class="flex-grow-1 overflow-hidden">
                     <div class="text-subtitle-1 text-truncate">
-                        {{ task?.file.name || '未知文件' }}
+                        {{
+                            task?.file.name ||
+                            t('transfer.progress.unknownFile')
+                        }}
                     </div>
                     <div class="text-body-2 text-grey">
-                        {{ getStatusText(task?.status || 'pending') }}
+                        {{ t(getStatusKey(task?.status || 'pending')) }}
                         <span v-if="task?.peer"> → {{ task.peer.name }}</span>
                     </div>
                 </div>
@@ -37,28 +40,40 @@
             <!-- 传输详情 -->
             <v-row dense>
                 <v-col cols="6">
-                    <div class="text-body-2 text-grey">已传输</div>
+                    <div class="text-body-2 text-grey">
+                        {{ t('transfer.progress.transferred') }}
+                    </div>
                     <div class="text-subtitle-2">
                         {{ formatSize(task?.transferredBytes || 0) }} /
                         {{ formatSize(task?.file.size || 0) }}
                     </div>
                 </v-col>
                 <v-col cols="6">
-                    <div class="text-body-2 text-grey">传输速度</div>
+                    <div class="text-body-2 text-grey">
+                        {{ t('transfer.progress.speed') }}
+                    </div>
                     <div class="text-subtitle-2">
                         {{ formatSpeed(task?.speed || 0) }}
                     </div>
                 </v-col>
                 <v-col cols="6">
-                    <div class="text-body-2 text-grey">预估剩余时间</div>
+                    <div class="text-body-2 text-grey">
+                        {{ t('transfer.progress.timeRemaining') }}
+                    </div>
                     <div class="text-subtitle-2">
                         {{ formatTime(task?.estimatedTimeRemaining) }}
                     </div>
                 </v-col>
                 <v-col cols="6">
-                    <div class="text-body-2 text-grey">传输模式</div>
+                    <div class="text-body-2 text-grey">
+                        {{ t('transfer.progress.mode') }}
+                    </div>
                     <div class="text-subtitle-2">
-                        {{ task?.mode === 'local' ? '本地网络' : '云盘中转' }}
+                        {{
+                            task?.mode === 'local'
+                                ? t('transfer.progress.localNetwork')
+                                : t('transfer.progress.cloudTransfer')
+                        }}
                     </div>
                 </v-col>
             </v-row>
@@ -83,7 +98,7 @@
                     size="small"
                     @click="handleCancel"
                 >
-                    取消传输
+                    {{ t('transfer.progress.cancelTransfer') }}
                 </v-btn>
                 <v-btn
                     v-if="task?.status === 'failed'"
@@ -92,7 +107,7 @@
                     size="small"
                     @click="handleRetry"
                 >
-                    重试
+                    {{ t('transfer.progress.retry') }}
                 </v-btn>
                 <v-btn
                     v-if="
@@ -105,7 +120,7 @@
                     size="small"
                     @click="handleRemove"
                 >
-                    移除
+                    {{ t('transfer.progress.remove') }}
                 </v-btn>
             </div>
         </v-card-text>
@@ -114,8 +129,9 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { TransferTask } from '../../types'
-import { getStatusText, formatSpeed, formatTimeRemaining } from '../../types'
+import { getStatusKey, formatSpeed } from '../../types'
 import { formatFileSize } from '../../types/file'
 import {
     mdiClockOutline,
@@ -124,6 +140,8 @@ import {
     mdiAlertCircle,
     mdiCancel,
 } from '@mdi/js'
+
+const { t } = useI18n()
 
 const props = defineProps<{
     task: TransferTask | null
@@ -170,7 +188,18 @@ function formatSize(bytes: number): string {
 }
 
 function formatTime(seconds?: number): string {
-    return formatTimeRemaining(seconds)
+    if (!seconds) return '--'
+    if (seconds < 60) {
+        return t('transfer.time.seconds', { count: seconds })
+    } else if (seconds < 3600) {
+        const minutes = Math.floor(seconds / 60)
+        const secs = seconds % 60
+        return t('transfer.time.minutesSeconds', { minutes, seconds: secs })
+    } else {
+        const hours = Math.floor(seconds / 3600)
+        const minutes = Math.floor((seconds % 3600) / 60)
+        return t('transfer.time.hoursMinutes', { hours, minutes })
+    }
 }
 
 function handleCancel() {

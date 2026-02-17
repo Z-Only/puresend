@@ -11,12 +11,12 @@
                 v-for="type in contentTypes"
                 :key="type"
                 :value="type"
-                :title="getContentTypeInfo(type).description"
+                :title="t(getContentTypeInfo(type).descriptionKey)"
                 class="flex-grow-1 content-type-btn"
             >
                 <v-icon :icon="getContentTypeInfo(type).icon" />
                 <span class="btn-text">{{
-                    getContentTypeInfo(type).label
+                    t(getContentTypeInfo(type).labelKey)
                 }}</span>
             </v-btn>
         </v-btn-toggle>
@@ -25,8 +25,11 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { ContentType } from '../../types'
 import { getContentTypeInfo } from '../../types'
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
     (e: 'change', type: ContentType): void

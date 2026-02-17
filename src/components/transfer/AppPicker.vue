@@ -9,13 +9,13 @@
                         class="mr-2"
                         color="primary"
                     />
-                    <span class="text-subtitle-1 font-weight-bold"
-                        >选择应用程序</span
-                    >
+                    <span class="text-subtitle-1 font-weight-bold">
+                        {{ t('appPicker.title') }}
+                    </span>
                 </div>
 
                 <div class="text-body-2 text-grey mb-3">
-                    选择已安装的应用程序进行传输
+                    {{ t('appPicker.description') }}
                 </div>
 
                 <v-btn
@@ -26,7 +26,7 @@
                     @click="pickApp"
                 >
                     <v-icon :icon="mdiApps" />
-                    <span class="btn-text">选择应用</span>
+                    <span class="btn-text">{{ t('appPicker.selectApp') }}</span>
                 </v-btn>
 
                 <v-alert
@@ -57,7 +57,11 @@
                                 v-if="selectedApp.metadata?.version"
                                 class="text-body-2 text-grey"
                             >
-                                版本：{{ selectedApp.metadata.version }}
+                                {{
+                                    t('appPicker.version', {
+                                        version: selectedApp.metadata.version,
+                                    })
+                                }}
                             </div>
                             <div class="text-body-2 text-grey">
                                 {{ selectedApp.path }}
@@ -72,10 +76,14 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { open } from '@tauri-apps/plugin-dialog'
 import { getFileMetadata } from '../../services/transferService'
 import type { ContentItem } from '../../types'
+import { getContentFilterNameKey } from '../../types'
 import { mdiApplication, mdiApps } from '@mdi/js'
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
     (e: 'select', item: ContentItem): void
@@ -94,7 +102,9 @@ async function pickApp() {
             multiple: false,
             filters: [
                 {
-                    name: '应用程序',
+                    name: t(
+                        getContentFilterNameKey('app') || 'content.filter.app'
+                    ),
                     extensions: ['app', 'exe', 'dmg', 'pkg', 'deb', 'rpm'],
                 },
             ],
@@ -132,7 +142,7 @@ async function pickApp() {
         // 用户取消选择时不显示错误信息，静默关闭即可
     } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error)
-        errorMessage.value = `选择应用失败：${errorMsg}`
+        errorMessage.value = t('appPicker.selectFailed', { error: errorMsg })
         console.error('选择应用失败:', error)
     } finally {
         loading.value = false

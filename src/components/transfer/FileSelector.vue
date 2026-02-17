@@ -18,10 +18,16 @@
             />
 
             <div class="text-h6 mb-2">
-                {{ isDragover ? '松开以上传' : '拖拽文件到此处' }}
+                {{
+                    isDragover
+                        ? t('fileSelector.releaseToUpload')
+                        : t('fileSelector.dragDropHint')
+                }}
             </div>
 
-            <div class="text-body-2 text-grey mb-4">或点击选择文件</div>
+            <div class="text-body-2 text-grey mb-4">
+                {{ t('fileSelector.orClickToSelect') }}
+            </div>
 
             <v-btn
                 color="primary"
@@ -32,7 +38,7 @@
                 @click.stop="openFileDialog"
             >
                 <v-icon :icon="mdiFolderOpen" class="mr-2" />
-                选择文件
+                {{ t('fileSelector.selectFile') }}
             </v-btn>
 
             <v-alert
@@ -76,6 +82,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { open } from '@tauri-apps/plugin-dialog'
 import {
     formatFileSize as formatSize,
@@ -84,6 +91,8 @@ import {
 } from '../../types'
 import { getFileMetadata } from '../../services/transferService'
 import { mdiCloudUpload, mdiFilePlus, mdiFolderOpen, mdiClose } from '@mdi/js'
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
     (
@@ -131,11 +140,13 @@ async function handleDrop(event: DragEvent) {
 
             emit('select', selectedFile.value)
         } else {
-            errorMessage.value = '未检测到拖拽的文件'
+            errorMessage.value = t('fileSelector.noFileDetected')
         }
     } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error)
-        errorMessage.value = `处理拖拽文件失败：${errorMsg}`
+        errorMessage.value = t('fileSelector.handleDragFailed', {
+            error: errorMsg,
+        })
         console.error('处理拖拽文件失败:', error)
     }
 }
@@ -147,7 +158,7 @@ async function openFileDialog() {
     try {
         const selected = await open({
             multiple: false,
-            title: '选择要传输的文件',
+            title: t('fileSelector.selectFileToTransfer'),
         })
 
         if (selected && typeof selected === 'string') {
@@ -176,7 +187,9 @@ async function openFileDialog() {
         // 用户取消选择时不显示错误信息
     } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error)
-        errorMessage.value = `打开文件对话框失败：${errorMsg}`
+        errorMessage.value = t('fileSelector.openDialogFailed', {
+            error: errorMsg,
+        })
         console.error('打开文件对话框失败:', error)
     } finally {
         // 确保加载状态一定会重置

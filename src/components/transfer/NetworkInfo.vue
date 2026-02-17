@@ -3,12 +3,14 @@
     <v-card class="network-info">
         <v-card-title class="text-subtitle-1 d-flex align-center">
             <v-icon :icon="mdiWifi" class="mr-2" color="primary" />
-            网络信息
+            {{ t('network.title') }}
         </v-card-title>
         <v-card-text>
             <!-- IP 地址和端口 -->
             <div class="network-address mb-4">
-                <div class="text-body-2 text-grey mb-2">监听地址</div>
+                <div class="text-body-2 text-grey mb-2">
+                    {{ t('network.listeningAddress') }}
+                </div>
                 <v-text-field
                     :model-value="displayAddress"
                     readonly
@@ -21,7 +23,9 @@
 
             <!-- 二维码 -->
             <div class="qr-code-section text-center mb-4">
-                <div class="text-body-2 text-grey mb-2">扫码连接</div>
+                <div class="text-body-2 text-grey mb-2">
+                    {{ t('network.scanToConnect') }}
+                </div>
                 <v-sheet
                     class="qr-code-container d-inline-flex align-center justify-center"
                     elevation="2"
@@ -43,7 +47,9 @@
 
             <!-- 分享码 -->
             <div class="share-code-section">
-                <div class="text-body-2 text-grey mb-2">分享码</div>
+                <div class="text-body-2 text-grey mb-2">
+                    {{ t('network.shareCode') }}
+                </div>
                 <v-chip
                     :text="shareCode"
                     color="primary"
@@ -61,21 +67,24 @@
 
             <!-- 提示信息 -->
             <v-alert type="info" variant="tonal" density="compact" class="mt-4">
-                其他设备可以通过扫描二维码或输入分享码连接到您的设备
+                {{ t('network.connectionHint') }}
             </v-alert>
         </v-card-text>
 
         <!-- 复制成功提示 -->
         <v-snackbar v-model="showCopySuccess" color="success" timeout="2000">
-            已复制到剪贴板
+            {{ t('network.copiedToClipboard') }}
         </v-snackbar>
     </v-card>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import QRCode from 'qrcode'
 import { mdiWifi, mdiQrcode, mdiContentCopy } from '@mdi/js'
+
+const { t } = useI18n()
 
 const props = defineProps<{
     networkAddress: string

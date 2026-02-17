@@ -70,7 +70,7 @@
                     <v-card-title
                         class="d-flex align-center justify-space-between"
                     >
-                        <span>发送任务</span>
+                        <span>{{ t('send.tasks') }}</span>
                         <v-btn
                             v-if="transferStore.sendTasks.length > 0"
                             color="primary"
@@ -78,7 +78,7 @@
                             size="small"
                             @click="handleCleanup"
                         >
-                            清理已完成
+                            {{ t('send.cleanup') }}
                         </v-btn>
                     </v-card-title>
                 </v-card>
@@ -94,8 +94,10 @@
                         color="grey"
                         class="mb-4"
                     />
-                    <div class="text-h6 text-grey">暂无发送任务</div>
-                    <div class="text-body-2 text-grey">选择文件开始发送</div>
+                    <div class="text-h6 text-grey">{{ t('send.noTasks') }}</div>
+                    <div class="text-body-2 text-grey">
+                        {{ t('send.selectFileToStart') }}
+                    </div>
                 </div>
 
                 <!-- 任务列表 -->
@@ -131,6 +133,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
     FileSelector,
     ContentTypeSelector,
@@ -152,6 +155,7 @@ import type {
 } from '../types'
 import { mdiInboxArrowUp, mdiSend } from '@mdi/js'
 
+const { t } = useI18n()
 const transferStore = useTransferStore()
 const discoveryStore = useDiscoveryStore()
 
@@ -214,7 +218,7 @@ async function handleSend() {
     const peer = discoveryStore.selectedPeer
     if (!peer) {
         showError.value = true
-        errorMessage.value = '请选择目标设备'
+        errorMessage.value = t('send.selectTargetDevice')
         return
     }
 
@@ -224,7 +228,7 @@ async function handleSend() {
         // 准备文件传输（计算哈希等）
         const metadata = await transferStore.prepareTransfer(targetPath)
         if (!metadata) {
-            throw new Error('准备传输失败')
+            throw new Error(t('send.prepareFailed'))
         }
 
         // 发送文件
@@ -243,7 +247,7 @@ async function handleSend() {
         }
     } catch (error) {
         showError.value = true
-        errorMessage.value = `发送失败：${error}`
+        errorMessage.value = t('send.sendFailed', { error })
     } finally {
         sending.value = false
     }
@@ -268,7 +272,6 @@ async function handleRetry(task: TransferTask) {
 }
 
 function handleRemove(taskId: string) {
-    // 从列表中移除任务
     transferStore.tasks.delete(taskId)
 }
 

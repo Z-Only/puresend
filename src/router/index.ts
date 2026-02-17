@@ -5,25 +5,25 @@ const routes = [
         path: '/',
         name: 'Send',
         component: () => import('@/views/SendView.vue'),
-        meta: { title: '发送文件' },
+        meta: { titleKey: 'nav.send' },
     },
     {
         path: '/receive',
         name: 'Receive',
         component: () => import('@/views/ReceiveView.vue'),
-        meta: { title: '接收文件' },
+        meta: { titleKey: 'nav.receive' },
     },
     {
         path: '/history',
         name: 'History',
         component: () => import('@/views/HistoryView.vue'),
-        meta: { title: '传输历史' },
+        meta: { titleKey: 'nav.history' },
     },
     {
         path: '/settings',
         name: 'Settings',
         component: () => import('@/views/SettingsView.vue'),
-        meta: { title: '设置' },
+        meta: { titleKey: 'nav.settings' },
     },
 ]
 

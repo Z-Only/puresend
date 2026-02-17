@@ -5,14 +5,14 @@
             <v-card-text>
                 <div class="d-flex align-center mb-3">
                     <v-icon :icon="mdiTextBox" class="mr-2" color="primary" />
-                    <span class="text-subtitle-1 font-weight-bold"
-                        >输入文本内容</span
-                    >
+                    <span class="text-subtitle-1 font-weight-bold">
+                        {{ t('textInput.title') }}
+                    </span>
                 </div>
 
                 <v-textarea
                     v-model="textContent"
-                    label="输入或粘贴文本内容"
+                    :label="t('textInput.placeholder')"
                     rows="6"
                     variant="outlined"
                     class="mb-3"
@@ -20,7 +20,7 @@
                 />
 
                 <div v-if="textContent" class="text-body-2 text-grey mb-3">
-                    字符数：{{ textContent.length }}
+                    {{ t('textInput.charCount') }}：{{ textContent.length }}
                 </div>
 
                 <v-btn
@@ -30,7 +30,7 @@
                     class="text-center"
                     @click="confirmText"
                 >
-                    确认发送
+                    {{ t('textInput.confirmSend') }}
                 </v-btn>
             </v-card-text>
         </v-card>
@@ -39,8 +39,11 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { ContentItem } from '../../types'
 import { mdiTextBox } from '@mdi/js'
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
     (e: 'select', item: ContentItem): void
@@ -58,7 +61,7 @@ function confirmText() {
     const item: ContentItem = {
         type: 'text',
         path: 'text://input',
-        name: '文本内容',
+        name: t('textInput.content'),
         size: textContent.value.length,
         mimeType: 'text/plain',
         createdAt: Date.now(),

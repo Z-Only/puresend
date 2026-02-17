@@ -9,7 +9,7 @@
                     <v-card-title
                         class="text-subtitle-1 d-flex align-center justify-space-between"
                     >
-                        <span>网络信息</span>
+                        <span>{{ t('receive.networkInfo') }}</span>
                         <v-btn
                             color="primary"
                             variant="text"
@@ -18,7 +18,7 @@
                             @click="handleShowNetworkInfo"
                         >
                             <v-icon :icon="mdiWifi" class="mr-2" />
-                            查看网络信息
+                            {{ t('receive.viewNetworkInfo') }}
                         </v-btn>
                     </v-card-title>
                     <v-card-text v-if="showNetworkInfo">
@@ -31,7 +31,7 @@
                     <v-card-text v-else class="text-center py-4">
                         <v-icon :icon="mdiWifiOff" size="48" color="grey" />
                         <div class="text-body-2 text-grey mt-2">
-                            点击"查看网络信息"获取本机网络信息
+                            {{ t('receive.clickToViewNetwork') }}
                         </div>
                     </v-card-text>
                 </v-card>
@@ -39,7 +39,7 @@
                 <!-- 接收模式选择 -->
                 <v-card class="mb-4">
                     <v-card-title class="text-subtitle-1">
-                        接收模式
+                        {{ t('receive.mode') }}
                     </v-card-title>
                     <v-card-text>
                         <v-btn-toggle
@@ -51,11 +51,11 @@
                         >
                             <v-btn value="local" block>
                                 <v-icon :icon="mdiWifi" class="mr-2" />
-                                本地网络
+                                {{ t('receive.localNetwork') }}
                             </v-btn>
                             <v-btn value="cloud" block disabled>
                                 <v-icon :icon="mdiCloud" class="mr-2" />
-                                云盘中转（开发中）
+                                {{ t('receive.cloudTransferDev') }}
                             </v-btn>
                         </v-btn-toggle>
                     </v-card-text>
@@ -64,12 +64,12 @@
                 <!-- 接收目录设置 -->
                 <v-card class="mb-4">
                     <v-card-title class="text-subtitle-1">
-                        接收目录
+                        {{ t('receive.receiveDirectory') }}
                     </v-card-title>
                     <v-card-text>
                         <v-text-field
                             :model-value="transferStore.receiveDirectory"
-                            label="文件保存位置"
+                            :label="t('receive.saveLocation')"
                             readonly
                             variant="outlined"
                             density="compact"
@@ -92,7 +92,7 @@
                             @click="handleStartReceiving"
                         >
                             <v-icon :icon="mdiWifiPlus" class="mr-2" />
-                            开始接收
+                            {{ t('receive.startReceiving') }}
                         </v-btn>
                         <v-btn
                             v-else
@@ -104,7 +104,7 @@
                             @click="handleStopReceiving"
                         >
                             <v-icon :icon="mdiWifiOff" class="mr-2" />
-                            停止接收
+                            {{ t('receive.stopReceiving') }}
                         </v-btn>
                     </v-card-text>
                 </v-card>
@@ -116,7 +116,7 @@
                     <v-card-title
                         class="d-flex align-center justify-space-between"
                     >
-                        <span>接收任务</span>
+                        <span>{{ t('receive.tasks') }}</span>
                         <v-btn
                             v-if="transferStore.receiveTasks.length > 0"
                             color="primary"
@@ -124,7 +124,7 @@
                             size="small"
                             @click="handleCleanup"
                         >
-                            清理已完成
+                            {{ t('send.cleanup') }}
                         </v-btn>
                     </v-card-title>
                 </v-card>
@@ -140,12 +140,14 @@
                         color="grey"
                         class="mb-4"
                     />
-                    <div class="text-h6 text-grey">暂无接收任务</div>
+                    <div class="text-h6 text-grey">
+                        {{ t('receive.noTasks') }}
+                    </div>
                     <div class="text-body-2 text-grey">
                         {{
                             isReceiving
-                                ? '等待发送方连接'
-                                : '点击开始接收等待连接'
+                                ? t('receive.waitingForSender')
+                                : t('receive.clickToStart')
                         }}
                     </div>
                 </div>
@@ -172,6 +174,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { open } from '@tauri-apps/plugin-dialog'
 import { ProgressDisplay } from '../components/transfer'
 import NetworkInfo from '../components/transfer/NetworkInfo.vue'
@@ -186,6 +189,7 @@ import {
     mdiFolderOpen,
 } from '@mdi/js'
 
+const { t } = useI18n()
 const transferStore = useTransferStore()
 
 const receiveMode = ref<TransferMode>('local')
@@ -213,7 +217,7 @@ async function handleShowNetworkInfo() {
         showNetworkInfo.value = true
     } catch (error) {
         showError.value = true
-        errorMessage.value = `获取网络信息失败：${error}`
+        errorMessage.value = t('receive.getNetworkInfoFailed', { error })
     } finally {
         loadingNetworkInfo.value = false
     }
@@ -228,7 +232,7 @@ async function handleStartReceiving() {
         // 启动接收后不自动显示网络信息，用户需要时可手动点击"查看网络信息"
     } catch (error) {
         showError.value = true
-        errorMessage.value = `启动接收失败：${error}`
+        errorMessage.value = t('receive.startFailed', { error })
     } finally {
         starting.value = false
     }
@@ -244,7 +248,7 @@ async function handleStopReceiving() {
         showNetworkInfo.value = false
     } catch (error) {
         showError.value = true
-        errorMessage.value = `停止接收失败：${error}`
+        errorMessage.value = t('receive.stopFailed', { error })
     } finally {
         stopping.value = false
     }
@@ -255,7 +259,7 @@ async function handleSelectDirectory() {
         const selected = await open({
             directory: true,
             multiple: false,
-            title: '选择接收目录',
+            title: t('receive.selectDirectory'),
         })
 
         if (selected && typeof selected === 'string') {
@@ -263,7 +267,7 @@ async function handleSelectDirectory() {
         }
     } catch (error) {
         showError.value = true
-        errorMessage.value = `选择目录失败：${error}`
+        errorMessage.value = t('receive.selectDirectoryFailed', { error })
     }
 }
 
@@ -274,7 +278,7 @@ async function handleCancel(taskId: string) {
 async function handleRetry() {
     // 接收任务暂不支持重试
     showError.value = true
-    errorMessage.value = '接收任务不支持重试'
+    errorMessage.value = t('receive.retryNotSupported')
 }
 
 function handleRemove(taskId: string) {

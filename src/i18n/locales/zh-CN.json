@@ -31,15 +31,193 @@
     "dragDropHint": "拖拽文件到此处",
     "send": "发送",
     "receive": "接收",
-    "progress": "传输进度",
     "completed": "已完成",
     "failed": "传输失败",
-    "cancelled": "已取消"
+    "cancelled": "已取消",
+    "mode": {
+      "title": "选择传输模式",
+      "local": {
+        "title": "本地网络",
+        "description": "通过局域网直接传输，速度快"
+      },
+      "cloud": {
+        "title": "云盘中转",
+        "description": "通过云盘中转，跨网络传输"
+      },
+      "noDeviceHint": "当前没有发现可用的设备，请确保目标设备已打开 PureSend",
+      "cloudComingSoon": "云盘中转功能即将推出"
+    },
+    "status": {
+      "pending": "等待中",
+      "transferring": "传输中",
+      "completed": "已完成",
+      "failed": "失败",
+      "cancelled": "已取消"
+    },
+    "progress": {
+      "transferred": "已传输",
+      "speed": "传输速度",
+      "timeRemaining": "预估剩余时间",
+      "mode": "传输模式",
+      "localNetwork": "本地网络",
+      "cloudTransfer": "云盘中转",
+      "cancelTransfer": "取消传输",
+      "retry": "重试",
+      "remove": "移除",
+      "unknownFile": "未知文件"
+    },
+    "time": {
+      "seconds": "{count} 秒",
+      "minutesSeconds": "{minutes} 分 {seconds} 秒",
+      "hoursMinutes": "{hours} 小时 {minutes} 分"
+    }
   },
   "history": {
     "title": "传输历史",
-    "empty": "暂无传输记录",
-    "clear": "清空历史"
+    "empty": "暂无传输历史",
+    "emptyHint": "完成文件传输后将显示在此处",
+    "clear": "清空历史",
+    "unknownDevice": "未知设备"
+  },
+  "peer": {
+    "nearbyDevices": "附近设备",
+    "noDevices": "未发现设备",
+    "noDevicesHint": "请确保目标设备已打开 PureSend",
+    "addManual": "手动添加设备",
+    "addDevice": "添加设备",
+    "ipAddress": "IP 地址",
+    "port": "端口",
+    "status": {
+      "available": "在线",
+      "busy": "忙碌中",
+      "offline": "离线"
+    },
+    "deviceType": {
+      "desktop": "桌面端",
+      "mobile": "移动端",
+      "web": "网页端",
+      "unknown": "未知"
+    },
+    "validation": {
+      "enterIp": "请输入 IP 地址",
+      "invalidIp": "请输入有效的 IP 地址"
+    }
+  },
+  "content": {
+    "type": {
+      "file": {
+        "label": "文件",
+        "description": "选择单个文件进行传输"
+      },
+      "folder": {
+        "label": "文件夹",
+        "description": "选择整个文件夹进行传输"
+      },
+      "clipboard": {
+        "label": "剪贴板",
+        "description": "从剪贴板导入文本内容"
+      },
+      "text": {
+        "label": "文本",
+        "description": "手动输入或粘贴文本内容"
+      },
+      "media": {
+        "label": "媒体",
+        "description": "选择图片、视频、音频文件"
+      },
+      "app": {
+        "label": "应用",
+        "description": "选择已安装的应用程序"
+      }
+    },
+    "filter": {
+      "media": "媒体文件",
+      "app": "应用程序"
+    }
+  },
+  "send": {
+    "tasks": "发送任务",
+    "cleanup": "清理已完成",
+    "noTasks": "暂无发送任务",
+    "selectFileToStart": "选择文件开始发送",
+    "selectTargetDevice": "请选择目标设备",
+    "prepareFailed": "准备传输失败",
+    "sendFailed": "发送失败：{error}"
+  },
+  "receive": {
+    "networkInfo": "网络信息",
+    "viewNetworkInfo": "查看网络信息",
+    "clickToViewNetwork": "点击\"查看网络信息\"获取本机网络信息",
+    "mode": "接收模式",
+    "localNetwork": "本地网络",
+    "cloudTransferDev": "云盘中转（开发中）",
+    "receiveDirectory": "接收目录",
+    "saveLocation": "文件保存位置",
+    "startReceiving": "开始接收",
+    "stopReceiving": "停止接收",
+    "tasks": "接收任务",
+    "noTasks": "暂无接收任务",
+    "waitingForSender": "等待发送方连接",
+    "clickToStart": "点击开始接收等待连接",
+    "getNetworkInfoFailed": "获取网络信息失败：{error}",
+    "startFailed": "启动接收失败：{error}",
+    "stopFailed": "停止接收失败：{error}"
+  },
+  "network": {
+    "title": "网络信息",
+    "listeningAddress": "监听地址",
+    "scanToConnect": "扫码连接",
+    "shareCode": "分享码",
+    "connectionHint": "其他设备可以通过扫描二维码或输入分享码连接到您的设备",
+    "copiedToClipboard": "已复制到剪贴板"
+  },
+  "fileSelector": {
+    "releaseToUpload": "松开以上传",
+    "dragDropHint": "拖拽文件到此处",
+    "orClickToSelect": "或点击选择文件",
+    "selectFile": "选择文件",
+    "noFileDetected": "未检测到拖拽的文件",
+    "handleDragFailed": "处理拖拽文件失败：{error}",
+    "selectFileToTransfer": "选择要传输的文件",
+    "openDialogFailed": "打开文件对话框失败：{error}"
+  },
+  "clipboardImporter": {
+    "title": "从剪贴板导入",
+    "preview": "预览",
+    "reRead": "重新读取",
+    "readClipboard": "读取剪贴板",
+    "confirmImport": "确认导入",
+    "clipboardEmpty": "剪贴板为空，请先复制一些文本内容",
+    "readFailed": "读取剪贴板失败：{error}",
+    "content": "剪贴板内容"
+  },
+  "folderPicker": {
+    "title": "选择文件夹",
+    "description": "选择整个文件夹进行传输",
+    "selectFolder": "选择文件夹",
+    "noFolderSelected": "未选择任何文件夹",
+    "selectFailed": "选择文件夹失败：{error}"
+  },
+  "textInput": {
+    "title": "输入文本内容",
+    "placeholder": "输入或粘贴文本内容",
+    "charCount": "字符数",
+    "confirmSend": "确认发送",
+    "content": "文本内容"
+  },
+  "mediaPicker": {
+    "title": "选择媒体文件",
+    "description": "支持图片、视频、音频文件",
+    "selectMedia": "选择媒体文件",
+    "selectedCount": "已选择 {count} 个文件",
+    "selectFailed": "选择媒体文件失败：{error}"
+  },
+  "appPicker": {
+    "title": "选择应用程序",
+    "description": "选择已安装的应用程序进行传输",
+    "selectApp": "选择应用",
+    "version": "版本：{version}",
+    "selectFailed": "选择应用失败：{error}"
   },
   "common": {
     "confirm": "确认",
@@ -48,6 +226,7 @@
     "reset": "重置",
     "loading": "加载中...",
     "error": "发生错误",
-    "success": "操作成功"
+    "success": "操作成功",
+    "add": "添加"
   }
 }

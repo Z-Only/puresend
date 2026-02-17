@@ -1,7 +1,9 @@
 <!-- 传输模式切换组件 -->
 <template>
     <v-card class="mode-switcher">
-        <v-card-title class="text-subtitle-1 pb-0"> 选择传输模式 </v-card-title>
+        <v-card-title class="text-subtitle-1 pb-0">
+            {{ t('transfer.mode.title') }}
+        </v-card-title>
         <v-card-text>
             <v-row>
                 <v-col v-for="mode in modes" :key="mode.value" cols="6">
@@ -54,7 +56,7 @@
                 class="mt-4"
                 density="compact"
             >
-                当前没有发现可用的设备，请确保目标设备已打开 PureSend
+                {{ t('transfer.mode.noDeviceHint') }}
             </v-alert>
 
             <!-- 云盘提示 -->
@@ -65,15 +67,18 @@
                 class="mt-4"
                 density="compact"
             >
-                云盘中转功能即将推出
+                {{ t('transfer.mode.cloudComingSoon') }}
             </v-alert>
         </v-card-text>
     </v-card>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import type { TransferMode } from '../../types'
 import { mdiWifi, mdiCloudUpload } from '@mdi/js'
+
+const { t } = useI18n()
 
 defineProps<{
     modelValue: TransferMode
@@ -94,14 +99,14 @@ interface ModeOption {
 const modes: ModeOption[] = [
     {
         value: 'local',
-        title: '本地网络',
-        description: '通过局域网直接传输，速度快',
+        title: t('transfer.mode.local.title'),
+        description: t('transfer.mode.local.description'),
         icon: mdiWifi,
     },
     {
         value: 'cloud',
-        title: '云盘中转',
-        description: '通过云盘中转，跨网络传输',
+        title: t('transfer.mode.cloud.title'),
+        description: t('transfer.mode.cloud.description'),
         icon: mdiCloudUpload,
     },
 ]
