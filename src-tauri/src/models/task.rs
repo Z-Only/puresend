@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 /// 传输任务
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TransferTask {
     /// 任务 ID
     pub id: String,
@@ -174,6 +175,7 @@ pub enum TransferDirection {
 
 /// 传输进度事件
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TransferProgress {
     /// 任务 ID
     pub task_id: String,

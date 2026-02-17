@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 /// 设备信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PeerInfo {
     /// 设备 ID
     pub id: String,
@@ -117,6 +118,7 @@ impl Default for PeerStatus {
 
 /// 设备发现事件
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PeerDiscoveryEvent {
     /// 事件类型
     pub event_type: PeerEventType,

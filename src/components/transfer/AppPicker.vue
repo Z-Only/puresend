@@ -120,7 +120,7 @@ async function pickApp() {
             try {
                 const metadata = await getFileMetadata(selected)
                 size = metadata.size
-                mimeType = metadata.mime_type
+                mimeType = metadata.mimeType
             } catch (metaError) {
                 console.warn('获取应用元数据失败:', metaError)
             }

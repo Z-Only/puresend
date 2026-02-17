@@ -22,8 +22,8 @@ export interface FileMetadata {
     name: string
     /** 文件大小（字节） */
     size: number
-    /** MIME 类型（Rust 后端返回的字段名） */
-    mime_type: string
+    /** MIME 类型 */
+    mimeType: string
     /** 文件哈希（用于校验） */
     hash: string
     /** 分块信息 */

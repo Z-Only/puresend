@@ -109,7 +109,7 @@ async function pickMedia() {
                     try {
                         const metadata = await getFileMetadata(path)
                         size = metadata.size
-                        mimeType = metadata.mime_type || getMimeType(extension)
+                        mimeType = metadata.mimeType || getMimeType(extension)
                     } catch (metaError) {
                         console.warn(`获取文件 ${name} 元数据失败：`, metaError)
                     }

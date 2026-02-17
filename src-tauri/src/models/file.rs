@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 /// 文件元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FileMetadata {
     /// 文件唯一标识
     pub id: String,
@@ -113,6 +114,7 @@ impl FileMetadata {
 
 /// 分块信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ChunkInfo {
     /// 块序号（从 0 开始）
     pub index: u32,

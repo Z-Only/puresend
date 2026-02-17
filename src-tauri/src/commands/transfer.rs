@@ -26,6 +26,7 @@ pub struct TransferState {
 
 /// 接收状态
 #[derive(Debug, Clone, Default, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ReceivingState {
     /// 是否正在接收
     pub is_receiving: bool,

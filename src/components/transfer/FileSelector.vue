@@ -143,7 +143,7 @@ async function openFileDialog() {
                 console.warn('获取文件元数据失败，使用默认值:', metaError)
             }
 
-            const mimeType = metadata?.mime_type || inferMimeType(name)
+            const mimeType = metadata?.mimeType || inferMimeType(name)
 
             selectedFile.value = {
                 path: selected,
