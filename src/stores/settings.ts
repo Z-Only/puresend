@@ -10,6 +10,7 @@ import {
     SETTINGS_VERSION,
     SETTINGS_STORAGE_KEY,
 } from '@/types/settings'
+import type { AppLocale } from '@/i18n'
 
 export const useSettingsStore = defineStore('settings', {
     state: (): SettingsState => ({
@@ -45,7 +46,7 @@ export const useSettingsStore = defineStore('settings', {
         /**
          * 获取实际语言（解析 system 模式）
          */
-        actualLanguage(): string {
+        actualLanguage(): AppLocale {
             if (this.language === 'system') {
                 try {
                     const systemLang =
@@ -62,7 +63,7 @@ export const useSettingsStore = defineStore('settings', {
                         return 'en-US'
                     }
 
-                    const langMap: Record<string, string> = {
+                    const langMap: Record<string, AppLocale> = {
                         zh: 'zh-CN',
                         'zh-CN': 'zh-CN',
                         'zh-Hans': 'zh-CN',
@@ -89,7 +90,7 @@ export const useSettingsStore = defineStore('settings', {
                     return 'en-US'
                 }
             }
-            return this.language
+            return this.language as AppLocale
         },
     },
 
