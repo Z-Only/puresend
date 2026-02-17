@@ -30,6 +30,27 @@ export default defineConfig(async () => ({
         },
     },
 
+    // 构建优化配置
+    build: {
+        // 设置 chunk 大小警告限制为 600 kB
+        chunkSizeWarningLimit: 600,
+        rollupOptions: {
+            output: {
+                // 手动分割代码块
+                manualChunks: {
+                    // Vue 相关库
+                    'vendor-vue': ['vue', 'vue-router', 'pinia'],
+                    // Vuetify UI 框架
+                    'vendor-vuetify': ['vuetify'],
+                    // 国际化
+                    'vendor-i18n': ['vue-i18n'],
+                    // 其他第三方库
+                    vendor: ['qrcode'],
+                },
+            },
+        },
+    },
+
     // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
     //
     // 1. prevent Vite from obscuring rust errors
