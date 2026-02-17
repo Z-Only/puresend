@@ -2,7 +2,7 @@
 <template>
     <v-card class="network-info">
         <v-card-title class="text-subtitle-1 d-flex align-center">
-            <v-icon icon="mdi-wifi" class="mr-2" color="primary" />
+            <v-icon :icon="mdiWifi" class="mr-2" color="primary" />
             网络信息
         </v-card-title>
         <v-card-text>
@@ -14,7 +14,7 @@
                     readonly
                     variant="outlined"
                     density="compact"
-                    append-icon="mdi-content-copy"
+                    :append-icon="mdiContentCopy"
                     @click:append="handleCopyAddress"
                 />
             </div>
@@ -36,7 +36,7 @@
                         contain
                     />
                     <div v-else class="qr-code-placeholder">
-                        <v-icon icon="mdi-qrcode" size="64" color="grey" />
+                        <v-icon :icon="mdiQrcode" size="64" color="grey" />
                     </div>
                 </v-sheet>
             </div>
@@ -52,7 +52,7 @@
                     class="mr-2"
                 />
                 <v-btn
-                    icon="mdi-content-copy"
+                    :icon="mdiContentCopy"
                     size="small"
                     variant="text"
                     @click="handleCopyShareCode"
@@ -75,6 +75,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import QRCode from 'qrcode'
+import { mdiWifi, mdiQrcode, mdiContentCopy } from '@mdi/js'
 
 const props = defineProps<{
     networkAddress: string

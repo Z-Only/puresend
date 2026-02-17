@@ -23,7 +23,7 @@
                 class="d-flex flex-column align-center justify-center py-16"
             >
                 <v-icon
-                    icon="mdi-history"
+                    :icon="mdiHistory"
                     size="64"
                     color="grey"
                     class="mb-4"
@@ -86,6 +86,7 @@
 import { ref, onMounted } from 'vue'
 import type { TaskStatus, TransferDirection } from '../types'
 import { getStatusText as getStatusTextFn, formatFileSize } from '../types'
+import { mdiHistory, mdiArrowUp, mdiArrowDown } from '@mdi/js'
 
 interface HistoryItem {
     id: string
@@ -115,7 +116,7 @@ function getStatusText(status: TaskStatus): string {
 }
 
 function getDirectionIcon(direction: TransferDirection): string {
-    return direction === 'send' ? 'mdi-arrow-up' : 'mdi-arrow-down'
+    return direction === 'send' ? mdiArrowUp : mdiArrowDown
 }
 
 function formatSize(bytes: number): string {
@@ -152,7 +153,7 @@ function saveHistory() {
 // 监听传输完成事件，添加到历史
 function setupHistoryListener() {
     // 从 transferStore 获取已完成的任务并添加到历史
-     
+
     const transferStore = (window as any).__TRANSFER_STORE__
     if (transferStore) {
         const completedTasks = transferStore.completedTasks

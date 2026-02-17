@@ -8,6 +8,7 @@
                     :icon="statusIcon"
                     :color="statusColor"
                     size="32"
+                    :class="{ 'mdi-spin': isSpinning }"
                     class="mr-3"
                 />
                 <div class="flex-grow-1 overflow-hidden">
@@ -116,6 +117,13 @@ import { computed } from 'vue'
 import type { TransferTask } from '../../types'
 import { getStatusText, formatSpeed, formatTimeRemaining } from '../../types'
 import { formatFileSize } from '../../types/file'
+import {
+    mdiClockOutline,
+    mdiSync,
+    mdiCheckCircle,
+    mdiAlertCircle,
+    mdiCancel,
+} from '@mdi/js'
 
 const props = defineProps<{
     task: TransferTask | null
@@ -143,14 +151,18 @@ const statusColor = computed(() => {
 })
 
 const statusIcon = computed(() => {
-    const icons: Record<string, string> = {
-        pending: 'mdi-clock-outline',
-        transferring: 'mdi-sync mdi-spin',
-        completed: 'mdi-check-circle',
-        failed: 'mdi-alert-circle',
-        cancelled: 'mdi-cancel',
+    const icons: Record<string, any> = {
+        pending: mdiClockOutline,
+        transferring: mdiSync,
+        completed: mdiCheckCircle,
+        failed: mdiAlertCircle,
+        cancelled: mdiCancel,
     }
     return icons[props.task?.status || 'pending']
+})
+
+const isSpinning = computed(() => {
+    return props.task?.status === 'transferring'
 })
 
 function formatSize(bytes: number): string {
@@ -183,5 +195,18 @@ function handleRemove() {
 <style scoped>
 .progress-display {
     border-left: 4px solid rgb(var(--v-theme-primary));
+}
+
+.mdi-spin {
+    animation: mdi-spin 1s linear infinite;
+}
+
+@keyframes mdi-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }
 </style>

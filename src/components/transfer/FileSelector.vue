@@ -11,7 +11,7 @@
             class="d-flex flex-column align-center justify-center pa-8"
         >
             <v-icon
-                :icon="isDragover ? 'mdi-cloud-upload' : 'mdi-file-plus'"
+                :icon="isDragover ? mdiCloudUpload : mdiFilePlus"
                 size="64"
                 :color="isDragover ? 'primary' : 'grey'"
                 class="mb-4"
@@ -31,7 +31,7 @@
                 :loading="loading"
                 @click.stop="openFileDialog"
             >
-                <v-icon icon="mdi-folder-open" class="mr-2" />
+                <v-icon :icon="mdiFolderOpen" class="mr-2" />
                 选择文件
             </v-btn>
 
@@ -63,7 +63,7 @@
                         </div>
                     </div>
                     <v-btn
-                        icon="mdi-close"
+                        :icon="mdiClose"
                         variant="text"
                         size="small"
                         @click.stop="clearFile"
@@ -83,6 +83,7 @@ import {
     inferMimeType,
 } from '../../types'
 import { getFileMetadata } from '../../services/transferService'
+import { mdiCloudUpload, mdiFilePlus, mdiFolderOpen, mdiClose } from '@mdi/js'
 
 const emit = defineEmits<{
     (

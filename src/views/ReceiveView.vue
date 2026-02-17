@@ -17,7 +17,7 @@
                             :loading="loadingNetworkInfo"
                             @click="handleShowNetworkInfo"
                         >
-                            <v-icon icon="mdi-wifi" class="mr-2" />
+                            <v-icon :icon="mdiWifi" class="mr-2" />
                             查看网络信息
                         </v-btn>
                     </v-card-title>
@@ -29,7 +29,7 @@
                         />
                     </v-card-text>
                     <v-card-text v-else class="text-center py-4">
-                        <v-icon icon="mdi-wifi-off" size="48" color="grey" />
+                        <v-icon :icon="mdiWifiOff" size="48" color="grey" />
                         <div class="text-body-2 text-grey mt-2">
                             点击"查看网络信息"获取本机网络信息
                         </div>
@@ -50,11 +50,11 @@
                             class="w-100"
                         >
                             <v-btn value="local" block>
-                                <v-icon icon="mdi-wifi" class="mr-2" />
+                                <v-icon :icon="mdiWifi" class="mr-2" />
                                 本地网络
                             </v-btn>
                             <v-btn value="cloud" block disabled>
-                                <v-icon icon="mdi-cloud" class="mr-2" />
+                                <v-icon :icon="mdiCloud" class="mr-2" />
                                 云盘中转（开发中）
                             </v-btn>
                         </v-btn-toggle>
@@ -73,7 +73,7 @@
                             readonly
                             variant="outlined"
                             density="compact"
-                            append-icon="mdi-folder-open"
+                            :append-icon="mdiFolderOpen"
                             @click:append="handleSelectDirectory"
                         />
                     </v-card-text>
@@ -91,7 +91,7 @@
                             :loading="starting"
                             @click="handleStartReceiving"
                         >
-                            <v-icon icon="mdi-wifi-plus" class="mr-2" />
+                            <v-icon :icon="mdiWifiPlus" class="mr-2" />
                             开始接收
                         </v-btn>
                         <v-btn
@@ -103,7 +103,7 @@
                             :loading="stopping"
                             @click="handleStopReceiving"
                         >
-                            <v-icon icon="mdi-wifi-off" class="mr-2" />
+                            <v-icon :icon="mdiWifiOff" class="mr-2" />
                             停止接收
                         </v-btn>
                     </v-card-text>
@@ -135,7 +135,7 @@
                     class="d-flex flex-column align-center justify-center py-8"
                 >
                     <v-icon
-                        icon="mdi-inbox-arrow-down"
+                        :icon="mdiInboxArrowDown"
                         size="64"
                         color="grey"
                         class="mb-4"
@@ -177,6 +177,14 @@ import { ProgressDisplay } from '../components/transfer'
 import NetworkInfo from '../components/transfer/NetworkInfo.vue'
 import { useTransferStore } from '../stores'
 import type { TransferMode } from '../types'
+import {
+    mdiWifi,
+    mdiWifiOff,
+    mdiCloud,
+    mdiWifiPlus,
+    mdiInboxArrowDown,
+    mdiFolderOpen,
+} from '@mdi/js'
 
 const transferStore = useTransferStore()
 

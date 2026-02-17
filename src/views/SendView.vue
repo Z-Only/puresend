@@ -89,7 +89,7 @@
                     class="d-flex flex-column align-center justify-center py-8"
                 >
                     <v-icon
-                        icon="mdi-inbox-arrow-up"
+                        :icon="mdiInboxArrowUp"
                         size="64"
                         color="grey"
                         class="mb-4"
@@ -115,7 +115,7 @@
         <v-fab
             v-if="(selectedFile || selectedContent) && selectedPeerId"
             color="primary"
-            icon="mdi-send"
+            :icon="mdiSend"
             location="bottom right"
             size="large"
             :loading="sending"
@@ -150,6 +150,7 @@ import type {
     ContentType,
     ContentItem,
 } from '../types'
+import { mdiInboxArrowUp, mdiSend } from '@mdi/js'
 
 const transferStore = useTransferStore()
 const discoveryStore = useDiscoveryStore()

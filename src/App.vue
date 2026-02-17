@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settings'
 import { setI18nLanguage, type AppLocale } from '@/i18n'
 import { useTheme } from 'vuetify'
+import { mdiSend, mdiWifiPlus, mdiHistory, mdiCog } from '@mdi/js'
 
 const route = useRoute()
 const router = useRouter()
@@ -17,16 +18,16 @@ const currentRoute = computed(() => route.name as string)
 const navigationItems = computed(() => [
     {
         title: t('nav.send'),
-        icon: 'mdi-send',
+        icon: mdiSend,
         route: 'Send',
     },
     {
         title: t('nav.receive'),
-        icon: 'mdi-wifi-plus',
+        icon: mdiWifiPlus,
         route: 'Receive',
     },
-    { title: t('nav.history'), icon: 'mdi-history', route: 'History' },
-    { title: t('nav.settings'), icon: 'mdi-cog', route: 'Settings' },
+    { title: t('nav.history'), icon: mdiHistory, route: 'History' },
+    { title: t('nav.settings'), icon: mdiCog, route: 'Settings' },
 ])
 
 function navigateTo(routeName: string) {

@@ -73,6 +73,7 @@
 
 <script setup lang="ts">
 import type { TransferMode } from '../../types'
+import { mdiWifi, mdiCloudUpload } from '@mdi/js'
 
 defineProps<{
     modelValue: TransferMode
@@ -95,13 +96,13 @@ const modes: ModeOption[] = [
         value: 'local',
         title: '本地网络',
         description: '通过局域网直接传输，速度快',
-        icon: 'mdi-wifi',
+        icon: mdiWifi,
     },
     {
         value: 'cloud',
         title: '云盘中转',
         description: '通过云盘中转，跨网络传输',
-        icon: 'mdi-cloud-upload',
+        icon: mdiCloudUpload,
     },
 ]
 

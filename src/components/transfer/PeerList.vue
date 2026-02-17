@@ -4,7 +4,7 @@
         <v-card-title class="d-flex align-center justify-space-between">
             <span class="text-subtitle-1">附近设备</span>
             <v-btn
-                icon="mdi-refresh"
+                :icon="mdiRefresh"
                 variant="text"
                 size="small"
                 :loading="loading"
@@ -19,7 +19,7 @@
                 class="d-flex flex-column align-center justify-center pa-8"
             >
                 <v-icon
-                    icon="mdi-wifi-off"
+                    :icon="mdiWifiOff"
                     size="48"
                     color="grey"
                     class="mb-2"
@@ -78,7 +78,7 @@
                 block
                 @click="showAddDialog = true"
             >
-                <v-icon icon="mdi-plus" class="mr-1" />
+                <v-icon :icon="mdiPlus" class="mr-1" />
                 手动添加设备
             </v-btn>
         </v-card-actions>
@@ -124,6 +124,15 @@
 import { ref } from 'vue'
 import type { PeerInfo, PeerStatus, DeviceType } from '../../types'
 import { getPeerStatusText, getPeerStatusColor } from '../../types'
+import {
+    mdiRefresh,
+    mdiWifiOff,
+    mdiDesktopTowerMonitor,
+    mdiCellphone,
+    mdiWeb,
+    mdiHelpCircle,
+    mdiPlus,
+} from '@mdi/js'
 
 defineProps<{
     peers: PeerInfo[]
@@ -149,12 +158,12 @@ function getStatusColor(status: PeerStatus): string {
     return getPeerStatusColor(status)
 }
 
-function getDeviceIcon(type: DeviceType): string {
-    const icons: Record<DeviceType, string> = {
-        desktop: 'mdi-desktop-tower-monitor',
-        mobile: 'mdi-cellphone',
-        web: 'mdi-web',
-        unknown: 'mdi-help-circle',
+function getDeviceIcon(type: DeviceType) {
+    const icons: Record<DeviceType, any> = {
+        desktop: mdiDesktopTowerMonitor,
+        mobile: mdiCellphone,
+        web: mdiWeb,
+        unknown: mdiHelpCircle,
     }
     return icons[type]
 }

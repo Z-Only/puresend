@@ -4,7 +4,7 @@
         <v-card variant="outlined" class="pa-4">
             <v-card-text>
                 <div class="d-flex align-center mb-3">
-                    <v-icon icon="mdi-clipboard" class="mr-2" color="primary" />
+                    <v-icon :icon="mdiClipboard" class="mr-2" color="primary" />
                     <span class="text-subtitle-1 font-weight-bold"
                         >从剪贴板导入</span
                     >
@@ -59,6 +59,7 @@
 import { ref } from 'vue'
 import { readText } from '@tauri-apps/plugin-clipboard-manager'
 import type { ContentItem } from '../../types'
+import { mdiClipboard } from '@mdi/js'
 
 const emit = defineEmits<{
     (e: 'select', item: ContentItem): void

@@ -4,7 +4,7 @@
         <v-card variant="outlined" class="pa-4">
             <v-card-text>
                 <div class="d-flex align-center mb-3">
-                    <v-icon icon="mdi-folder" class="mr-2" color="primary" />
+                    <v-icon :icon="mdiFolder" class="mr-2" color="primary" />
                     <span class="text-subtitle-1 font-weight-bold"
                         >选择文件夹</span
                     >
@@ -21,7 +21,7 @@
                     class="text-center"
                     @click="pickFolder"
                 >
-                    <v-icon icon="mdi-folder-open" class="mr-2" />
+                    <v-icon :icon="mdiFolderOpen" class="mr-2" />
                     选择文件夹
                 </v-btn>
 
@@ -40,7 +40,7 @@
                     <v-divider class="mb-3" />
                     <div class="d-flex align-center">
                         <v-icon
-                            icon="mdi-folder"
+                            :icon="mdiFolder"
                             size="40"
                             color="primary"
                             class="mr-3"
@@ -65,6 +65,7 @@ import { ref } from 'vue'
 import { open } from '@tauri-apps/plugin-dialog'
 import { getFileMetadata } from '../../services/transferService'
 import type { ContentItem } from '../../types'
+import { mdiFolder, mdiFolderOpen } from '@mdi/js'
 
 const emit = defineEmits<{
     (e: 'select', item: ContentItem): void

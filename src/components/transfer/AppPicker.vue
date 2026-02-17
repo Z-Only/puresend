@@ -5,7 +5,7 @@
             <v-card-text>
                 <div class="d-flex align-center mb-3">
                     <v-icon
-                        icon="mdi-application"
+                        :icon="mdiApplication"
                         class="mr-2"
                         color="primary"
                     />
@@ -25,7 +25,7 @@
                     class="text-center picker-btn"
                     @click="pickApp"
                 >
-                    <v-icon icon="mdi-apps" />
+                    <v-icon :icon="mdiApps" />
                     <span class="btn-text">选择应用</span>
                 </v-btn>
 
@@ -44,7 +44,7 @@
                     <v-divider class="mb-3" />
                     <div class="d-flex align-center">
                         <v-icon
-                            icon="mdi-application"
+                            :icon="mdiApplication"
                             size="40"
                             color="primary"
                             class="mr-3"
@@ -75,6 +75,7 @@ import { ref } from 'vue'
 import { open } from '@tauri-apps/plugin-dialog'
 import { getFileMetadata } from '../../services/transferService'
 import type { ContentItem } from '../../types'
+import { mdiApplication, mdiApps } from '@mdi/js'
 
 const emit = defineEmits<{
     (e: 'select', item: ContentItem): void

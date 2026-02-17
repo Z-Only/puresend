@@ -4,7 +4,7 @@
         <v-card variant="outlined" class="pa-4">
             <v-card-text>
                 <div class="d-flex align-center mb-3">
-                    <v-icon icon="mdi-text-box" class="mr-2" color="primary" />
+                    <v-icon :icon="mdiTextBox" class="mr-2" color="primary" />
                     <span class="text-subtitle-1 font-weight-bold"
                         >输入文本内容</span
                     >
@@ -40,6 +40,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { ContentItem } from '../../types'
+import { mdiTextBox } from '@mdi/js'
 
 const emit = defineEmits<{
     (e: 'select', item: ContentItem): void

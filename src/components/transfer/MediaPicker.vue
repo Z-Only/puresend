@@ -5,7 +5,7 @@
             <v-card-text>
                 <div class="d-flex align-center mb-3">
                     <v-icon
-                        icon="mdi-image-multiple"
+                        :icon="mdiImageMultiple"
                         class="mr-2"
                         color="primary"
                     />
@@ -25,7 +25,7 @@
                     class="text-center picker-btn"
                     @click="pickMedia"
                 >
-                    <v-icon icon="mdi-folder-open" />
+                    <v-icon :icon="mdiFolderOpen" />
                     <span class="btn-text">选择媒体文件</span>
                 </v-btn>
 
@@ -88,6 +88,14 @@ import { ref } from 'vue'
 import { open } from '@tauri-apps/plugin-dialog'
 import { getFileMetadata } from '../../services/transferService'
 import type { ContentItem } from '../../types'
+import {
+    mdiImageMultiple,
+    mdiFolderOpen,
+    mdiFileImage,
+    mdiFileVideo,
+    mdiFileMusic,
+    mdiFile,
+} from '@mdi/js'
 
 const emit = defineEmits<{
     (e: 'select', item: ContentItem): void
@@ -175,11 +183,11 @@ function isImage(mimeType: string): boolean {
     return mimeType.startsWith('image/')
 }
 
-function getMediaIcon(mimeType: string): string {
-    if (mimeType.startsWith('image/')) return 'mdi-file-image'
-    if (mimeType.startsWith('video/')) return 'mdi-file-video'
-    if (mimeType.startsWith('audio/')) return 'mdi-file-music'
-    return 'mdi-file'
+function getMediaIcon(mimeType: string) {
+    if (mimeType.startsWith('image/')) return mdiFileImage
+    if (mimeType.startsWith('video/')) return mdiFileVideo
+    if (mimeType.startsWith('audio/')) return mdiFileMusic
+    return mdiFile
 }
 
 function getMimeType(extension: string): string {
