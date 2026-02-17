@@ -36,16 +36,12 @@ pub struct TransferTask {
 
 impl TransferTask {
     /// 创建新的传输任务
-    pub fn new(
-        file: FileMetadata,
-        mode: TransferMode,
-        direction: TransferDirection,
-    ) -> Self {
+    pub fn new(file: FileMetadata, mode: TransferMode, direction: TransferDirection) -> Self {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_millis() as u64;
-        
+
         Self {
             id: Uuid::new_v4().to_string(),
             file,

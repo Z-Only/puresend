@@ -31,6 +31,14 @@ export async function prepareFileTransfer(
 }
 
 /**
+ * 获取文件元数据（不计算哈希，仅获取基本信息）
+ * @param filePath 文件路径
+ */
+export async function getFileMetadata(filePath: string): Promise<FileMetadata> {
+    return invoke('get_file_metadata', { filePath })
+}
+
+/**
  * 发送文件（同步执行，阻塞直到完成或失败）
  * @param fileMetadata 文件元数据
  * @param peerId 目标设备ID

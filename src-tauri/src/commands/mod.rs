@@ -1,7 +1,7 @@
 //! Tauri 命令模块
 
-mod transfer;
 mod discovery;
+mod transfer;
 
-pub use transfer::*;
 pub use discovery::*;
+pub use transfer::*;

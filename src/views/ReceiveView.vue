@@ -290,4 +290,22 @@ onUnmounted(() => {
 .receive-view {
     min-height: calc(100vh - 64px);
 }
+
+/* 修复按钮中文本居中问题 */
+.v-btn:deep(.v-btn__content) {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    justify-items: center;
+    width: 100%;
+}
+
+.v-btn:deep(.v-btn__content .v-icon) {
+    grid-column: 1;
+}
+
+.v-btn:deep(.v-btn__content span) {
+    grid-column: 2;
+    text-align: center;
+}
 </style>

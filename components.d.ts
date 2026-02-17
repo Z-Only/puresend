@@ -11,9 +11,14 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AppPicker: typeof import('./src/components/transfer/AppPicker.vue')['default']
+    ClipboardImporter: typeof import('./src/components/transfer/ClipboardImporter.vue')['default']
+    ContentTypeSelector: typeof import('./src/components/transfer/ContentTypeSelector.vue')['default']
     FileSelector: typeof import('./src/components/transfer/FileSelector.vue')['default']
     FileTypeIcon: typeof import('./src/components/transfer/FileTypeIcon.vue')['default']
+    FolderPicker: typeof import('./src/components/transfer/FolderPicker.vue')['default']
     LanguageSelector: typeof import('./src/components/settings/LanguageSelector.vue')['default']
+    MediaPicker: typeof import('./src/components/transfer/MediaPicker.vue')['default']
     ModeSwitcher: typeof import('./src/components/transfer/ModeSwitcher.vue')['default']
     NetworkInfo: typeof import('./src/components/transfer/NetworkInfo.vue')['default']
     PeerList: typeof import('./src/components/transfer/PeerList.vue')['default']
@@ -21,6 +26,7 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SettingsGroup: typeof import('./src/components/settings/SettingsGroup.vue')['default']
+    TextInput: typeof import('./src/components/transfer/TextInput.vue')['default']
     ThemeSelector: typeof import('./src/components/settings/ThemeSelector.vue')['default']
   }
 }

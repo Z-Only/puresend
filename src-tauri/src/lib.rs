@@ -1,5 +1,5 @@
 //! PureSend 文件传输应用
-//! 
+//!
 //! 提供本地网络和云盘文件传输功能
 
 // 模块声明
@@ -15,6 +15,8 @@ use commands::{DiscoveryState, TransferState};
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .manage(TransferState::new())
         .manage(DiscoveryState::new())
         .invoke_handler(tauri::generate_handler![
@@ -22,6 +24,7 @@ pub fn run() {
             commands::init_transfer,
             commands::get_transfer_port,
             commands::prepare_file_transfer,
+            commands::get_file_metadata,
             commands::send_file,
             commands::cancel_transfer,
             commands::get_transfer_progress,

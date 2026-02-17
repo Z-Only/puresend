@@ -32,7 +32,7 @@ impl PeerInfo {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_millis() as u64;
-        
+
         Self {
             id: Uuid::new_v4().to_string(),
             name,

@@ -1,5 +1,5 @@
 //! 本地网络传输实现
-//! 
+//!
 //! 基于 TCP 的本地网络文件传输
 
 use async_trait::async_trait;
@@ -68,7 +68,7 @@ impl MessageHeader {
         if &bytes[0..4] != PROTOCOL_MAGIC {
             return Err(TransferError::Network("无效的协议魔数".to_string()));
         }
-        
+
         let version = bytes[4];
         if version != PROTOCOL_VERSION {
             return Err(TransferError::Network(format!(
@@ -174,9 +174,12 @@ impl LocalTransport {
         task: &TransferTask,
         addr: SocketAddr,
     ) -> TransferResult<TransferProgress> {
-        let file_path = task.file.path.as_ref()
+        let file_path = task
+            .file
+            .path
+            .as_ref()
             .ok_or_else(|| TransferError::InvalidMetadata("文件路径未设置".to_string()))?;
-        
+
         let file_path = std::path::Path::new(file_path);
         if !file_path.exists() {
             return Err(TransferError::FileNotFound(file_path.display().to_string()));
@@ -184,10 +187,14 @@ impl LocalTransport {
 
         // 创建取消通道
         let (cancel_tx, mut cancel_rx) = mpsc::channel::<()>(1);
-        self.cancel_senders.write().await.insert(task.id.clone(), cancel_tx);
+        self.cancel_senders
+            .write()
+            .await
+            .insert(task.id.clone(), cancel_tx);
 
         // 连接目标
-        let mut stream = TcpStream::connect(&addr).await
+        let mut stream = TcpStream::connect(&addr)
+            .await
             .map_err(|e| TransferError::Network(format!("连接失败: {}", e)))?;
 
         // 发送文件请求
@@ -200,7 +207,7 @@ impl LocalTransport {
         let mut response_header_buf = [0u8; 8];
         stream.read_exact(&mut response_header_buf).await?;
         let response_header = MessageHeader::from_bytes(&response_header_buf)?;
-        
+
         if response_header.message_type != MessageType::FileResponse {
             return Err(TransferError::Network("未收到正确的文件响应".to_string()));
         }
@@ -208,9 +215,12 @@ impl LocalTransport {
         let mut response_buf = vec![0u8; response_header.payload_length as usize];
         stream.read_exact(&mut response_buf).await?;
         let response: FileResponse = serde_json::from_slice(&response_buf)?;
-        
+
         if !response.accepted {
-            return Err(TransferError::Network(format!("对方拒绝接收: {}", response.reason.unwrap_or_default())));
+            return Err(TransferError::Network(format!(
+                "对方拒绝接收: {}",
+                response.reason.unwrap_or_default()
+            )));
         }
 
         // 发送文件分块
@@ -228,13 +238,16 @@ impl LocalTransport {
             // 检查取消信号
             if cancel_rx.try_recv().is_ok() {
                 task_state.progress.status = crate::models::TaskStatus::Cancelled;
-                self.active_tasks.write().await.insert(task.id.clone(), task_state);
+                self.active_tasks
+                    .write()
+                    .await
+                    .insert(task.id.clone(), task_state);
                 return Err(TransferError::Cancelled);
             }
 
             // 读取分块数据
             let data = self.chunker.read_chunk(file_path, chunk)?;
-            
+
             // 发送分块
             let chunk_message = ChunkMessage {
                 index: chunk.index,
@@ -268,16 +281,23 @@ impl LocalTransport {
 
             task_state.progress.transferred_bytes = total_transferred;
             task_state.progress.speed = speed;
-            task_state.progress.progress = (total_transferred as f64 / task.file.size as f64) * 100.0;
-            
+            task_state.progress.progress =
+                (total_transferred as f64 / task.file.size as f64) * 100.0;
+
             // 更新活跃任务状态
-            self.active_tasks.write().await.insert(task.id.clone(), task_state.clone());
+            self.active_tasks
+                .write()
+                .await
+                .insert(task.id.clone(), task_state.clone());
         }
 
         // 传输完成
         task_state.progress.status = crate::models::TaskStatus::Completed;
         task_state.progress.progress = 100.0;
-        self.active_tasks.write().await.insert(task.id.clone(), task_state.clone());
+        self.active_tasks
+            .write()
+            .await
+            .insert(task.id.clone(), task_state.clone());
 
         Ok(task_state.progress)
     }
@@ -303,7 +323,8 @@ impl LocalTransport {
                     reason: None,
                 };
                 let response_json = serde_json::to_vec(&response)?;
-                let response_header = MessageHeader::new(MessageType::FileResponse, response_json.len() as u32);
+                let response_header =
+                    MessageHeader::new(MessageType::FileResponse, response_json.len() as u32);
                 stream.write_all(&response_header.to_bytes()).await?;
                 stream.write_all(&response_json).await?;
 
@@ -320,9 +341,13 @@ impl LocalTransport {
 
     /// 接收文件分块
     #[allow(dead_code)]
-    async fn receive_file_chunks(&self, stream: &mut TcpStream, metadata: &FileMetadata) -> TransferResult<()> {
+    async fn receive_file_chunks(
+        &self,
+        stream: &mut TcpStream,
+        metadata: &FileMetadata,
+    ) -> TransferResult<()> {
         let save_path = std::env::temp_dir().join(&metadata.name);
-        
+
         for _ in 0..metadata.chunks.len() {
             // 读取分块消息头
             let mut header_buf = [0u8; 8];
@@ -340,10 +365,11 @@ impl LocalTransport {
 
             // 写入文件
             let chunk_info = &metadata.chunks[chunk_message.index as usize];
-            self.chunker.write_chunk(&save_path, chunk_info, &chunk_message.data)?;
+            self.chunker
+                .write_chunk(&save_path, chunk_info, &chunk_message.data)?;
 
             // 发送确认
-            let ack = ChunkAck { 
+            let ack = ChunkAck {
                 index: chunk_message.index,
                 success: true,
             };
@@ -355,7 +381,9 @@ impl LocalTransport {
 
         // 验证文件
         if !self.checker.verify_file(&save_path, &metadata.hash)? {
-            return Err(TransferError::IntegrityCheckFailed("文件校验失败".to_string()));
+            return Err(TransferError::IntegrityCheckFailed(
+                "文件校验失败".to_string(),
+            ));
         }
 
         Ok(())
@@ -400,7 +428,7 @@ impl Transport for LocalTransport {
 
         // 创建 TCP 监听器
         let listener = TcpListener::bind(format!("0.0.0.0:{}", self.listen_port)).await?;
-        
+
         let mut listener_guard = self.listener.lock().await;
         *listener_guard = Some(listener);
 
@@ -410,10 +438,14 @@ impl Transport for LocalTransport {
 
     async fn send(&self, task: &TransferTask) -> TransferResult<TransferProgress> {
         if task.mode != TransferMode::Local {
-            return Err(TransferError::UnsupportedOperation("仅支持本地网络传输".to_string()));
+            return Err(TransferError::UnsupportedOperation(
+                "仅支持本地网络传输".to_string(),
+            ));
         }
 
-        let peer = task.peer.as_ref()
+        let peer = task
+            .peer
+            .as_ref()
             .ok_or_else(|| TransferError::PeerUnreachable("未指定目标设备".to_string()))?;
 
         let addr: SocketAddr = format!("{}:{}", peer.ip, peer.port)
@@ -425,7 +457,9 @@ impl Transport for LocalTransport {
 
     async fn receive(&self, _task: &TransferTask) -> TransferResult<TransferProgress> {
         // 接收逻辑在 handle_connection 中处理
-        Err(TransferError::UnsupportedOperation("请使用监听模式接收文件".to_string()))
+        Err(TransferError::UnsupportedOperation(
+            "请使用监听模式接收文件".to_string(),
+        ))
     }
 
     async fn cancel(&self, task_id: &str) -> TransferResult<()> {

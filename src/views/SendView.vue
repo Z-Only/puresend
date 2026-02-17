@@ -4,10 +4,44 @@
         <v-row>
             <!-- 左侧：文件选择和传输设置 -->
             <v-col cols="12" md="6">
+                <!-- 内容类型选择 -->
+                <ContentTypeSelector @change="handleContentTypeChange" />
+
                 <!-- 文件选择 -->
                 <FileSelector
+                    v-if="contentType === 'file'"
                     @select="handleFileSelect"
                     @clear="handleFileClear"
+                />
+
+                <!-- 文件夹选择 -->
+                <FolderPicker
+                    v-else-if="contentType === 'folder'"
+                    @select="handleContentSelect"
+                />
+
+                <!-- 剪贴板导入 -->
+                <ClipboardImporter
+                    v-else-if="contentType === 'clipboard'"
+                    @select="handleContentSelect"
+                />
+
+                <!-- 文本输入 -->
+                <TextInput
+                    v-else-if="contentType === 'text'"
+                    @select="handleContentSelect"
+                />
+
+                <!-- 媒体选择 -->
+                <MediaPicker
+                    v-else-if="contentType === 'media'"
+                    @select="handleContentSelect"
+                />
+
+                <!-- 应用选择 -->
+                <AppPicker
+                    v-else-if="contentType === 'app'"
+                    @select="handleContentSelect"
                 />
 
                 <!-- 传输模式选择 -->
@@ -79,7 +113,7 @@
 
         <!-- 发送按钮 -->
         <v-fab
-            v-if="selectedFile && selectedPeerId"
+            v-if="(selectedFile || selectedContent) && selectedPeerId"
             color="primary"
             icon="mdi-send"
             location="bottom right"
@@ -99,27 +133,46 @@
 import { ref } from 'vue'
 import {
     FileSelector,
+    ContentTypeSelector,
+    ClipboardImporter,
+    TextInput,
+    MediaPicker,
+    FolderPicker,
+    AppPicker,
     ProgressDisplay,
     ModeSwitcher,
     PeerList,
 } from '../components/transfer'
 import { useTransferStore, useDiscoveryStore } from '../stores'
-import type { TransferMode, TransferTask } from '../types'
+import type {
+    TransferMode,
+    TransferTask,
+    ContentType,
+    ContentItem,
+} from '../types'
 
 const transferStore = useTransferStore()
 const discoveryStore = useDiscoveryStore()
 
+const contentType = ref<ContentType>('file')
 const selectedFile = ref<{
     path: string
     name: string
     size: number
     type: string
 } | null>(null)
+const selectedContent = ref<ContentItem | null>(null)
 const selectedPeerId = ref('')
 const transferMode = ref<TransferMode>('local')
 const sending = ref(false)
 const showError = ref(false)
 const errorMessage = ref('')
+
+function handleContentTypeChange(type: ContentType) {
+    contentType.value = type
+    selectedFile.value = null
+    selectedContent.value = null
+}
 
 async function handleFileSelect(file: {
     path: string
@@ -132,6 +185,10 @@ async function handleFileSelect(file: {
 
 function handleFileClear() {
     selectedFile.value = null
+}
+
+async function handleContentSelect(item: ContentItem) {
+    selectedContent.value = item
 }
 
 function handlePeerSelect(peerId: string) {
@@ -150,7 +207,8 @@ async function handleAddManual(ip: string, port: number) {
 }
 
 async function handleSend() {
-    if (!selectedFile.value || !selectedPeerId.value) return
+    const targetPath = selectedFile.value?.path || selectedContent.value?.path
+    if (!targetPath || !selectedPeerId.value) return
 
     const peer = discoveryStore.selectedPeer
     if (!peer) {
@@ -163,9 +221,7 @@ async function handleSend() {
 
     try {
         // 准备文件传输（计算哈希等）
-        const metadata = await transferStore.prepareTransfer(
-            selectedFile.value.path
-        )
+        const metadata = await transferStore.prepareTransfer(targetPath)
         if (!metadata) {
             throw new Error('准备传输失败')
         }
@@ -181,6 +237,7 @@ async function handleSend() {
         if (taskId) {
             // 清除选择
             selectedFile.value = null
+            selectedContent.value = null
             selectedPeerId.value = ''
         }
     } catch (error) {
@@ -222,5 +279,23 @@ async function handleCleanup() {
 <style scoped>
 .send-view {
     min-height: calc(100vh - 64px);
+}
+
+/* 修复按钮中文本居中问题 */
+.v-btn:deep(.v-btn__content) {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    justify-items: center;
+    width: 100%;
+}
+
+.v-btn:deep(.v-btn__content .v-icon) {
+    grid-column: 1;
+}
+
+.v-btn:deep(.v-btn__content span) {
+    grid-column: 2;
+    text-align: center;
 }
 </style>

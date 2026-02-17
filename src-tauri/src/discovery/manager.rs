@@ -1,10 +1,10 @@
 //! 设备发现管理器
-//! 
+//!
 //! 统一管理设备发现和连接
 
 use crate::discovery::MdnsDiscovery;
 use crate::error::DiscoveryResult;
-use crate::models::{PeerInfo, PeerDiscoveryEvent};
+use crate::models::{PeerDiscoveryEvent, PeerInfo};
 use std::sync::Arc;
 use tokio::sync::{broadcast, Mutex};
 

@@ -1,9 +1,9 @@
 //! 数据模型模块
 
 mod file;
-mod task;
 mod peer;
+mod task;
 
 pub use file::*;
-pub use task::*;
 pub use peer::*;
+pub use task::*;

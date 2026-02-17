@@ -1,10 +1,10 @@
 //! 文件分块处理模块
-//! 
+//!
 //! 负责将大文件分割成固定大小的块，便于传输和断点续传
 
 use crate::error::TransferResult;
 use crate::models::{ChunkInfo, FileMetadata, DEFAULT_CHUNK_SIZE};
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -27,16 +27,16 @@ impl FileChunker {
     }
 
     /// 计算文件的分块信息
-    /// 
+    ///
     /// # Arguments
     /// * `file_path` - 文件路径
-    /// 
+    ///
     /// # Returns
     /// * `TransferResult<Vec<ChunkInfo>>` - 分块信息列表
     pub fn compute_chunks(&self, file_path: &Path) -> TransferResult<Vec<ChunkInfo>> {
         let metadata = std::fs::metadata(file_path)?;
         let file_size = metadata.len();
-        
+
         if file_size == 0 {
             return Ok(Vec::new());
         }
@@ -56,33 +56,38 @@ impl FileChunker {
     }
 
     /// 读取指定分块的数据
-    /// 
+    ///
     /// # Arguments
     /// * `file_path` - 文件路径
     /// * `chunk` - 分块信息
-    /// 
+    ///
     /// # Returns
     /// * `TransferResult<Vec<u8>>` - 分块数据
     pub fn read_chunk(&self, file_path: &Path, chunk: &ChunkInfo) -> TransferResult<Vec<u8>> {
         let mut file = File::open(file_path)?;
         file.seek(SeekFrom::Start(chunk.offset))?;
-        
+
         let mut buffer = vec![0u8; chunk.size as usize];
         file.read_exact(&mut buffer)?;
-        
+
         Ok(buffer)
     }
 
     /// 写入分块数据到文件
-    /// 
+    ///
     /// # Arguments
     /// * `file_path` - 目标文件路径
     /// * `chunk` - 分块信息
     /// * `data` - 分块数据
-    /// 
+    ///
     /// # Returns
     /// * `TransferResult<()>` - 操作结果
-    pub fn write_chunk(&self, file_path: &Path, chunk: &ChunkInfo, data: &[u8]) -> TransferResult<()> {
+    pub fn write_chunk(
+        &self,
+        file_path: &Path,
+        chunk: &ChunkInfo,
+        data: &[u8],
+    ) -> TransferResult<()> {
         // 确保父目录存在
         if let Some(parent) = file_path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -102,10 +107,10 @@ impl FileChunker {
     }
 
     /// 计算数据的 SHA256 哈希值
-    /// 
+    ///
     /// # Arguments
     /// * `data` - 要计算哈希的数据
-    /// 
+    ///
     /// # Returns
     /// * `String` - 十六进制格式的哈希值
     pub fn compute_hash(data: &[u8]) -> String {
@@ -116,10 +121,10 @@ impl FileChunker {
     }
 
     /// 计算整个文件的哈希值
-    /// 
+    ///
     /// # Arguments
     /// * `file_path` - 文件路径
-    /// 
+    ///
     /// # Returns
     /// * `TransferResult<String>` - 十六进制格式的哈希值
     pub fn compute_file_hash(&self, file_path: &Path) -> TransferResult<String> {
@@ -141,11 +146,11 @@ impl FileChunker {
     }
 
     /// 为文件元数据计算并设置所有分块的哈希值
-    /// 
+    ///
     /// # Arguments
     /// * `metadata` - 文件元数据（会被修改）
     /// * `file_path` - 文件路径
-    /// 
+    ///
     /// # Returns
     /// * `TransferResult<FileMetadata>` - 包含哈希值的元数据
     pub fn compute_metadata_with_hashes(
@@ -155,7 +160,7 @@ impl FileChunker {
     ) -> TransferResult<FileMetadata> {
         // 计算文件总哈希
         metadata.hash = self.compute_file_hash(file_path)?;
-        
+
         // 计算每个分块的哈希
         metadata.chunks = self.compute_chunks(file_path)?;
         for chunk in &mut metadata.chunks {
@@ -182,7 +187,7 @@ mod tests {
     fn test_compute_chunks() {
         let chunker = FileChunker::new(100);
         let mut temp_file = NamedTempFile::new().unwrap();
-        
+
         // 写入 250 字节
         temp_file.write_all(&[0u8; 250]).unwrap();
         temp_file.flush().unwrap();

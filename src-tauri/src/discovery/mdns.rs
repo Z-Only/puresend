@@ -1,9 +1,9 @@
 //! mDNS 服务发现模块
-//! 
+//!
 //! 使用多播 DNS 在本地网络中发现 PureSend 设备
 
 use crate::error::DiscoveryResult;
-use crate::models::{DeviceType, PeerInfo, PeerStatus, PeerDiscoveryEvent, PeerEventType};
+use crate::models::{DeviceType, PeerDiscoveryEvent, PeerEventType, PeerInfo, PeerStatus};
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
@@ -97,10 +97,8 @@ impl MdnsDiscovery {
                 Err(_) => return,
             };
 
-            let broadcast_addr = SocketAddr::new(
-                IpAddr::V4(Ipv4Addr::new(255, 255, 255, 255)),
-                MDNS_PORT,
-            );
+            let broadcast_addr =
+                SocketAddr::new(IpAddr::V4(Ipv4Addr::new(255, 255, 255, 255)), MDNS_PORT);
 
             // 构造广播消息
             let message = DiscoveryMessage {
@@ -120,7 +118,11 @@ impl MdnsDiscovery {
                 }
 
                 // 发送广播
-                if socket.send_to(&message_bytes, broadcast_addr).await.is_err() {
+                if socket
+                    .send_to(&message_bytes, broadcast_addr)
+                    .await
+                    .is_err()
+                {
                     // 发送失败，可能网络不可用，继续尝试
                 }
 
@@ -190,10 +192,7 @@ impl MdnsDiscovery {
                             peers_guard.insert(peer.id.clone(), peer.clone());
 
                             // 发送事件
-                            let _ = event_sender.send(PeerDiscoveryEvent {
-                                event_type,
-                                peer,
-                            });
+                            let _ = event_sender.send(PeerDiscoveryEvent { event_type, peer });
                         }
                     }
                     Err(_) => continue,
@@ -299,10 +298,13 @@ struct DiscoveryMessage {
 
 impl Default for MdnsDiscovery {
     fn default() -> Self {
-        Self::new(hostname::get()
-            .ok()
-            .and_then(|h| h.into_string().ok())
-            .unwrap_or_else(|| "PureSend Device".to_string()), 0)
+        Self::new(
+            hostname::get()
+                .ok()
+                .and_then(|h| h.into_string().ok())
+                .unwrap_or_else(|| "PureSend Device".to_string()),
+            0,
+        )
     }
 }
 

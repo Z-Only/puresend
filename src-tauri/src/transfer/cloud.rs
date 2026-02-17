@@ -1,11 +1,11 @@
 //! 云盘传输实现（接口预留）
-//! 
+//!
 //! 提供云盘中转传输的抽象接口，具体实现在后续版本完成
 
-use async_trait::async_trait;
 use crate::error::{TransferError, TransferResult};
 use crate::models::{TransferMode, TransferProgress, TransferTask};
 use crate::transfer::Transport;
+use async_trait::async_trait;
 
 /// 云盘传输配置
 #[derive(Debug, Clone)]
@@ -50,7 +50,7 @@ pub enum CloudProvider {
 }
 
 /// 云盘传输实现
-/// 
+///
 /// 当前仅提供接口定义，具体实现将在后续版本完成
 pub struct CloudTransport {
     /// 配置
@@ -79,10 +79,10 @@ impl CloudTransport {
     }
 
     /// 上传文件到云盘（预留接口）
-    /// 
+    ///
     /// # Arguments
     /// * `_task` - 传输任务
-    /// 
+    ///
     /// # Returns
     /// * `TransferResult<TransferProgress>` - 传输进度
     async fn upload_to_cloud(&self, _task: &TransferTask) -> TransferResult<TransferProgress> {
@@ -118,10 +118,10 @@ impl CloudTransport {
     }
 
     /// 从云盘下载文件（预留接口）
-    /// 
+    ///
     /// # Arguments
     /// * `_task` - 传输任务
-    /// 
+    ///
     /// # Returns
     /// * `TransferResult<TransferProgress>` - 传输进度
     async fn download_from_cloud(&self, _task: &TransferTask) -> TransferResult<TransferProgress> {
@@ -157,11 +157,11 @@ impl CloudTransport {
     }
 
     /// 生成分享链接（预留接口）
-    /// 
+    ///
     /// # Arguments
     /// * `_file_id` - 文件 ID
     /// * `_expires_in` - 过期时间（秒）
-    /// 
+    ///
     /// # Returns
     /// * `TransferResult<String>` - 分享链接
     pub async fn generate_share_link(
@@ -184,7 +184,7 @@ impl Transport for CloudTransport {
                 "云盘访问凭据未配置".to_string(),
             ));
         }
-        
+
         if self.config.bucket.is_empty() {
             return Err(TransferError::InvalidMetadata(
                 "存储桶名称未配置".to_string(),

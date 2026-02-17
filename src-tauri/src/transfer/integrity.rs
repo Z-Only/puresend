@@ -1,5 +1,5 @@
 //! 完整性校验模块
-//! 
+//!
 //! 提供文件传输前后的数据完整性验证
 
 use crate::error::TransferResult;
@@ -28,13 +28,13 @@ impl IntegrityChecker {
     }
 
     /// 验证文件完整性
-    /// 
+    ///
     /// 比较文件的实际哈希与期望哈希
-    /// 
+    ///
     /// # Arguments
     /// * `file_path` - 文件路径
     /// * `expected_hash` - 期望的 SHA256 哈希值
-    /// 
+    ///
     /// # Returns
     /// * `TransferResult<bool>` - 校验结果
     pub fn verify_file(&self, file_path: &Path, expected_hash: &str) -> TransferResult<bool> {
@@ -43,11 +43,11 @@ impl IntegrityChecker {
     }
 
     /// 验证指定分块的完整性
-    /// 
+    ///
     /// # Arguments
     /// * `file_path` - 文件路径
     /// * `chunk` - 分块信息（包含期望哈希）
-    /// 
+    ///
     /// # Returns
     /// * `TransferResult<bool>` - 校验结果
     pub fn verify_chunk(&self, file_path: &Path, chunk: &ChunkInfo) -> TransferResult<bool> {
@@ -57,11 +57,11 @@ impl IntegrityChecker {
     }
 
     /// 验证整个文件的所有分块
-    /// 
+    ///
     /// # Arguments
     /// * `file_path` - 文件路径
     /// * `chunks` - 所有分块信息
-    /// 
+    ///
     /// # Returns
     /// * `TransferResult<Vec<(u32, bool)>>` - 每个分块的校验结果（索引, 是否通过）
     pub fn verify_all_chunks(
@@ -70,7 +70,7 @@ impl IntegrityChecker {
         chunks: &[ChunkInfo],
     ) -> TransferResult<Vec<(u32, bool)>> {
         let mut results = Vec::with_capacity(chunks.len());
-        
+
         for chunk in chunks {
             let is_valid = if chunk.hash.is_empty() {
                 // 如果分块没有哈希值，跳过校验
@@ -85,13 +85,13 @@ impl IntegrityChecker {
     }
 
     /// 完整验证文件元数据
-    /// 
+    ///
     /// 验证文件大小、总哈希和所有分块哈希
-    /// 
+    ///
     /// # Arguments
     /// * `file_path` - 文件路径
     /// * `metadata` - 文件元数据
-    /// 
+    ///
     /// # Returns
     /// * `TransferResult<VerificationResult>` - 验证结果详情
     pub fn verify_metadata(
@@ -144,14 +144,14 @@ impl IntegrityChecker {
     }
 
     /// 快速校验 - 仅检查文件大小和部分分块
-    /// 
+    ///
     /// 用于传输过程中的快速验证
-    /// 
+    ///
     /// # Arguments
     /// * `file_path` - 文件路径
     /// * `metadata` - 文件元数据
     /// * `sample_count` - 抽样校验的分块数量
-    /// 
+    ///
     /// # Returns
     /// * `TransferResult<bool>` - 快速校验结果
     pub fn quick_verify(
@@ -255,6 +255,8 @@ mod tests {
 
         let hash = checker.chunker.compute_file_hash(temp_file.path()).unwrap();
         assert!(checker.verify_file(temp_file.path(), &hash).unwrap());
-        assert!(!checker.verify_file(temp_file.path(), "invalid_hash").unwrap());
+        assert!(!checker
+            .verify_file(temp_file.path(), "invalid_hash")
+            .unwrap());
     }
 }

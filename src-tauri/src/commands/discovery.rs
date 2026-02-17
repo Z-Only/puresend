@@ -46,7 +46,7 @@ pub async fn init_discovery(
     // 订阅发现事件并转发到前端
     let mut event_receiver = manager.subscribe();
     let app_handle = app.clone();
-    
+
     tokio::spawn(async move {
         while let Ok(event) = event_receiver.recv().await {
             let _ = app_handle.emit("peer-discovery", &event);
@@ -64,7 +64,7 @@ pub async fn init_discovery(
 #[tauri::command]
 pub async fn stop_discovery(state: State<'_, DiscoveryState>) -> Result<(), String> {
     let mut manager_guard = state.manager.lock().await;
-    
+
     if let Some(manager) = manager_guard.take() {
         manager.stop().await.map_err(|e| e.to_string())?;
     }
@@ -76,7 +76,7 @@ pub async fn stop_discovery(state: State<'_, DiscoveryState>) -> Result<(), Stri
 #[tauri::command]
 pub async fn get_peers(state: State<'_, DiscoveryState>) -> Result<Vec<PeerInfo>, String> {
     let manager_guard = state.manager.lock().await;
-    
+
     if let Some(manager) = manager_guard.as_ref() {
         Ok(manager.get_peers().await)
     } else {
@@ -86,9 +86,12 @@ pub async fn get_peers(state: State<'_, DiscoveryState>) -> Result<Vec<PeerInfo>
 
 /// 获取指定设备信息
 #[tauri::command]
-pub async fn get_peer(state: State<'_, DiscoveryState>, peer_id: String) -> Result<Option<PeerInfo>, String> {
+pub async fn get_peer(
+    state: State<'_, DiscoveryState>,
+    peer_id: String,
+) -> Result<Option<PeerInfo>, String> {
     let manager_guard = state.manager.lock().await;
-    
+
     if let Some(manager) = manager_guard.as_ref() {
         Ok(manager.get_peer(&peer_id).await)
     } else {
@@ -104,7 +107,7 @@ pub async fn add_peer_manual(
     port: u16,
 ) -> Result<PeerInfo, String> {
     let manager_guard = state.manager.lock().await;
-    
+
     if let Some(manager) = manager_guard.as_ref() {
         Ok(manager.add_peer_manual(ip, port).await)
     } else {
@@ -119,7 +122,7 @@ pub async fn is_peer_online(
     peer_id: String,
 ) -> Result<bool, String> {
     let manager_guard = state.manager.lock().await;
-    
+
     if let Some(manager) = manager_guard.as_ref() {
         Ok(manager.is_peer_online(&peer_id).await)
     } else {
@@ -131,7 +134,7 @@ pub async fn is_peer_online(
 #[tauri::command]
 pub async fn get_online_count(state: State<'_, DiscoveryState>) -> Result<usize, String> {
     let manager_guard = state.manager.lock().await;
-    
+
     if let Some(manager) = manager_guard.as_ref() {
         Ok(manager.online_count().await)
     } else {

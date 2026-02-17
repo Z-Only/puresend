@@ -49,7 +49,7 @@ impl FileMetadata {
             "css" => "text/css".to_string(),
             "js" => "application/javascript".to_string(),
             "ts" => "application/typescript".to_string(),
-            
+
             // 图像类型
             "jpg" | "jpeg" => "image/jpeg".to_string(),
             "png" => "image/png".to_string(),
@@ -58,36 +58,40 @@ impl FileMetadata {
             "svg" => "image/svg+xml".to_string(),
             "bmp" => "image/bmp".to_string(),
             "ico" => "image/x-icon".to_string(),
-            
+
             // 视频类型
             "mp4" => "video/mp4".to_string(),
             "avi" => "video/x-msvideo".to_string(),
             "mov" => "video/quicktime".to_string(),
             "mkv" => "video/x-matroska".to_string(),
             "webm" => "video/webm".to_string(),
-            
+
             // 音频类型
             "mp3" => "audio/mpeg".to_string(),
             "wav" => "audio/wav".to_string(),
             "ogg" => "audio/ogg".to_string(),
             "flac" => "audio/flac".to_string(),
-            
+
             // 文档类型
             "pdf" => "application/pdf".to_string(),
             "doc" => "application/msword".to_string(),
-            "docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document".to_string(),
+            "docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                .to_string(),
             "xls" => "application/vnd.ms-excel".to_string(),
-            "xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet".to_string(),
+            "xlsx" => {
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet".to_string()
+            }
             "ppt" => "application/vnd.ms-powerpoint".to_string(),
-            "pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation".to_string(),
-            
+            "pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                .to_string(),
+
             // 压缩文件
             "zip" => "application/zip".to_string(),
             "rar" => "application/vnd.rar".to_string(),
             "7z" => "application/x-7z-compressed".to_string(),
             "tar" => "application/x-tar".to_string(),
             "gz" => "application/gzip".to_string(),
-            
+
             // 其他
             _ => "application/octet-stream".to_string(),
         }
@@ -144,7 +148,10 @@ mod tests {
         assert_eq!(FileMetadata::infer_mime_type("test.txt"), "text/plain");
         assert_eq!(FileMetadata::infer_mime_type("image.jpg"), "image/jpeg");
         assert_eq!(FileMetadata::infer_mime_type("doc.pdf"), "application/pdf");
-        assert_eq!(FileMetadata::infer_mime_type("unknown.xyz"), "application/octet-stream");
+        assert_eq!(
+            FileMetadata::infer_mime_type("unknown.xyz"),
+            "application/octet-stream"
+        );
     }
 
     #[test]
