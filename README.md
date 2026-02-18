@@ -79,6 +79,43 @@ pnpm tauri android build
 pnpm tauri android build --release
 ```
 
+## CI/CD 构建
+
+本项目使用 GitHub Actions 实现全平台自动化构建。
+
+### 触发构建
+
+**方式一：推送 Tag**
+```bash
+# 创建并推送版本标签，自动触发构建
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+**方式二：手动触发**
+1. 进入 GitHub 仓库的 **Actions** 页面
+2. 选择 **Build and Release** 工作流
+3. 点击 **Run workflow**，选择构建选项
+
+### 构建产物
+
+构建完成后，产物可在以下位置下载：
+
+| 来源 | 说明 |
+|------|------|
+| **GitHub Release** | 推送 tag 后自动创建，包含所有平台安装包 |
+| **Actions Artifacts** | 手动触发后可在 Actions 运行记录中下载 |
+
+### 支持的构建平台
+
+| 平台 | 架构 | 输出格式 |
+|------|------|----------|
+| macOS (Intel) | x64 | .app, .dmg |
+| macOS (Apple Silicon) | arm64 | .app, .dmg |
+| Windows | x64 | .msi, .exe (NSIS) |
+| Linux | x64 | .deb, .AppImage, .rpm |
+| Android | arm64, armv7, x86, x64 | .apk, .aab |
+
 ## Recommended IDE Setup
 
 - [VS Code](https://code.visualstudio.com/) + [Vue - Official](https://marketplace.visualstudio.com/items?itemName=Vue.volar) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
