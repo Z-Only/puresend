@@ -1,8 +1,21 @@
 # PureSend
 
-跨平台文件传输应用，基于 Tauri 2 + Vue 3 + TypeScript 构建。
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub release](https://img.shields.io/github/v/release/z-only/puresend?include_prereleases)](https://github.com/z-only/puresend/releases)
+[![GitHub stars](https://img.shields.io/github/stars/z-only/puresend?style=social)](https://github.com/z-only/puresend/stargazers)
+
+**跨平台文件传输应用**，基于 Tauri 2 + Vue 3 + TypeScript 构建。支持 macOS、Windows、Linux 和 Android 平台，实现设备间快速、安全的文件传输。
 
 📚 **文档站点**: https://z-only.github.io/puresend/
+
+## 功能特性
+
+- 🚀 **快速传输** - 局域网内高速文件传输
+- 🔒 **安全可靠** - 端到端加密，保护数据安全
+- 🌐 **跨平台** - 支持 macOS、Windows、Linux 和 Android
+- 📱 **移动端支持** - Android 设备无缝连接
+- 🌍 **多语言** - 支持中文、英文等多语言界面
+- 🎨 **现代化界面** - 基于 Material Design 的简洁 UI
 
 ## 支持的平台
 

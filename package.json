@@ -1,8 +1,26 @@
 {
   "name": "puresend",
-  "private": true,
   "version": "0.1.0",
+  "description": "跨平台文件传输应用，基于 Tauri 2 + Vue 3 + TypeScript 构建",
+  "author": "PureSend Contributors",
+  "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/z-only/puresend.git"
+  },
+  "bugs": {
+    "url": "https://github.com/z-only/puresend/issues"
+  },
+  "homepage": "https://z-only.github.io/puresend/",
+  "keywords": [
+    "tauri",
+    "vue3",
+    "file-transfer",
+    "cross-platform",
+    "p2p",
+    "desktop-app"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
