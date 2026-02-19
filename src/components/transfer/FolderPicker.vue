@@ -129,9 +129,8 @@ async function pickFolder() {
             }
 
             emit('select', selectedFolder.value)
-        } else {
-            errorMessage.value = t('folderPicker.noFolderSelected')
         }
+        // 用户取消选择时不显示错误信息，静默关闭即可
     } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error)
         errorMessage.value = t('folderPicker.selectFailed', { error: errorMsg })

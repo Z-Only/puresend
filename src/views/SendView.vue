@@ -55,23 +55,42 @@
                     @thumbnail-error="handleThumbnailError"
                 />
 
-                <!-- 传输模式选择 -->
-                <ModeSwitcher
-                    v-model="transferMode"
-                    :online-peer-count="discoveryStore.onlineCount"
+                <!-- 发送模式选择器 -->
+                <SendModeSelector
+                    v-model="sendMode"
+                    :has-selected-files="selectedFiles.count.value > 0"
                     class="mt-4"
+                    @change="handleSendModeChange"
                 />
 
-                <!-- 设备列表（本地网络模式） -->
-                <PeerList
-                    v-if="transferMode === 'local'"
-                    :peers="discoveryStore.peerList"
-                    :selected-peer-id="selectedPeerId"
-                    :loading="discoveryStore.scanning"
+                <!-- 设备列表（P2P 模式） -->
+                <template v-if="sendMode === 'p2p'">
+                    <ModeSwitcher
+                        v-model="transferMode"
+                        :online-peer-count="discoveryStore.onlineCount"
+                        class="mt-4"
+                    />
+
+                    <PeerList
+                        v-if="transferMode === 'local'"
+                        :peers="discoveryStore.peerList"
+                        :selected-peer-id="selectedPeerId"
+                        :loading="discoveryStore.scanning"
+                        class="mt-4"
+                        @select="handlePeerSelect"
+                        @refresh="handlePeerRefresh"
+                        @add-manual="handleAddManual"
+                    />
+                </template>
+
+                <!-- 分享链接面板（链接分享模式） -->
+                <LinkSharePanel
+                    v-else-if="sendMode === 'link'"
+                    :files="[...selectedFiles.files.value]"
                     class="mt-4"
-                    @select="handlePeerSelect"
-                    @refresh="handlePeerRefresh"
-                    @add-manual="handleAddManual"
+                    @start-share="handleStartShare"
+                    @stop-share="handleStopShare"
+                    @settings="handleShareSettings"
                 />
             </v-col>
 
@@ -124,9 +143,13 @@
             </v-col>
         </v-row>
 
-        <!-- 发送按钮 -->
+        <!-- 发送按钮（P2P 模式） -->
         <v-fab
-            v-if="selectedFiles.count.value > 0 && selectedPeerId"
+            v-if="
+                selectedFiles.count.value > 0 &&
+                selectedPeerId &&
+                sendMode === 'p2p'
+            "
             color="primary"
             :icon="mdiSend"
             location="bottom right"
@@ -148,11 +171,20 @@
         <v-snackbar v-model="showError" color="error" :timeout="5000">
             {{ errorMessage }}
         </v-snackbar>
+
+        <!-- 分享设置对话框 -->
+        <ShareSettingsDialog
+            :visible="showShareSettings"
+            :settings="shareSettings"
+            @update:visible="showShareSettings = $event"
+            @update:settings="handleApplyShareSettings"
+        />
     </v-container>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
     FileSelector,
@@ -166,8 +198,11 @@ import {
     ModeSwitcher,
     PeerList,
     SelectedFileList,
+    SendModeSelector,
+    LinkSharePanel,
+    ShareSettingsDialog,
 } from '../components/transfer'
-import { useTransferStore, useDiscoveryStore } from '../stores'
+import { useTransferStore, useDiscoveryStore, useShareStore } from '../stores'
 import { useSelectedFiles } from '../composables'
 import type {
     TransferMode,
@@ -176,23 +211,72 @@ import type {
     ThumbnailInfo,
     FileSourceType,
     TransferTask,
+    SendMode,
+    ShareSettings,
+    FileMetadata,
 } from '../types'
 import { FILE_COUNT_LIMIT } from '../types/content'
 import { mdiInboxArrowUp, mdiSend } from '@mdi/js'
 
+const router = useRouter()
 const { t } = useI18n()
 const transferStore = useTransferStore()
 const discoveryStore = useDiscoveryStore()
+const shareStore = useShareStore()
 
 // 使用已选文件管理 composable
 const selectedFiles = useSelectedFiles()
 
+// 页面激活时恢复文件列表
+onMounted(() => {
+    // 从 shareStore 恢复已选文件列表
+    if (shareStore.selectedFiles.length > 0) {
+        selectedFiles.addFiles(
+            shareStore.selectedFiles.map((f) => ({
+                path: f.path,
+                name: f.name,
+                size: f.size,
+                mimeType: f.mimeType,
+                sourceType: f.sourceType,
+                relativePath: f.relativePath,
+                isTemp: f.isTemp,
+                metadata: f.metadata,
+            }))
+        )
+    }
+})
+
 const contentType = ref<ContentType>('file')
 const selectedPeerId = ref('')
 const transferMode = ref<TransferMode>('local')
+const sendMode = ref<SendMode>('p2p')
 const sending = ref(false)
 const showError = ref(false)
 const errorMessage = ref('')
+const showShareSettings = ref(false)
+const shareSettings = ref<ShareSettings>({
+    pinEnabled: false,
+    pin: '',
+    autoAccept: false,
+})
+
+// 处理发送模式切换
+async function handleSendModeChange(mode: 'p2p' | 'link') {
+    if (mode === 'link' && selectedFiles.count.value > 0) {
+        try {
+            // 有选中文件时，将文件列表保存到 shareStore
+            shareStore.setSelectedFiles([...selectedFiles.files.value])
+            // 跳转到链接分享界面，由 ShareLinkView 自动开始分享
+            router.push({ name: 'ShareLink' })
+        } catch (error) {
+            console.error('切换到链接分享模式失败:', error)
+            // 跳转失败时，恢复为 P2P 模式
+            sendMode.value = 'p2p'
+            showError.value = true
+            errorMessage.value = t('share.switchModeError')
+        }
+    }
+}
 
 // 添加结果提示
 const showAddResult = ref(false)
@@ -439,6 +523,37 @@ async function handleSend() {
     }
 }
 
+// 处理开始分享
+async function handleStartShare(files: FileMetadata[]) {
+    try {
+        await shareStore.startShare(files)
+    } catch (error) {
+        showError.value = true
+        errorMessage.value = t('share.startError', { error })
+    }
+}
+
+// 处理停止分享
+async function handleStopShare() {
+    try {
+        await shareStore.stopShare()
+    } catch (error) {
+        showError.value = true
+        errorMessage.value = t('share.stopError', { error })
+    }
+}
+
+// 处理分享设置
+function handleShareSettings() {
+    showShareSettings.value = true
+}
+
+// 处理应用分享设置
+function handleApplyShareSettings(settings: ShareSettings) {
+    shareSettings.value = settings
+    shareStore.updateSettings(settings)
+}
+
 async function handleCancel(taskId: string) {
     await transferStore.cancel(taskId)
 }
@@ -457,8 +572,8 @@ async function handleRetry(task: TransferTask) {
     }
 }
 
-function handleRemoveTask(taskId: string) {
-    transferStore.tasks.delete(taskId)
+async function handleRemoveTask(taskId: string) {
+    await transferStore.removeTask(taskId)
 }
 
 async function handleCleanup() {
@@ -468,24 +583,7 @@ async function handleCleanup() {
 
 <style scoped>
 .send-view {
-    min-height: calc(100vh - 64px);
-}
-
-/* 修复按钮中文本居中问题 */
-.v-btn:deep(.v-btn__content) {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
-    justify-items: center;
-    width: 100%;
-}
-
-.v-btn:deep(.v-btn__content .v-icon) {
-    grid-column: 1;
-}
-
-.v-btn:deep(.v-btn__content span) {
-    grid-column: 2;
-    text-align: center;
+    max-width: 1400px;
+    margin: 0 auto;
 }
 </style>

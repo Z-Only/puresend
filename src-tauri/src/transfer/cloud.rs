@@ -9,6 +9,7 @@ use async_trait::async_trait;
 
 /// 云盘传输配置
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct CloudTransportConfig {
     /// 云服务提供商
     pub provider: CloudProvider,
@@ -36,6 +37,7 @@ impl Default for CloudTransportConfig {
 
 /// 云服务提供商
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum CloudProvider {
     /// 阿里云 OSS
     AliyunOss,
@@ -52,11 +54,13 @@ pub enum CloudProvider {
 /// 云盘传输实现
 ///
 /// 当前仅提供接口定义，具体实现将在后续版本完成
+#[allow(dead_code)]
 pub struct CloudTransport {
     /// 配置
     config: CloudTransportConfig,
 }
 
+#[allow(dead_code)]
 impl CloudTransport {
     /// 创建新的云盘传输实例
     pub fn new(config: CloudTransportConfig) -> Self {

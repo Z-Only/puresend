@@ -118,6 +118,7 @@ pub struct LocalTransport {
 
 /// 传输任务状态
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct TransferTaskState {
     /// 进度
     progress: TransferProgress,
@@ -140,6 +141,7 @@ impl LocalTransport {
     }
 
     /// 使用指定端口创建本地传输实例
+    #[allow(dead_code)]
     pub fn with_port(port: u16) -> Self {
         Self {
             listen_port: port,

@@ -20,7 +20,7 @@ const currentTheme = computed({
     set: async (value: ThemeMode) => {
         await settingsStore.setTheme(value)
         // 应用主题变化到 Vuetify
-        vuetifyTheme.global.name.value = settingsStore.actualTheme
+        vuetifyTheme.change(settingsStore.actualTheme)
     },
 })
 </script>

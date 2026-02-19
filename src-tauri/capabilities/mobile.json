@@ -10,7 +10,7 @@
     "core:event:default",
     "core:event:allow-emit",
     "core:event:allow-listen",
-    "opener:default",
+    "shell:default",
     "clipboard-manager:default",
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-write-text",

@@ -24,7 +24,7 @@ const vuetify = createVuetify({
         },
     },
     theme: {
-        defaultTheme: 'light',
+        defaultTheme: 'system',
         themes: {
             light: {
                 dark: false,
@@ -68,7 +68,7 @@ settingsStore.loadSettings().then(() => {
     setI18nLanguage(settingsStore.actualLanguage)
 
     // 应用保存的主题设置
-    vuetify.theme.global.name.value = settingsStore.actualTheme
+    vuetify.theme.change(settingsStore.actualTheme)
 })
 
 app.use(vuetify)

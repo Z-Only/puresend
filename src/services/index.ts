@@ -4,3 +4,4 @@
 
 export * from './transferService'
 export * from './discoveryService'
+export * from './shareService'

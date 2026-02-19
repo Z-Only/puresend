@@ -5,3 +5,4 @@
 export { useTransferStore } from './transfer'
 export { useDiscoveryStore } from './discovery'
 export { useSettingsStore } from './settings'
+export { useShareStore } from './share'

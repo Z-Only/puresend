@@ -20,30 +20,30 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
-tauri-plugin-opener = "2"
-tauri-plugin-dialog = "2"
+tauri-plugin-shell = "2"
 tauri-plugin-fs = "2"
+tauri-plugin-dialog = "2"
 tauri-plugin-clipboard-manager = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-
-# 异步运行时
 tokio = { version = "1", features = ["full"] }
-
-# 异步 trait
-async-trait = "0.1"
-
-# UUID 生成
-uuid = { version = "1", features = ["v4", "serde"] }
-
-# 哈希计算
+base64 = "0.22"
 sha2 = "0.10"
-
-# 错误处理
-thiserror = "1"
-
-# 获取主机名
-hostname = "0.4"
+thiserror = "2"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+local-ip-address = "0.6"
+bytes = "1"
+futures = "0.3"
+axum = "0.8"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors"] }
+tokio-util = { version = "0.7", features = ["io"] }
+hex = "0.4"
+qrcode = "0.14"
+urlencoding = "2.1"
+async-trait = "0.1.89"
+hostname = "0.4.2"
 
 [dev-dependencies]
 tempfile = "3"

@@ -99,11 +99,13 @@ impl FileMetadata {
     }
 
     /// 获取文件扩展名
+    #[allow(dead_code)]
     pub fn extension(&self) -> Option<&str> {
         self.name.rsplit('.').next()
     }
 
     /// 计算分块数量
+    #[allow(dead_code)]
     pub fn chunk_count(&self, chunk_size: u64) -> u32 {
         if self.size == 0 {
             return 0;

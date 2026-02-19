@@ -10,6 +10,7 @@ use async_trait::async_trait;
 ///
 /// 所有传输实现（本地、云盘等）都需要实现此接口
 #[async_trait]
+#[allow(dead_code)]
 pub trait Transport: Send + Sync {
     /// 初始化传输通道
     ///
@@ -61,6 +62,7 @@ pub trait Transport: Send + Sync {
 /// 传输工厂 Trait
 ///
 /// 用于创建不同类型的传输实例
+#[allow(dead_code)]
 pub trait TransportFactory: Send + Sync {
     /// 创建传输实例
     fn create(&self) -> Box<dyn Transport>;

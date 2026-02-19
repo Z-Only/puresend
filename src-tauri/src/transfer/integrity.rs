@@ -21,6 +21,7 @@ impl IntegrityChecker {
     }
 
     /// 使用指定分块大小创建校验器
+    #[allow(dead_code)]
     pub fn with_chunk_size(chunk_size: u64) -> Self {
         Self {
             chunker: FileChunker::new(chunk_size),
@@ -50,6 +51,7 @@ impl IntegrityChecker {
     ///
     /// # Returns
     /// * `TransferResult<bool>` - 校验结果
+    #[allow(dead_code)]
     pub fn verify_chunk(&self, file_path: &Path, chunk: &ChunkInfo) -> TransferResult<bool> {
         let data = self.chunker.read_chunk(file_path, chunk)?;
         let actual_hash = FileChunker::compute_hash(&data);
@@ -64,6 +66,7 @@ impl IntegrityChecker {
     ///
     /// # Returns
     /// * `TransferResult<Vec<(u32, bool)>>` - 每个分块的校验结果（索引, 是否通过）
+    #[allow(dead_code)]
     pub fn verify_all_chunks(
         &self,
         file_path: &Path,
@@ -94,6 +97,7 @@ impl IntegrityChecker {
     ///
     /// # Returns
     /// * `TransferResult<VerificationResult>` - 验证结果详情
+    #[allow(dead_code)]
     pub fn verify_metadata(
         &self,
         file_path: &Path,
@@ -154,6 +158,7 @@ impl IntegrityChecker {
     ///
     /// # Returns
     /// * `TransferResult<bool>` - 快速校验结果
+    #[allow(dead_code)]
     pub fn quick_verify(
         &self,
         file_path: &Path,
@@ -202,6 +207,7 @@ impl Default for IntegrityChecker {
 
 /// 验证结果
 #[derive(Debug, Default)]
+#[allow(dead_code)]
 pub struct VerificationResult {
     /// 文件是否存在
     pub file_exists: bool,
@@ -219,6 +225,7 @@ pub struct VerificationResult {
 
 impl VerificationResult {
     /// 获取失败原因描述
+    #[allow(dead_code)]
     pub fn failure_reason(&self) -> Option<String> {
         if !self.file_exists {
             return Some("文件不存在".to_string());

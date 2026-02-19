@@ -88,7 +88,7 @@ pub async fn prepare_file_transfer(
     let path = PathBuf::from(&file_path);
 
     if !path.exists() {
-        return Err(format!("文件不存在: {}", file_path));
+        return Err(format!("文件不存在：{}", file_path));
     }
 
     let file_name = path
@@ -193,7 +193,7 @@ pub async fn send_file(
     Ok(task_id)
 }
 
-/// 发送文件（后台执行，立即返回任务ID）
+/// 发送文件（后台执行，立即返回任务 ID）
 #[tauri::command]
 pub async fn send_file_async(
     app: AppHandle,
@@ -317,7 +317,7 @@ pub async fn get_transfer_progress(
     active_tasks
         .get(&task_id)
         .map(|t| TransferProgress::from(t))
-        .ok_or_else(|| format!("任务不存在: {}", task_id))
+        .ok_or_else(|| format!("任务不存在：{}", task_id))
 }
 
 /// 获取所有活跃任务
@@ -355,123 +355,6 @@ pub async fn cleanup_completed_tasks(state: State<'_, TransferState>) -> Result<
     });
 
     Ok(before_count - active_tasks.len())
-}
-
-/// 启动接收监听服务器（内部实现）
-async fn start_receiving_impl(state: &State<'_, TransferState>) -> Result<ReceivingState, String> {
-    use std::net::IpAddr;
-    use std::str::FromStr;
-
-    let mut receiving_state = state.receiving_state.lock().await;
-
-    if receiving_state.is_receiving {
-        return Err("接收服务已在运行".to_string());
-    }
-
-    // 获取本机 IP 地址
-    let network_address = get_local_ip().unwrap_or_else(|| IpAddr::from_str("127.0.0.1").unwrap());
-    let network_address_str = network_address.to_string();
-
-    // 生成随机端口（10000-20000 范围）
-    let port = 10000
-        + (std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis()
-            % 10000) as u16;
-
-    // 生成分享码（6 位随机数字）
-    let share_code = format!("{:06}", port % 10000);
-
-    receiving_state.is_receiving = true;
-    receiving_state.port = port;
-    receiving_state.network_address = network_address_str.clone();
-    receiving_state.share_code = share_code.clone();
-
-    Ok(ReceivingState {
-        is_receiving: true,
-        port,
-        network_address: network_address_str,
-        share_code,
-    })
-}
-
-/// 启动接收监听服务器
-#[tauri::command]
-pub async fn start_receiving(
-    app: AppHandle,
-    state: State<'_, TransferState>,
-) -> Result<ReceivingState, String> {
-    let receiving_state = start_receiving_impl(&state).await?;
-
-    // 启动接收监听（后台任务）
-    let _receiving_state_clone = state.receiving_state.clone();
-    let app_handle = app.clone();
-
-    tokio::spawn(async move {
-        // TODO: 实现接收监听逻辑
-        // 这里需要启动 TCP 监听器，等待发送方连接
-        let _ = app_handle.emit("receiving-started", &*_receiving_state_clone.lock().await);
-    });
-
-    Ok(receiving_state)
-}
-
-/// 停止接收监听服务器
-#[tauri::command]
-pub async fn stop_receiving(state: State<'_, TransferState>) -> Result<(), String> {
-    let mut receiving_state = state.receiving_state.lock().await;
-
-    if !receiving_state.is_receiving {
-        return Err("接收服务未运行".to_string());
-    }
-
-    receiving_state.is_receiving = false;
-    receiving_state.port = 0;
-    receiving_state.network_address = String::new();
-    receiving_state.share_code = String::new();
-
-    Ok(())
-}
-
-/// 获取接收目录
-#[tauri::command]
-pub async fn get_receive_directory() -> Result<String, String> {
-    let home_dir = std::env::var("HOME").map_err(|_| "无法获取主目录".to_string())?;
-    let receive_dir = std::path::PathBuf::from(home_dir)
-        .join("Downloads")
-        .join("PureSend");
-
-    // 确保目录存在
-    std::fs::create_dir_all(&receive_dir).map_err(|e| format!("创建目录失败：{}", e))?;
-
-    Ok(receive_dir.to_string_lossy().to_string())
-}
-
-/// 设置接收目录
-#[tauri::command]
-pub async fn set_receive_directory(directory: String) -> Result<(), String> {
-    let path = PathBuf::from(&directory);
-
-    if !path.exists() {
-        std::fs::create_dir_all(&path).map_err(|e| format!("创建目录失败：{}", e))?;
-    }
-
-    // TODO: 保存到配置文件
-    Ok(())
-}
-
-/// 获取本机 IP 地址
-fn get_local_ip() -> Option<std::net::IpAddr> {
-    // 尝试获取本机 IP 地址
-    if let Ok(socket) = std::net::UdpSocket::bind("0.0.0.0:0") {
-        if socket.connect("8.8.8.8:80").is_ok() {
-            if let Ok(addr) = socket.local_addr() {
-                return Some(addr.ip());
-            }
-        }
-    }
-    None
 }
 
 /// 获取网络信息（不启动接收服务）
@@ -550,6 +433,7 @@ pub struct FileInfo {
     /// 相对路径
     pub relative_path: String,
 }
+
 /// 递归获取文件夹下的所有文件
 #[tauri::command]
 pub async fn get_files_in_folder(folder_path: String) -> Result<Vec<FileInfo>, String> {
@@ -618,46 +502,15 @@ fn collect_files_recursive(
     Ok(())
 }
 
-/// 将剪贴板内容保存为临时文件
-#[tauri::command]
-pub async fn save_clipboard_to_temp(content: String) -> Result<String, String> {
-    // 获取系统临时目录
-    let temp_dir = std::env::temp_dir().join("puresend");
-
-    // 确保临时目录存在
-    std::fs::create_dir_all(&temp_dir).map_err(|e| format!("创建临时目录失败：{}", e))?;
-
-    // 生成唯一文件名
-    let timestamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|e| format!("获取时间戳失败：{}", e))?;
-    let file_name = format!("clipboard_{}.txt", timestamp.as_millis());
-    let temp_file = temp_dir.join(&file_name);
-
-    // 写入内容
-    std::fs::write(&temp_file, &content).map_err(|e| format!("写入文件失败：{}", e))?;
-
-    Ok(temp_file.to_string_lossy().to_string())
-}
-
-/// 清理临时文件
-#[tauri::command]
-pub async fn cleanup_temp_file(file_path: String) -> Result<(), String> {
-    let path = PathBuf::from(&file_path);
-
-    // 验证路径在临时目录内（安全检查）
-    let temp_dir = std::env::temp_dir().join("puresend");
-    let canonical_path = path
-        .canonicalize()
-        .map_err(|e| format!("路径验证失败：{}", e))?;
-
-    if !canonical_path.starts_with(&temp_dir) {
-        return Err("只能清理临时目录中的文件".to_string());
+/// 获取本机 IP 地址
+fn get_local_ip() -> Option<std::net::IpAddr> {
+    // 尝试获取本机 IP 地址
+    if let Ok(socket) = std::net::UdpSocket::bind("0.0.0.0:0") {
+        if socket.connect("8.8.8.8:80").is_ok() {
+            if let Ok(addr) = socket.local_addr() {
+                return Some(addr.ip());
+            }
+        }
     }
-
-    if canonical_path.exists() {
-        std::fs::remove_file(&canonical_path).map_err(|e| format!("删除文件失败：{}", e))?;
-    }
-
-    Ok(())
+    None
 }

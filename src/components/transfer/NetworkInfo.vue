@@ -34,7 +34,7 @@
                     <v-img
                         v-if="qrCodeDataUrl"
                         :src="qrCodeDataUrl"
-                        alt="连接二维码"
+                        :alt="t('network.qrCodeAlt')"
                         width="180"
                         height="180"
                         contain

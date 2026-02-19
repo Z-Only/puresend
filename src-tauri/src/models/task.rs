@@ -66,6 +66,7 @@ impl TransferTask {
     }
 
     /// 更新进度
+    #[allow(dead_code)]
     pub fn update_progress(&mut self, transferred_bytes: u64, speed: u64) {
         self.transferred_bytes = transferred_bytes;
         self.speed = speed;
@@ -80,6 +81,7 @@ impl TransferTask {
     }
 
     /// 标记为完成
+    #[allow(dead_code)]
     pub fn complete(&mut self) {
         self.status = TaskStatus::Completed;
         self.progress = 100.0;
@@ -105,6 +107,7 @@ impl TransferTask {
     }
 
     /// 标记为取消
+    #[allow(dead_code)]
     pub fn cancel(&mut self) {
         self.status = TaskStatus::Cancelled;
         self.completed_at = Some(

@@ -172,6 +172,7 @@ impl FileChunker {
     }
 
     /// 获取分块大小
+    #[allow(dead_code)]
     pub fn chunk_size(&self) -> u64 {
         self.chunk_size
     }

@@ -75,11 +75,13 @@ impl DiscoveryManager {
     }
 
     /// 手动添加设备
+    #[allow(dead_code)]
     pub async fn add_peer_manual(&self, ip: String, port: u16) -> PeerInfo {
         self.mdns.add_peer_manual(ip, port).await
     }
 
     /// 检查设备是否在线
+    #[allow(dead_code)]
     pub async fn is_peer_online(&self, id: &str) -> bool {
         self.mdns
             .get_peer(id)
@@ -89,6 +91,7 @@ impl DiscoveryManager {
     }
 
     /// 获取在线设备数量
+    #[allow(dead_code)]
     pub async fn online_count(&self) -> usize {
         self.mdns
             .get_peers()

@@ -38,37 +38,6 @@
                 >
                     {{ errorMessage }}
                 </v-alert>
-
-                <!-- 已选择的应用信息 -->
-                <div v-if="selectedApp" class="mt-4">
-                    <v-divider class="mb-3" />
-                    <div class="d-flex align-center">
-                        <v-icon
-                            :icon="mdiApplication"
-                            size="40"
-                            color="primary"
-                            class="mr-3"
-                        />
-                        <div class="flex-grow-1">
-                            <div class="text-subtitle-1">
-                                {{ selectedApp.name }}
-                            </div>
-                            <div
-                                v-if="selectedApp.metadata?.version"
-                                class="text-body-2 text-grey"
-                            >
-                                {{
-                                    t('appPicker.version', {
-                                        version: selectedApp.metadata.version,
-                                    })
-                                }}
-                            </div>
-                            <div class="text-body-2 text-grey">
-                                {{ selectedApp.path }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </v-card-text>
         </v-card>
     </div>

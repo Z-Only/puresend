@@ -4,7 +4,12 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { FileMetadata, TransferTask, TransferProgress } from '../types'
+import type {
+    FileMetadata,
+    TransferTask,
+    TransferProgress,
+    SendMode,
+} from '../types'
 import {
     initTransfer,
     getTransferPort,
@@ -57,8 +62,11 @@ export const useTransferStore = defineStore('transfer', () => {
     /** 错误信息 */
     const error = ref<string>('')
 
+    /** 发送模式（仅本地网络模式下可用） */
+    const sendMode = ref<SendMode>('p2p')
+
     /** 事件监听器清理函数 */
-    let unlistenFns: UnlistenFn[] = []
+    const unlistenFns: UnlistenFn[] = []
 
     // ============ 计算属性 ============
 
@@ -375,11 +383,40 @@ export const useTransferStore = defineStore('transfer', () => {
     }
 
     /**
-     * 销毁传输服务
+     * 移除单个任务
+     * @param taskId 任务 ID
      */
-    function destroy() {
+    async function removeTask(taskId: string) {
+        try {
+            const task = tasks.value.get(taskId)
+            if (
+                task &&
+                (task.status === 'transferring' || task.status === 'pending')
+            ) {
+                await cancelTransfer(taskId)
+            }
+            tasks.value.delete(taskId)
+        } catch (e) {
+            error.value = `移除任务失败：${e}`
+            console.error('移除任务失败:', e)
+        }
+    }
+
+    /**
+     * 设置发送模式
+     * @param mode 发送模式
+     */
+    function setSendMode(mode: SendMode): void {
+        sendMode.value = mode
+    }
+
+    /**
+     * 销毁 store，清理事件监听器
+     */
+    function destroy(): void {
         unlistenFns.forEach((unlisten) => unlisten())
-        unlistenFns = []
+        unlistenFns.length = 0
+        tasks.value.clear()
         initialized.value = false
     }
 
@@ -395,6 +432,7 @@ export const useTransferStore = defineStore('transfer', () => {
         selectedTaskId,
         loading,
         error,
+        sendMode,
         // 计算属性
         taskList,
         sendTasks,
@@ -414,6 +452,8 @@ export const useTransferStore = defineStore('transfer', () => {
         updateReceiveDirectory,
         cancel,
         cleanup,
+        removeTask,
+        setSendMode,
         destroy,
     }
 })

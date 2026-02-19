@@ -2,52 +2,57 @@
 //!
 //! 提供本地网络和云盘文件传输功能
 
-// 模块声明
-pub mod commands;
-pub mod discovery;
-pub mod error;
-pub mod models;
-pub mod transfer;
+mod discovery;
+mod error;
+mod models;
+mod share;
+mod transfer;
 
-use commands::{DiscoveryState, TransferState};
+use discovery::DiscoveryState;
+use transfer::TransferState;
+use share::ShareManagerState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .manage(TransferState::new())
-        .manage(DiscoveryState::new())
+        .manage(TransferState::default())
+        .manage(DiscoveryState::default())
+        .manage(ShareManagerState::default())
         .invoke_handler(tauri::generate_handler![
-            // 传输命令
-            commands::init_transfer,
-            commands::get_transfer_port,
-            commands::prepare_file_transfer,
-            commands::get_file_metadata,
-            commands::send_file,
-            commands::cancel_transfer,
-            commands::get_transfer_progress,
-            commands::get_active_tasks,
-            commands::verify_file_integrity,
-            commands::cleanup_completed_tasks,
-            commands::get_network_info,
-            commands::start_receiving,
-            commands::stop_receiving,
-            commands::get_receive_directory,
-            commands::set_receive_directory,
-            commands::get_files_in_folder,
-            commands::save_clipboard_to_temp,
-            commands::cleanup_temp_file,
-            // 设备发现命令
-            commands::init_discovery,
-            commands::stop_discovery,
-            commands::get_peers,
-            commands::get_peer,
-            commands::add_peer_manual,
-            commands::is_peer_online,
-            commands::get_online_count,
+            // Discovery commands
+            crate::discovery::init_discovery,
+            crate::discovery::stop_discovery,
+            crate::discovery::get_peers,
+            crate::discovery::get_peer,
+            crate::discovery::add_peer_manual,
+            crate::discovery::is_peer_online,
+            crate::discovery::get_online_count,
+            // Transfer commands
+            crate::transfer::init_transfer,
+            crate::transfer::get_transfer_port,
+            crate::transfer::prepare_file_transfer,
+            crate::transfer::get_file_metadata,
+            crate::transfer::get_files_in_folder,
+            crate::transfer::get_network_info,
+            crate::transfer::send_file,
+            crate::transfer::send_file_async,
+            crate::transfer::cancel_transfer,
+            crate::transfer::get_transfer_progress,
+            crate::transfer::get_active_tasks,
+            crate::transfer::verify_file_integrity,
+            crate::transfer::cleanup_completed_tasks,
+            // Share commands
+            crate::share::start_share,
+            crate::share::stop_share,
+            crate::share::get_share_info,
+            crate::share::get_access_requests,
+            crate::share::accept_access_request,
+            crate::share::reject_access_request,
+            crate::share::update_share_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

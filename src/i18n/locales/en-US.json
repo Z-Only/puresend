@@ -1,8 +1,4 @@
 {
-  "app": {
-    "name": "PureSend",
-    "title": "File Transfer"
-  },
   "nav": {
     "send": "Send",
     "receive": "Receive",
@@ -26,7 +22,6 @@
     }
   },
   "transfer": {
-    "title": "File Transfer",
     "selectFile": "Select File",
     "dragDropHint": "Drag and drop files here",
     "send": "Send",
@@ -135,14 +130,31 @@
       "app": "Applications"
     }
   },
+  "selectedFiles": {
+    "title": "Selected Files",
+    "count": "{count} files",
+    "stats": "{count} files selected, total {size}",
+    "mediaCount": "{count} media files",
+    "empty": "No files selected. Please select files to send",
+    "clearAll": "Clear All",
+    "tempFile": "Temp File",
+    "limitReached": "File limit reached ({limit} files)",
+    "added": "{count} file(s) added",
+    "duplicate": "File already exists, skipped",
+    "duplicates": "{count} file(s) already exist, skipped",
+    "limitExceeded": "{count} file(s) exceeded limit, not added",
+    "noFilesAdded": "No files were added"
+  },
   "send": {
+    "title": "Send",
+    "selectFiles": "Select Files",
+    "sending": "Sending...",
+    "noPeers": "No nearby devices found",
+    "peerDisconnected": "Device disconnected",
     "tasks": "Send Tasks",
-    "cleanup": "Clear Completed",
     "noTasks": "No send tasks",
-    "selectFileToStart": "Select a file to start sending",
-    "selectTargetDevice": "Please select a target device",
-    "prepareFailed": "Failed to prepare transfer",
-    "sendFailed": "Send failed: {error}"
+    "selectFileToStart": "Select files to start sending",
+    "cleanup": "Cleanup Completed"
   },
   "receive": {
     "networkInfo": "Network Info",
@@ -150,7 +162,7 @@
     "clickToViewNetwork": "Click \"View Network Info\" to get network information",
     "mode": "Receive Mode",
     "localNetwork": "Local Network",
-    "cloudTransferDev": "Cloud Relay (In Development)",
+    "cloudTransferDev": "Cloud Transfer (Dev)",
     "receiveDirectory": "Receive Directory",
     "saveLocation": "File Save Location",
     "startReceiving": "Start Receiving",
@@ -169,7 +181,8 @@
     "scanToConnect": "Scan to Connect",
     "shareCode": "Share Code",
     "connectionHint": "Other devices can connect to your device by scanning the QR code or entering the share code",
-    "copiedToClipboard": "Copied to clipboard"
+    "copiedToClipboard": "Copied to clipboard",
+    "qrCodeAlt": "Connection QR Code"
   },
   "fileSelector": {
     "releaseToUpload": "Release to upload",
@@ -181,67 +194,130 @@
     "selectFileToTransfer": "Select a file to transfer",
     "openDialogFailed": "Failed to open file dialog: {error}"
   },
-  "clipboardImporter": {
-    "title": "Import from Clipboard",
-    "preview": "Preview",
-    "reRead": "Re-read",
-    "readClipboard": "Read Clipboard",
-    "confirmImport": "Confirm Import",
-    "clipboardEmpty": "Clipboard is empty. Please copy some text content first",
-    "readFailed": "Failed to read clipboard: {error}",
-    "content": "Clipboard Content"
+  "sendMode": {
+    "label": "Send Mode",
+    "p2p": {
+      "label": "P2P Direct",
+      "description": "Direct transfer via local network, faster for devices on the same network"
+    },
+    "link": {
+      "label": "Link Share",
+      "description": "Generate a share link, any device can download files via the link",
+      "selectFileHint": "Please select files to share first"
+    }
+  },
+  "share": {
+    "backToSend": "Back to Send",
+    "startError": "Failed to start sharing: {error}",
+    "stopError": "Failed to stop sharing: {error}",
+    "acceptError": "Failed to accept request: {error}",
+    "rejectError": "Failed to reject request: {error}",
+    "noRequests": "No access requests",
+    "link": {
+      "title": "Share Link",
+      "copy": "Copy Link",
+      "copied": "Copied",
+      "warning": "This link is for trusted networks only, do not share publicly"
+    },
+    "qrcode": {
+      "title": "QR Code",
+      "generating": "Generating..."
+    },
+    "info": {
+      "files": "Files",
+      "created": "Created",
+      "status": "Status"
+    },
+    "status": {
+      "active": "Sharing"
+    },
+    "pin": {
+      "enabled": "PIN protection enabled"
+    },
+    "requests": {
+      "title": "Access Requests",
+      "accept": "Accept",
+      "reject": "Reject",
+      "status": {
+        "pending": "Waiting",
+        "accepted": "Accepted",
+        "rejected": "Rejected"
+      }
+    },
+    "downloads": {
+      "title": "Download Progress"
+    },
+    "actions": {
+      "stop": "Stop Sharing"
+    },
+    "inactive": {
+      "waiting": "Waiting to start sharing..."
+    },
+    "settings": {
+      "title": "Share Settings",
+      "autoAccept": "Auto Accept",
+      "pinEnabled": "PIN Protection",
+      "pinSet": "Set",
+      "pinNotSet": "Not Set",
+      "currentPin": "Current PIN",
+      "configure": "Configure",
+      "pinEnabledHint": "PIN required when accessing share link",
+      "autoAcceptHint": "Auto accept all access requests"
+    },
+    "settingsUpdateError": "Failed to update share settings: {error}",
+    "pinConfig": {
+      "title": "Configure PIN",
+      "pinLabel": "PIN Code",
+      "pinHint": "Used to protect access to shared links",
+      "pinPlaceholder": "Enter or generate PIN",
+      "refresh": "Generate New PIN",
+      "tips": "Default generates 6 random numbers, you can modify to any length and type combination"
+    }
+  },
+  "common": {
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "apply": "Apply",
+    "add": "Add"
   },
   "folderPicker": {
     "title": "Select Folder",
-    "description": "Select an entire folder to transfer",
+    "description": "Select an entire folder to transfer, including all subfolders",
     "selectFolder": "Select Folder",
-    "noFolderSelected": "No folder selected",
+    "emptyFolder": "Folder is empty",
     "selectFailed": "Failed to select folder: {error}"
-  },
-  "textInput": {
-    "title": "Enter Text Content",
-    "placeholder": "Enter or paste text content",
-    "charCount": "Characters",
-    "addToSend": "Add Text",
-    "content": "Text Content"
   },
   "mediaPicker": {
     "title": "Select Media Files",
-    "description": "Supports images, videos, and audio files",
-    "selectMedia": "Select Media Files",
-    "selectedCount": "{count} files selected",
+    "description": "Select images, videos, or audio files",
+    "selectMedia": "Select Media",
     "selectFailed": "Failed to select media files: {error}"
   },
   "appPicker": {
     "title": "Select Application",
-    "description": "Select installed applications to transfer",
+    "description": "Select installed applications",
     "selectApp": "Select App",
-    "version": "Version: {version}",
-    "selectFailed": "Failed to select app: {error}"
+    "selectFailed": "Failed to select application: {error}"
   },
-  "common": {
-    "confirm": "Confirm",
-    "cancel": "Cancel",
-    "save": "Save",
-    "reset": "Reset",
-    "loading": "Loading...",
-    "error": "An error occurred",
-    "success": "Success",
-    "add": "Add"
+  "clipboardImporter": {
+    "title": "Import from Clipboard",
+    "preview": "Preview",
+    "charCount": "{count} characters",
+    "reRead": "Re-read",
+    "readClipboard": "Read Clipboard",
+    "confirmImport": "Confirm Import",
+    "clipboardEmpty": "Clipboard is empty",
+    "readFailed": "Failed to read clipboard: {error}",
+    "saveFailed": "Failed to save clipboard content: {error}",
+    "content": "Clipboard Content"
   },
-  "selectedFiles": {
-    "title": "Selected Files",
-    "count": "{count} files",
-    "stats": "{count} files selected, total {size}",
-    "mediaCount": "{count} media files",
-    "empty": "No files selected. Please select files to send",
-    "clearAll": "Clear All",
-    "tempFile": "Temp File",
-    "limitReached": "File limit reached ({limit} files)",
-    "added": "{count} file(s) added",
-    "duplicate": "File already exists, skipped",
-    "duplicates": "{count} file(s) already exist, skipped",
-    "limitExceeded": "{count} file(s) exceeded limit, not added",
-    "noFilesAdded": "No files were added"
+  "textInput": {
+    "title": "Text Input",
+    "placeholder": "Enter or paste text content here...",
+    "charCount": "{count} characters",
+    "addToSend": "Add to Send List",
+    "content": "Text Content"
   }
 }

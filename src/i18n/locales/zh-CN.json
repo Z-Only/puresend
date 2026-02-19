@@ -1,12 +1,8 @@
 {
-  "app": {
-    "name": "PureSend",
-    "title": "文件传输"
-  },
   "nav": {
-    "send": "发送文件",
-    "receive": "接收文件",
-    "history": "传输历史",
+    "send": "发送",
+    "receive": "接收",
+    "history": "历史",
     "settings": "设置"
   },
   "settings": {
@@ -26,7 +22,6 @@
     }
   },
   "transfer": {
-    "title": "文件传输",
     "selectFile": "选择文件",
     "dragDropHint": "拖拽文件到此处",
     "send": "发送",
@@ -135,14 +130,31 @@
       "app": "应用程序"
     }
   },
+  "selectedFiles": {
+    "title": "已选文件",
+    "count": "{count} 个文件",
+    "stats": "已选择 {count} 个文件，共 {size}",
+    "mediaCount": "{count} 个媒体文件",
+    "empty": "未选择文件，请选择要发送的文件",
+    "clearAll": "清空全部",
+    "tempFile": "临时文件",
+    "limitReached": "已达到文件数量限制（{limit} 个文件）",
+    "added": "已添加 {count} 个文件",
+    "duplicate": "文件已存在，已跳过",
+    "duplicates": "{count} 个文件已存在，已跳过",
+    "limitExceeded": "{count} 个文件超出限制，未添加",
+    "noFilesAdded": "未添加任何文件"
+  },
   "send": {
+    "title": "发送",
+    "selectFiles": "选择文件",
+    "sending": "发送中...",
+    "noPeers": "未发现附近设备",
+    "peerDisconnected": "设备已断开连接",
     "tasks": "发送任务",
-    "cleanup": "清理已完成",
     "noTasks": "暂无发送任务",
     "selectFileToStart": "选择文件开始发送",
-    "selectTargetDevice": "请选择目标设备",
-    "prepareFailed": "准备传输失败",
-    "sendFailed": "发送失败：{error}"
+    "cleanup": "清理已完成"
   },
   "receive": {
     "networkInfo": "网络信息",
@@ -169,7 +181,8 @@
     "scanToConnect": "扫码连接",
     "shareCode": "分享码",
     "connectionHint": "其他设备可以通过扫描二维码或输入分享码连接到您的设备",
-    "copiedToClipboard": "已复制到剪贴板"
+    "copiedToClipboard": "已复制到剪贴板",
+    "qrCodeAlt": "连接二维码"
   },
   "fileSelector": {
     "releaseToUpload": "松开以上传",
@@ -181,67 +194,130 @@
     "selectFileToTransfer": "选择要传输的文件",
     "openDialogFailed": "打开文件对话框失败：{error}"
   },
-  "clipboardImporter": {
-    "title": "从剪贴板导入",
-    "preview": "预览",
-    "reRead": "重新读取",
-    "readClipboard": "读取剪贴板",
-    "confirmImport": "确认导入",
-    "clipboardEmpty": "剪贴板为空，请先复制一些文本内容",
-    "readFailed": "读取剪贴板失败：{error}",
-    "content": "剪贴板内容"
+  "sendMode": {
+    "label": "发送模式",
+    "p2p": {
+      "label": "P2P 直连",
+      "description": "直接发送到附近设备"
+    },
+    "link": {
+      "label": "链接分享",
+      "description": "生成分享链接和二维码",
+      "selectFileHint": "请先选择要分享的文件"
+    }
+  },
+  "share": {
+    "backToSend": "返回发送",
+    "startError": "开始分享失败：{error}",
+    "stopError": "停止分享失败：{error}",
+    "acceptError": "接受请求失败：{error}",
+    "rejectError": "拒绝请求失败：{error}",
+    "noRequests": "暂无访问请求",
+    "link": {
+      "title": "分享链接",
+      "copy": "复制链接",
+      "copied": "已复制",
+      "warning": "请确保在安全的环境下使用分享链接"
+    },
+    "qrcode": {
+      "title": "二维码",
+      "generating": "生成中..."
+    },
+    "info": {
+      "files": "文件数量",
+      "created": "创建时间",
+      "status": "状态"
+    },
+    "status": {
+      "active": "进行中"
+    },
+    "pin": {
+      "enabled": "已启用 PIN 码保护"
+    },
+    "requests": {
+      "title": "访问请求",
+      "accept": "接受",
+      "reject": "拒绝",
+      "status": {
+        "pending": "等待响应",
+        "accepted": "已同意",
+        "rejected": "已拒绝"
+      }
+    },
+    "downloads": {
+      "title": "下载进度"
+    },
+    "actions": {
+      "stop": "停止分享"
+    },
+    "inactive": {
+      "waiting": "等待开始分享..."
+    },
+    "settings": {
+      "title": "分享设置",
+      "autoAccept": "自动接受请求",
+      "pinEnabled": "PIN 码保护",
+      "pinSet": "已设置",
+      "pinNotSet": "未设置",
+      "currentPin": "当前 PIN",
+      "configure": "配置",
+      "pinEnabledHint": "访问分享链接时需要输入 PIN 码",
+      "autoAcceptHint": "自动接受所有访问请求，无需手动审批"
+    },
+    "settingsUpdateError": "更新分享设置失败：{error}",
+    "pinConfig": {
+      "title": "配置 PIN 码",
+      "pinLabel": "PIN 码",
+      "pinHint": "用于保护分享链接的访问",
+      "pinPlaceholder": "输入或生成 PIN 码",
+      "refresh": "生成新的 PIN",
+      "tips": "默认生成 6 位随机数字，您可以修改为任意长度和类型的字符组合"
+    }
+  },
+  "common": {
+    "enabled": "已启用",
+    "disabled": "已禁用",
+    "cancel": "取消",
+    "confirm": "确认",
+    "apply": "应用",
+    "add": "添加"
   },
   "folderPicker": {
     "title": "选择文件夹",
-    "description": "选择整个文件夹进行传输",
+    "description": "选择整个文件夹进行传输，包含所有子文件夹",
     "selectFolder": "选择文件夹",
-    "noFolderSelected": "未选择任何文件夹",
+    "emptyFolder": "文件夹为空",
     "selectFailed": "选择文件夹失败：{error}"
-  },
-  "textInput": {
-    "title": "输入文本内容",
-    "placeholder": "输入或粘贴文本内容",
-    "charCount": "字符数",
-    "addToSend": "添加文本",
-    "content": "文本内容"
   },
   "mediaPicker": {
     "title": "选择媒体文件",
-    "description": "支持图片、视频、音频文件",
-    "selectMedia": "选择媒体文件",
-    "selectedCount": "已选择 {count} 个文件",
+    "description": "选择图片、视频或音频文件",
+    "selectMedia": "选择媒体",
     "selectFailed": "选择媒体文件失败：{error}"
   },
   "appPicker": {
     "title": "选择应用程序",
-    "description": "选择已安装的应用程序进行传输",
+    "description": "选择已安装的应用程序",
     "selectApp": "选择应用",
-    "version": "版本：{version}",
     "selectFailed": "选择应用失败：{error}"
   },
-  "common": {
-    "confirm": "确认",
-    "cancel": "取消",
-    "save": "保存",
-    "reset": "重置",
-    "loading": "加载中...",
-    "error": "发生错误",
-    "success": "操作成功",
-    "add": "添加"
+  "clipboardImporter": {
+    "title": "剪贴板导入",
+    "preview": "预览",
+    "charCount": "{count} 个字符",
+    "reRead": "重新读取",
+    "readClipboard": "读取剪贴板",
+    "confirmImport": "确认导入",
+    "clipboardEmpty": "剪贴板为空",
+    "readFailed": "读取剪贴板失败：{error}",
+    "saveFailed": "保存剪贴板内容失败：{error}",
+    "content": "剪贴板内容"
   },
-  "selectedFiles": {
-    "title": "已选文件",
-    "count": "{count} 个文件",
-    "stats": "已选择 {count} 个文件，共 {size}",
-    "mediaCount": "其中 {count} 个媒体文件",
-    "empty": "暂无已选文件，请选择要发送的文件",
-    "clearAll": "全部清空",
-    "tempFile": "临时文件",
-    "limitReached": "已达到文件数量上限（{limit} 个）",
-    "added": "已添加 {count} 个文件",
-    "duplicate": "文件已存在，已跳过",
-    "duplicates": "{count} 个文件已存在，已跳过",
-    "limitExceeded": "{count} 个文件超出上限，未添加",
-    "noFilesAdded": "没有文件被添加"
+  "textInput": {
+    "title": "文本输入",
+    "placeholder": "在此输入或粘贴文本内容...",
+    "charCount": "{count} 个字符",
+    "addToSend": "添加到发送列表",
+    "content": "文本内容"
   }
 }

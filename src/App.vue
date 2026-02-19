@@ -38,7 +38,7 @@ function navigateTo(routeName: string) {
 let cleanupThemeWatcher: (() => void) | null = null
 
 function handleSystemThemeChange(theme: 'light' | 'dark') {
-    vuetifyTheme.global.name.value = theme
+    vuetifyTheme.change(theme)
 }
 
 onMounted(async () => {
@@ -49,7 +49,7 @@ onMounted(async () => {
     setI18nLanguage(settingsStore.actualLanguage as AppLocale)
 
     // 设置主题
-    vuetifyTheme.global.name.value = settingsStore.actualTheme
+    vuetifyTheme.change(settingsStore.actualTheme)
 
     // 监听系统主题变化
     cleanupThemeWatcher = settingsStore.watchSystemTheme(

@@ -8,6 +8,7 @@ use thiserror::Error;
 
 /// 传输错误类型
 #[derive(Debug, Error, Serialize)]
+#[allow(dead_code)]
 pub enum TransferError {
     #[error("IO错误: {0}")]
     Io(String),
@@ -60,6 +61,7 @@ impl From<serde_json::Error> for TransferError {
 
 /// 设备发现错误类型
 #[derive(Debug, Error, Serialize)]
+#[allow(dead_code)]
 pub enum DiscoveryError {
     #[error("mDNS服务错误: {0}")]
     Mdns(String),
