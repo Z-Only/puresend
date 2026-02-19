@@ -85,7 +85,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { TaskStatus, TransferDirection } from '../types'
 import { getStatusKey, formatFileSize } from '../types'
@@ -175,10 +175,20 @@ function setupHistoryListener() {
     }
 }
 
+// 定时器ID
+let historyIntervalId: ReturnType<typeof setInterval> | null = null
+
 onMounted(() => {
     loadHistory()
     // 定期检查并更新历史
-    setInterval(setupHistoryListener, 5000)
+    historyIntervalId = setInterval(setupHistoryListener, 5000)
+})
+
+onUnmounted(() => {
+    if (historyIntervalId) {
+        clearInterval(historyIntervalId)
+        historyIntervalId = null
+    }
 })
 </script>
 

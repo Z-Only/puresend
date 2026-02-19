@@ -16,10 +16,10 @@ hero:
 features:
   - icon: 🚀
     title: 快速传输
-    details: 基于 WebRTC 技术，在局域网内实现高速点对点文件传输
+    details: 基于 HTTP/TCP 直连技术，在局域网内实现高速点对点文件传输
   - icon: 🔒
     title: 安全可靠
-    details: 端到端加密，文件不经过服务器，保护您的隐私
+    details: 局域网直连传输，文件不经过外部服务器，保护您的隐私
   - icon: 📱
     title: 跨平台支持
     details: 支持 macOS、Windows、Linux 和 Android 平台

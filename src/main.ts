@@ -3,8 +3,6 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import i18n from './i18n'
-import { useSettingsStore } from './stores/settings'
-import { setI18nLanguage } from './i18n'
 
 // Vuetify
 import 'vuetify/styles'
@@ -60,17 +58,6 @@ const app = createApp(App)
 const pinia = createPinia()
 
 app.use(pinia)
-
-// 初始化设置
-const settingsStore = useSettingsStore()
-settingsStore.loadSettings().then(() => {
-    // 应用保存的语言设置
-    setI18nLanguage(settingsStore.actualLanguage)
-
-    // 应用保存的主题设置
-    vuetify.theme.change(settingsStore.actualTheme)
-})
-
 app.use(vuetify)
 app.use(router)
 app.use(i18n)
