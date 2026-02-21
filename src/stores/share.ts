@@ -11,6 +11,7 @@ import type {
     FileMetadata,
     ContentType,
 } from '../types'
+import { DEFAULT_MAX_HISTORY_COUNT } from '../types/transfer'
 import type { SelectedFileItem } from '../types/content'
 import type { UnlistenFn } from '@tauri-apps/api/event'
 import {
@@ -22,7 +23,10 @@ import {
     onAccessRequestAccepted,
     onAccessRequestRejected,
     onDownloadProgress,
+    onDownloadComplete,
+    type DownloadCompletePayload,
 } from '../services/shareService'
+import { useSettingsStore } from './settings'
 
 export const useShareStore = defineStore('share', () => {
     // ============ 状态 ============
@@ -135,6 +139,48 @@ export const useShareStore = defineStore('share', () => {
     }
 
     /**
+     * 处理下载完成事件
+     */
+    async function handleDownloadComplete(payload: DownloadCompletePayload) {
+        console.log('下载完成:', payload)
+
+        // 检查是否需要记录历史
+        const settingsStore = useSettingsStore()
+        if (!settingsStore.history.recordHistory) {
+            return
+        }
+
+        // 添加到传输历史记录
+        const historyItem = {
+            id: crypto.randomUUID(),
+            fileName: payload.file_name,
+            fileSize: payload.file_size,
+            peerName: payload.client_ip,
+            status: 'completed' as const,
+            direction: 'send' as const,
+            completedAt: Date.now(),
+            mode: 'local' as const,
+        }
+
+        // 使用 transferStore 添加历史记录
+        const { useTransferStore } = await import('./transfer')
+        const transferStore = useTransferStore()
+
+        // 直接添加到历史记录列表
+        if (!transferStore.historyItems.some((h) => h.id === historyItem.id)) {
+            transferStore.historyItems.unshift(historyItem)
+            // 超出上限时移除最旧的记录
+            if (transferStore.historyItems.length > DEFAULT_MAX_HISTORY_COUNT) {
+                transferStore.historyItems = transferStore.historyItems.slice(
+                    0,
+                    DEFAULT_MAX_HISTORY_COUNT
+                )
+            }
+            await transferStore.saveHistory()
+        }
+    }
+
+    /**
      * 设置事件监听器
      */
     async function setupEventListeners(): Promise<void> {
@@ -142,7 +188,8 @@ export const useShareStore = defineStore('share', () => {
             await onAccessRequest(handleAccessRequest),
             await onAccessRequestAccepted(handleAccessRequestAccepted),
             await onAccessRequestRejected(handleAccessRequestRejected),
-            await onDownloadProgress(handleDownloadProgress)
+            await onDownloadProgress(handleDownloadProgress),
+            await onDownloadComplete(handleDownloadComplete)
         )
     }
 

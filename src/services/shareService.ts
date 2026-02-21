@@ -129,6 +129,28 @@ export async function onDownloadProgress(
     })
 }
 
+/** 下载完成事件载荷 */
+export interface DownloadCompletePayload {
+    /** 文件名 */
+    file_name: string
+    /** 文件大小 */
+    file_size: number
+    /** 客户端 IP */
+    client_ip: string
+}
+
+/**
+ * 监听下载完成事件
+ * @param callback 回调函数
+ */
+export async function onDownloadComplete(
+    callback: (payload: DownloadCompletePayload) => void
+): Promise<UnlistenFn> {
+    return listen<DownloadCompletePayload>('download-complete', (event) => {
+        callback(event.payload)
+    })
+}
+
 /**
  * 监听分享停止事件
  * @param callback 回调函数

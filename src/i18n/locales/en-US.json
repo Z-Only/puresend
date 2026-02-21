@@ -5,6 +5,15 @@
     "history": "History",
     "settings": "Settings"
   },
+  "common": {
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "apply": "Apply",
+    "add": "Add"
+  },
   "settings": {
     "title": "Settings",
     "appearance": "Appearance",
@@ -19,6 +28,34 @@
       "zhCN": "中文",
       "enUS": "English",
       "system": "System"
+    },
+    "history": {
+      "title": "History",
+      "recordHistory": {
+        "label": "Record Transfer History",
+        "description": "Automatically record transfers to history list after completion"
+      },
+      "privacy": {
+        "label": "Privacy Mode",
+        "description": "Hide sensitive information in history",
+        "hideFileName": "Hide File Names",
+        "hidePeerName": "Hide Device Names"
+      },
+      "autoCleanup": {
+        "label": "Auto Cleanup",
+        "description": "Automatically clean up old history records",
+        "strategy": {
+          "disabled": "Disabled",
+          "byTime": "By Time",
+          "byCount": "By Count"
+        },
+        "retentionDays": "Retention Days",
+        "maxCount": "Max Records",
+        "daysUnit": "days",
+        "countUnit": "records"
+      },
+      "currentCount": "Current records: {count}",
+      "cleanupNow": "Cleanup Now"
     }
   },
   "transfer": {
@@ -72,7 +109,49 @@
     "empty": "No transfer history",
     "emptyHint": "Completed transfers will appear here",
     "clear": "Clear History",
-    "unknownDevice": "Unknown Device"
+    "unknownDevice": "Unknown Device",
+    "noResults": "No matching records",
+    "recordCount": "{count} records total",
+    "selectAll": "Select All",
+    "deleteSelected": "Delete Selected ({count})",
+    "direction": {
+      "send": "Send",
+      "receive": "Receive"
+    },
+    "filter": {
+      "direction": "Direction",
+      "status": "Status",
+      "all": "All"
+    },
+    "sort": {
+      "field": "Sort By",
+      "order": "Order",
+      "fields": {
+        "time": "Time",
+        "fileName": "File Name",
+        "fileSize": "File Size"
+      },
+      "orders": {
+        "asc": "Ascending",
+        "desc": "Descending"
+      }
+    },
+    "deleteConfirm": {
+      "title": "Delete Record",
+      "message": "Are you sure you want to delete the transfer record for \"{name}\"?"
+    },
+    "batchDeleteConfirm": {
+      "title": "Batch Delete",
+      "message": "Are you sure you want to delete {count} selected records?"
+    },
+    "clearConfirm": {
+      "title": "Clear History",
+      "message": "Are you sure you want to clear all transfer history? This action cannot be undone."
+    },
+    "privacy": {
+      "hiddenFileName": "****",
+      "hiddenPeerName": "***"
+    }
   },
   "peer": {
     "nearbyDevices": "Nearby Devices",
@@ -273,14 +352,6 @@
       "refresh": "Generate New PIN",
       "tips": "Default generates 6 random numbers, you can modify to any length and type combination"
     }
-  },
-  "common": {
-    "enabled": "Enabled",
-    "disabled": "Disabled",
-    "cancel": "Cancel",
-    "confirm": "Confirm",
-    "apply": "Apply",
-    "add": "Add"
   },
   "folderPicker": {
     "title": "Select Folder",

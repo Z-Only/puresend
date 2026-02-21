@@ -552,9 +552,15 @@ async fn download_handler(
             let file_name = path
                 .file_name()
                 .and_then(|n| n.to_str())
-                .unwrap_or("download");
+                .unwrap_or("download")
+                .to_string();
 
-            let mime_type = FileMetadata::infer_mime_type(file_name);
+            // 获取文件大小
+            let file_size = std::fs::metadata(&path)
+                .map(|m| m.len() as i64)
+                .unwrap_or(0);
+
+            let mime_type = FileMetadata::infer_mime_type(&file_name);
             
             eprintln!("开始传输文件 - file_name: {}, mime_type: {}", file_name, mime_type);
 
@@ -574,13 +580,21 @@ async fn download_handler(
                         headers.insert(header::CONTENT_TYPE, "application/octet-stream".parse().unwrap());
                     }
                     // 使用 URL 编码文件名以支持中文等特殊字符
-                    let encoded_filename = urlencoding::encode(file_name);
+                    let encoded_filename = urlencoding::encode(&file_name);
                     headers.insert(
                         header::CONTENT_DISPOSITION,
                         format!("attachment; filename*=UTF-8''{}", encoded_filename)
                             .parse()
                             .unwrap(),
                     );
+                    
+                    // 发送下载完成事件到前端
+                    let _ = state.app_handle.emit("download-complete", DownloadCompletePayload {
+                        file_name: file_name.clone(),
+                        file_size,
+                        client_ip: client_ip.clone(),
+                    });
+                    
                     eprintln!("文件传输响应已发送 - file_name: {}", file_name);
                     return response;
                 }
@@ -597,6 +611,17 @@ async fn download_handler(
             return Html("<html><body><h1>文件不存在</h1></body></html>").into_response();
         }
     }
+}
+
+/// 下载完成事件载荷
+#[derive(Debug, Clone, Serialize)]
+struct DownloadCompletePayload {
+    /// 文件名
+    file_name: String,
+    /// 文件大小
+    file_size: i64,
+    /// 客户端 IP
+    client_ip: String,
 }/// 文件信息响应
 
 /// 文件信息响应

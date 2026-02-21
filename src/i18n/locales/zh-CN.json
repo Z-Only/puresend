@@ -5,6 +5,15 @@
     "history": "历史",
     "settings": "设置"
   },
+  "common": {
+    "cancel": "取消",
+    "delete": "删除",
+    "confirm": "确认",
+    "enabled": "已启用",
+    "disabled": "已禁用",
+    "apply": "应用",
+    "add": "添加"
+  },
   "settings": {
     "title": "设置",
     "appearance": "外观",
@@ -19,6 +28,34 @@
       "zhCN": "中文",
       "enUS": "English",
       "system": "跟随系统"
+    },
+    "history": {
+      "title": "历史记录",
+      "recordHistory": {
+        "label": "记录传输历史",
+        "description": "传输完成后自动记录到历史列表"
+      },
+      "privacy": {
+        "label": "隐私模式",
+        "description": "在历史记录中隐藏敏感信息",
+        "hideFileName": "隐藏文件名",
+        "hidePeerName": "隐藏设备名"
+      },
+      "autoCleanup": {
+        "label": "自动清理",
+        "description": "自动清理旧的历史记录",
+        "strategy": {
+          "disabled": "禁用",
+          "byTime": "按时间",
+          "byCount": "按数量"
+        },
+        "retentionDays": "保留天数",
+        "maxCount": "保留条数",
+        "daysUnit": "天",
+        "countUnit": "条"
+      },
+      "currentCount": "当前记录数：{count} 条",
+      "cleanupNow": "立即清理"
     }
   },
   "transfer": {
@@ -72,7 +109,49 @@
     "empty": "暂无传输历史",
     "emptyHint": "完成文件传输后将显示在此处",
     "clear": "清空历史",
-    "unknownDevice": "未知设备"
+    "unknownDevice": "未知设备",
+    "noResults": "没有符合条件的记录",
+    "recordCount": "共 {count} 条记录",
+    "selectAll": "全选",
+    "deleteSelected": "删除选中 ({count})",
+    "direction": {
+      "send": "发送",
+      "receive": "接收"
+    },
+    "filter": {
+      "direction": "传输方向",
+      "status": "状态",
+      "all": "全部"
+    },
+    "sort": {
+      "field": "排序字段",
+      "order": "排序顺序",
+      "fields": {
+        "time": "时间",
+        "fileName": "文件名",
+        "fileSize": "文件大小"
+      },
+      "orders": {
+        "asc": "升序",
+        "desc": "降序"
+      }
+    },
+    "deleteConfirm": {
+      "title": "删除记录",
+      "message": "确定要删除 \"{name}\" 的传输记录吗？"
+    },
+    "batchDeleteConfirm": {
+      "title": "批量删除",
+      "message": "确定要删除选中的 {count} 条记录吗？"
+    },
+    "clearConfirm": {
+      "title": "清空历史",
+      "message": "确定要清空所有传输历史记录吗？此操作不可撤销。"
+    },
+    "privacy": {
+      "hiddenFileName": "****",
+      "hiddenPeerName": "***"
+    }
   },
   "peer": {
     "nearbyDevices": "附近设备",
@@ -273,14 +352,6 @@
       "refresh": "生成新的 PIN",
       "tips": "默认生成 6 位随机数字，您可以修改为任意长度和类型的字符组合"
     }
-  },
-  "common": {
-    "enabled": "已启用",
-    "disabled": "已禁用",
-    "cancel": "取消",
-    "confirm": "确认",
-    "apply": "应用",
-    "add": "添加"
   },
   "folderPicker": {
     "title": "选择文件夹",

@@ -8,26 +8,81 @@ export type ThemeMode = 'light' | 'dark' | 'system'
 /** 语言模式 */
 export type LanguageMode = 'zh-CN' | 'en-US' | 'system'
 
+/** 设置存储版本，用于迁移兼容 */
+export const SETTINGS_VERSION = 2
+
+/** 清理策略 */
+export type CleanupStrategy = 'byTime' | 'byCount' | 'disabled'
+
+/** 历史记录隐私设置 */
+export interface HistoryPrivacySettings {
+    /** 是否启用隐私模式 */
+    enabled: boolean
+    /** 隐藏文件名 */
+    hideFileName: boolean
+    /** 隐藏对端设备名 */
+    hidePeerName: boolean
+}
+
+/** 自动清理设置 */
+export interface AutoCleanupSettings {
+    /** 清理策略 */
+    strategy: CleanupStrategy
+    /** 按时间清理：保留天数（仅在 strategy='byTime' 时有效） */
+    retentionDays?: number
+    /** 按数量清理：保留条数（仅在 strategy='byCount' 时有效） */
+    maxCount?: number
+}
+
+/** 历史记录设置 */
+export interface HistorySettings {
+    /** 是否记录传输历史 */
+    recordHistory: boolean
+    /** 隐私模式设置 */
+    privacy: HistoryPrivacySettings
+    /** 自动清理设置 */
+    autoCleanup: AutoCleanupSettings
+}
+
 /** 应用设置 */
 export interface AppSettings {
     /** 主题模式 */
     theme: ThemeMode
     /** 语言模式 */
     language: LanguageMode
+    /** 历史记录设置 */
+    history: HistorySettings
 }
-
-/** 设置存储版本，用于迁移兼容 */
-export const SETTINGS_VERSION = 1
 
 /** 扩展的设置状态，包含版本信息 */
 export interface SettingsState extends AppSettings {
     version: number
 }
 
+/** 默认隐私设置 */
+export const DEFAULT_PRIVACY_SETTINGS: HistoryPrivacySettings = {
+    enabled: false,
+    hideFileName: true,
+    hidePeerName: false,
+}
+
+/** 默认自动清理设置 */
+export const DEFAULT_AUTO_CLEANUP_SETTINGS: AutoCleanupSettings = {
+    strategy: 'disabled',
+}
+
+/** 默认历史记录设置 */
+export const DEFAULT_HISTORY_SETTINGS: HistorySettings = {
+    recordHistory: true,
+    privacy: DEFAULT_PRIVACY_SETTINGS,
+    autoCleanup: DEFAULT_AUTO_CLEANUP_SETTINGS,
+}
+
 /** 默认设置 */
 export const DEFAULT_SETTINGS: AppSettings = {
     theme: 'system',
     language: 'system',
+    history: DEFAULT_HISTORY_SETTINGS,
 }
 
 /** 本地存储键名 */

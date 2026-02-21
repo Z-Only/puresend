@@ -6,7 +6,10 @@ import {
     type ThemeMode,
     type LanguageMode,
     type SettingsState,
+    type HistoryPrivacySettings,
+    type AutoCleanupSettings,
     DEFAULT_SETTINGS,
+    DEFAULT_HISTORY_SETTINGS,
     SETTINGS_VERSION,
     SETTINGS_STORAGE_KEY,
 } from '@/types/settings'
@@ -112,6 +115,43 @@ export const useSettingsStore = defineStore('settings', {
         },
 
         /**
+         * 设置是否记录传输历史
+         */
+        async setRecordHistory(recordHistory: boolean): Promise<boolean> {
+            this.history = {
+                ...this.history,
+                recordHistory,
+            }
+            return this.saveSettings()
+        },
+
+        /**
+         * 设置历史记录隐私模式
+         */
+        async setHistoryPrivacy(
+            privacy: Partial<HistoryPrivacySettings>
+        ): Promise<boolean> {
+            this.history = {
+                ...this.history,
+                privacy: { ...this.history.privacy, ...privacy },
+            }
+            return this.saveSettings()
+        },
+
+        /**
+         * 设置自动清理策略
+         */
+        async setAutoCleanup(
+            cleanup: Partial<AutoCleanupSettings>
+        ): Promise<boolean> {
+            this.history = {
+                ...this.history,
+                autoCleanup: { ...this.history.autoCleanup, ...cleanup },
+            }
+            return this.saveSettings()
+        },
+
+        /**
          * 保存设置到持久化存储
          */
         async saveSettings(): Promise<boolean> {
@@ -119,6 +159,7 @@ export const useSettingsStore = defineStore('settings', {
                 const settingsData: SettingsState = {
                     theme: this.theme,
                     language: this.language,
+                    history: this.history,
                     version: this.version,
                 }
 
@@ -155,6 +196,8 @@ export const useSettingsStore = defineStore('settings', {
                     }
                     this.theme = settings.theme
                     this.language = settings.language
+                    // 兼容旧版设置（没有 history 字段）
+                    this.history = settings.history || DEFAULT_HISTORY_SETTINGS
                 }
             } catch (error) {
                 console.error('[Settings] 加载设置失败，使用默认值:', error)
@@ -233,6 +276,8 @@ export const useSettingsStore = defineStore('settings', {
             return {
                 ...oldSettings,
                 version: SETTINGS_VERSION,
+                // 兼容旧版设置
+                history: oldSettings.history || DEFAULT_HISTORY_SETTINGS,
             }
         },
 

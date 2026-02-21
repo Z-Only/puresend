@@ -224,3 +224,66 @@ export interface DownloadProgress {
     /** 访问者 IP */
     clientIp: string
 }
+
+// ============ 传输历史相关类型 ============
+
+/** 历史记录存储版本 */
+export const HISTORY_STORAGE_VERSION = 1
+
+/** 历史记录存储键名 */
+export const HISTORY_STORAGE_KEY = 'transfer-history'
+
+/** 历史记录默认上限 */
+export const DEFAULT_MAX_HISTORY_COUNT = 1000
+
+/** 传输历史记录项 */
+export interface TransferHistoryItem {
+    /** 记录唯一标识 */
+    id: string
+    /** 文件名 */
+    fileName: string
+    /** 文件大小（字节） */
+    fileSize: number
+    /** 对端设备名称 */
+    peerName: string
+    /** 传输状态 */
+    status: TaskStatus
+    /** 传输方向 */
+    direction: TransferDirection
+    /** 完成时间戳（毫秒） */
+    completedAt: number
+    /** 传输模式 */
+    mode?: TransferMode
+    /** 错误信息（失败时） */
+    error?: string
+    /** 是否选中（用于批量操作） */
+    selected?: boolean
+}
+
+/** 历史记录筛选条件 */
+export interface HistoryFilter {
+    /** 传输方向筛选 */
+    direction?: TransferDirection | 'all'
+    /** 状态筛选 */
+    status?: TaskStatus | 'all'
+}
+
+/** 历史记录排序字段 */
+export type HistorySortField = 'completedAt' | 'fileName' | 'fileSize'
+
+/** 历史记录排序顺序 */
+export type HistorySortOrder = 'asc' | 'desc'
+
+/** 历史记录排序选项 */
+export interface HistorySortOption {
+    field: HistorySortField
+    order: HistorySortOrder
+}
+
+/** 传输历史存储格式 */
+export interface TransferHistoryStorage {
+    /** 存储版本号 */
+    version: number
+    /** 历史记录列表 */
+    items: TransferHistoryItem[]
+}
