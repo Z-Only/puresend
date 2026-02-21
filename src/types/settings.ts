@@ -46,6 +46,8 @@ export interface HistorySettings {
 
 /** 应用设置 */
 export interface AppSettings {
+    /** 设备名称 */
+    deviceName: string
     /** 主题模式 */
     theme: ThemeMode
     /** 语言模式 */
@@ -80,6 +82,7 @@ export const DEFAULT_HISTORY_SETTINGS: HistorySettings = {
 
 /** 默认设置 */
 export const DEFAULT_SETTINGS: AppSettings = {
+    deviceName: '',
     theme: 'system',
     language: 'system',
     history: DEFAULT_HISTORY_SETTINGS,

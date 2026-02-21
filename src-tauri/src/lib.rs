@@ -19,10 +19,13 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_store::Builder::default().build())
         .manage(TransferState::default())
         .manage(DiscoveryState::default())
         .manage(ShareManagerState::default())
         .invoke_handler(tauri::generate_handler![
+            // Device commands
+            crate::discovery::get_device_name,
             // Discovery commands
             crate::discovery::init_discovery,
             crate::discovery::stop_discovery,

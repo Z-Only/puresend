@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settings'
 import { useTransferStore } from '@/stores/transfer'
 import { useShareStore } from '@/stores/share'
+import { useDiscoveryStore } from '@/stores/discovery'
 import { setI18nLanguage, type AppLocale } from '@/i18n'
 import { useTheme } from 'vuetify'
 import { mdiSend, mdiWifiPlus, mdiHistory, mdiCog } from '@mdi/js'
@@ -16,6 +17,7 @@ const settingsStore = useSettingsStore()
 const vuetifyTheme = useTheme()
 const transferStore = useTransferStore()
 const shareStore = useShareStore()
+const discoveryStore = useDiscoveryStore()
 
 const currentRoute = computed(() => route.name as string)
 
@@ -62,6 +64,10 @@ onMounted(async () => {
     // 设置主题
     vuetifyTheme.change(settingsStore.actualTheme)
 
+    // 初始化设备发现服务，使用设置中的设备名称
+    const deviceName = await settingsStore.getDeviceName()
+    await discoveryStore.initialize(deviceName)
+
     // 监听系统主题变化
     cleanupThemeWatcher = settingsStore.watchSystemTheme(
         handleSystemThemeChange
@@ -85,7 +91,7 @@ onUnmounted(() => {
 
             <!-- 导航标签 -->
             <v-tabs
-                v-model="currentRoute"
+                :model-value="currentRoute"
                 color="white"
                 align-tabs="center"
                 @update:model-value="navigateTo"

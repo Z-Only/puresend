@@ -5,11 +5,45 @@ import ThemeSelector from '@/components/settings/ThemeSelector.vue'
 import LanguageSelector from '@/components/settings/LanguageSelector.vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useTransferStore } from '@/stores/transfer'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
 const transferStore = useTransferStore()
+
+// 设备名称编辑
+const editingDeviceName = ref('')
+const isEditingDeviceName = ref(false)
+
+const deviceName = computed({
+    get: () => settingsStore.deviceName,
+    set: (value) => {
+        editingDeviceName.value = value
+    },
+})
+
+function startEditDeviceName() {
+    editingDeviceName.value = settingsStore.deviceName
+    isEditingDeviceName.value = true
+}
+
+async function saveDeviceName() {
+    const trimmedName = editingDeviceName.value.trim()
+    if (trimmedName && trimmedName !== settingsStore.deviceName) {
+        await settingsStore.setDeviceName(trimmedName)
+    }
+    isEditingDeviceName.value = false
+}
+
+function cancelEditDeviceName() {
+    editingDeviceName.value = ''
+    isEditingDeviceName.value = false
+}
+
+async function resetDeviceName() {
+    const systemName = await settingsStore.getSystemDeviceName()
+    await settingsStore.setDeviceName(systemName)
+}
 
 // 是否记录历史
 const recordHistory = computed({
@@ -91,7 +125,91 @@ async function handleCleanupNow() {
             {{ t('settings.title') }}
         </h1>
 
-        <SettingsGroup :title="t('settings.appearance')">
+        <!-- 设备设置 -->
+        <SettingsGroup :title="t('settings.device.title')">
+            <div class="d-flex flex-column ga-4">
+                <!-- 设备名称 -->
+                <div>
+                    <div class="d-flex align-center justify-space-between">
+                        <div>
+                            <div class="text-subtitle-1">
+                                {{ t('settings.device.deviceName.label') }}
+                            </div>
+                            <div class="text-body-2 text-grey">
+                                {{
+                                    t('settings.device.deviceName.description')
+                                }}
+                            </div>
+                        </div>
+                        <div class="d-flex align-center ga-2">
+                            <template v-if="!isEditingDeviceName">
+                                <span class="text-body-1">{{
+                                    deviceName
+                                }}</span>
+                                <v-btn
+                                    variant="text"
+                                    color="primary"
+                                    size="small"
+                                    @click="startEditDeviceName"
+                                >
+                                    {{ t('common.edit', '编辑') }}
+                                </v-btn>
+                            </template>
+                            <template v-else>
+                                <v-text-field
+                                    v-model="editingDeviceName"
+                                    :placeholder="
+                                        t(
+                                            'settings.device.deviceName.placeholder'
+                                        )
+                                    "
+                                    density="compact"
+                                    variant="outlined"
+                                    hide-details
+                                    style="min-width: 240px"
+                                    @keydown.enter="saveDeviceName"
+                                    @keydown.escape="cancelEditDeviceName"
+                                />
+                                <v-btn
+                                    variant="text"
+                                    color="primary"
+                                    size="small"
+                                    @click="saveDeviceName"
+                                >
+                                    {{ t('common.confirm') }}
+                                </v-btn>
+                                <v-btn
+                                    variant="text"
+                                    size="small"
+                                    @click="cancelEditDeviceName"
+                                >
+                                    {{ t('common.cancel') }}
+                                </v-btn>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <v-divider />
+
+                <!-- 恢复默认设备名 -->
+                <div class="d-flex align-center justify-space-between">
+                    <span class="text-body-2 text-grey">
+                        {{ t('settings.device.deviceName.reset') }}
+                    </span>
+                    <v-btn
+                        variant="text"
+                        color="primary"
+                        size="small"
+                        @click="resetDeviceName"
+                    >
+                        {{ t('settings.device.deviceName.reset') }}
+                    </v-btn>
+                </div>
+            </div>
+        </SettingsGroup>
+
+        <SettingsGroup :title="t('settings.appearance')" class="mt-6">
             <div class="d-flex flex-column ga-4">
                 <ThemeSelector />
                 <v-divider />

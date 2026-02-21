@@ -12,10 +12,20 @@
     "enabled": "Enabled",
     "disabled": "Disabled",
     "apply": "Apply",
-    "add": "Add"
+    "add": "Add",
+    "edit": "Edit"
   },
   "settings": {
     "title": "Settings",
+    "device": {
+      "title": "Device",
+      "deviceName": {
+        "label": "Device Name",
+        "description": "Other devices will see this name",
+        "placeholder": "Enter device name",
+        "reset": "Reset to Default"
+      }
+    },
     "appearance": "Appearance",
     "theme": {
       "label": "Theme",

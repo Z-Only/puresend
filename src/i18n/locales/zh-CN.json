@@ -12,10 +12,20 @@
     "enabled": "已启用",
     "disabled": "已禁用",
     "apply": "应用",
-    "add": "添加"
+    "add": "添加",
+    "edit": "编辑"
   },
   "settings": {
     "title": "设置",
+    "device": {
+      "title": "设备",
+      "deviceName": {
+        "label": "设备名称",
+        "description": "其他设备将看到此名称",
+        "placeholder": "输入设备名称",
+        "reset": "恢复默认"
+      }
+    },
     "appearance": "外观",
     "theme": {
       "label": "主题",
