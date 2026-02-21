@@ -36,30 +36,8 @@
                     </v-card-text>
                 </v-card>
 
-                <!-- 接收模式选择 -->
-                <v-card class="mb-4">
-                    <v-card-title class="text-subtitle-1">
-                        {{ t('receive.mode') }}
-                    </v-card-title>
-                    <v-card-text>
-                        <v-btn-toggle
-                            v-model="receiveMode"
-                            color="primary"
-                            variant="outlined"
-                            mandatory
-                            class="w-100"
-                        >
-                            <v-btn value="local" block>
-                                <v-icon :icon="mdiWifi" class="mr-2" />
-                                {{ t('receive.localNetwork') }}
-                            </v-btn>
-                            <v-btn value="cloud" block disabled>
-                                <v-icon :icon="mdiCloud" class="mr-2" />
-                                {{ t('receive.cloudTransferDev') }}
-                            </v-btn>
-                        </v-btn-toggle>
-                    </v-card-text>
-                </v-card>
+                <!-- 接收模式选择器 -->
+                <ReceiveModeSelector class="mt-4" />
 
                 <!-- 接收目录设置 -->
                 <v-card class="mb-4">
@@ -175,15 +153,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { storeToRefs } from 'pinia'
 import { open } from '@tauri-apps/plugin-dialog'
-import { ProgressDisplay } from '../components/transfer'
+import { ProgressDisplay, ReceiveModeSelector } from '../components/transfer'
 import NetworkInfo from '../components/transfer/NetworkInfo.vue'
 import { useTransferStore } from '../stores'
 import {
     mdiWifi,
     mdiWifiOff,
-    mdiCloud,
     mdiWifiPlus,
     mdiInboxArrowDown,
     mdiFolderOpen,
@@ -193,7 +169,10 @@ const { t } = useI18n()
 const transferStore = useTransferStore()
 
 // 从 store 获取响应式状态（Tab 切换时保留）
-const { receiveMode, showNetworkInfo } = storeToRefs(transferStore)
+const showNetworkInfo = computed({
+    get: () => transferStore.showNetworkInfo,
+    set: (value) => (transferStore.showNetworkInfo = value),
+})
 
 // 页面本地状态（无需持久化）
 const starting = ref(false)

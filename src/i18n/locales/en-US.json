@@ -277,12 +277,24 @@
     "label": "Send Mode",
     "p2p": {
       "label": "P2P Direct",
-      "description": "Direct transfer via local network, faster for devices on the same network"
+      "description": "Send directly to nearby devices"
     },
     "link": {
       "label": "Link Share",
-      "description": "Generate a share link, any device can download files via the link",
+      "description": "Generate share link and QR code",
       "selectFileHint": "Please select files to share first"
+    }
+  },
+  "receiveMode": {
+    "label": "Receive Mode",
+    "local": {
+      "label": "Local Network",
+      "description": "Receive files via local network"
+    },
+    "cloud": {
+      "label": "Cloud Relay",
+      "description": "Receive files via cloud relay",
+      "comingSoon": "Cloud relay feature coming soon"
     }
   },
   "share": {

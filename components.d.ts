@@ -26,6 +26,7 @@ declare module 'vue' {
     PeerList: typeof import('./src/components/transfer/PeerList.vue')['default']
     PinConfigDialog: typeof import('./src/components/transfer/PinConfigDialog.vue')['default']
     ProgressDisplay: typeof import('./src/components/transfer/ProgressDisplay.vue')['default']
+    ReceiveModeSelector: typeof import('./src/components/transfer/ReceiveModeSelector.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SelectedFileList: typeof import('./src/components/transfer/SelectedFileList.vue')['default']

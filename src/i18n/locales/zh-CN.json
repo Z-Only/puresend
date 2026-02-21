@@ -285,6 +285,18 @@
       "selectFileHint": "请先选择要分享的文件"
     }
   },
+  "receiveMode": {
+    "label": "接收模式",
+    "local": {
+      "label": "本地网络",
+      "description": "通过局域网接收文件"
+    },
+    "cloud": {
+      "label": "云盘中转",
+      "description": "通过云盘中转接收文件",
+      "comingSoon": "云盘中转功能即将推出"
+    }
+  },
   "share": {
     "backToSend": "返回发送",
     "startError": "开始分享失败：{error}",
