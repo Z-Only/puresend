@@ -3,6 +3,8 @@ import { computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settings'
+import { useTransferStore } from '@/stores/transfer'
+import { useShareStore } from '@/stores/share'
 import { setI18nLanguage, type AppLocale } from '@/i18n'
 import { useTheme } from 'vuetify'
 import { mdiSend, mdiWifiPlus, mdiHistory, mdiCog } from '@mdi/js'
@@ -12,6 +14,8 @@ const router = useRouter()
 const { t } = useI18n()
 const settingsStore = useSettingsStore()
 const vuetifyTheme = useTheme()
+const transferStore = useTransferStore()
+const shareStore = useShareStore()
 
 const currentRoute = computed(() => route.name as string)
 
@@ -31,6 +35,13 @@ const navigationItems = computed(() => [
 ])
 
 function navigateTo(routeName: string) {
+    // 特殊处理：当点击发送 Tab 时，如果处于链接分享模式或正在分享，则导航到链接分享页面
+    if (routeName === 'Send') {
+        if (transferStore.sendMode === 'link' || shareStore.isSharing) {
+            router.push({ name: 'ShareLink' })
+            return
+        }
+    }
     router.push({ name: routeName })
 }
 

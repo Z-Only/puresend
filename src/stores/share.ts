@@ -9,6 +9,7 @@ import type {
     AccessRequest,
     ShareSettings,
     FileMetadata,
+    ContentType,
 } from '../types'
 import type { SelectedFileItem } from '../types/content'
 import type { UnlistenFn } from '@tauri-apps/api/event'
@@ -49,6 +50,9 @@ export const useShareStore = defineStore('share', () => {
 
     /** 已选文件列表（用于链接分享） */
     const selectedFiles = ref<SelectedFileItem[]>([])
+
+    /** 内容类型（发送页面的内容类型选择） */
+    const contentType = ref<ContentType>('file')
 
     /** 事件监听器清理函数 */
     let unlistenFns: UnlistenFn[] = []
@@ -273,6 +277,7 @@ export const useShareStore = defineStore('share', () => {
         error.value = ''
         qrCodeDataUrl.value = ''
         selectedFiles.value = []
+        contentType.value = 'file'
         unlistenFns = []
     }
 
@@ -315,6 +320,14 @@ export const useShareStore = defineStore('share', () => {
     }
 
     /**
+     * 设置内容类型
+     * @param type 内容类型
+     */
+    function setContentType(type: ContentType): void {
+        contentType.value = type
+    }
+
+    /**
      * 销毁 store
      */
     function destroy(): void {
@@ -324,6 +337,7 @@ export const useShareStore = defineStore('share', () => {
         accessRequests.value.clear()
         qrCodeDataUrl.value = ''
         selectedFiles.value = []
+        contentType.value = 'file'
     }
 
     return {
@@ -335,6 +349,7 @@ export const useShareStore = defineStore('share', () => {
         error,
         qrCodeDataUrl,
         selectedFiles,
+        contentType,
         // 计算属性
         isSharing,
         shareLink,
@@ -354,6 +369,7 @@ export const useShareStore = defineStore('share', () => {
         setQRCode,
         setSelectedFiles,
         clearSelectedFiles,
+        setContentType,
         destroy,
     }
 })

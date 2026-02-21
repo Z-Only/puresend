@@ -184,6 +184,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
@@ -205,13 +206,11 @@ import {
 import { useTransferStore, useDiscoveryStore, useShareStore } from '../stores'
 import { useSelectedFiles } from '../composables'
 import type {
-    TransferMode,
     ContentType,
     ContentItem,
     ThumbnailInfo,
     FileSourceType,
     TransferTask,
-    SendMode,
     ShareSettings,
     FileMetadata,
 } from '../types'
@@ -224,32 +223,26 @@ const transferStore = useTransferStore()
 const discoveryStore = useDiscoveryStore()
 const shareStore = useShareStore()
 
-// 使用已选文件管理 composable
+// 从 store 获取响应式状态（Tab 切换时保留）
+const { transferMode, selectedPeerId, sendMode } = storeToRefs(transferStore)
+const { contentType } = storeToRefs(shareStore)
+
+// 使用已选文件管理 composable（现在直接使用 shareStore.selectedFiles）
 const selectedFiles = useSelectedFiles()
 
-// 页面激活时恢复文件列表
-onMounted(() => {
-    // 从 shareStore 恢复已选文件列表
-    if (shareStore.selectedFiles.length > 0) {
-        selectedFiles.addFiles(
-            shareStore.selectedFiles.map((f) => ({
-                path: f.path,
-                name: f.name,
-                size: f.size,
-                mimeType: f.mimeType,
-                sourceType: f.sourceType,
-                relativePath: f.relativePath,
-                isTemp: f.isTemp,
-                metadata: f.metadata,
-            }))
-        )
+// 页面激活时验证恢复的状态
+onMounted(async () => {
+    // 验证选中的设备是否仍在线
+    if (selectedPeerId.value) {
+        const isOnline = await discoveryStore.checkOnline(selectedPeerId.value)
+        if (!isOnline) {
+            // 设备已离线，清除选择
+            selectedPeerId.value = ''
+        }
     }
 })
 
-const contentType = ref<ContentType>('file')
-const selectedPeerId = ref('')
-const transferMode = ref<TransferMode>('local')
-const sendMode = ref<SendMode>('p2p')
+// 页面本地状态（无需持久化）
 const sending = ref(false)
 const showError = ref(false)
 const errorMessage = ref('')
@@ -291,7 +284,7 @@ const addResultColor = computed(() => {
     return 'success'
 })
 
-// 内容类型切换时不再清空已选文件
+// 内容类型切换时保存到 store
 function handleContentTypeChange(type: ContentType) {
     contentType.value = type
 }
@@ -471,6 +464,7 @@ function handleThumbnailError(_path: string, _error: string): void {
     void _error
 }
 
+// 选择设备时保存到 store
 function handlePeerSelect(peerId: string) {
     selectedPeerId.value = peerId
 }

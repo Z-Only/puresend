@@ -9,6 +9,7 @@ import type {
     TransferTask,
     TransferProgress,
     SendMode,
+    TransferMode,
 } from '../types'
 import {
     initTransfer,
@@ -64,6 +65,18 @@ export const useTransferStore = defineStore('transfer', () => {
 
     /** 发送模式（仅本地网络模式下可用） */
     const sendMode = ref<SendMode>('p2p')
+
+    /** 传输模式（P2P 模式下的传输方式） */
+    const transferMode = ref<TransferMode>('local')
+
+    /** 选中的目标设备 ID（P2P 模式） */
+    const selectedPeerId = ref<string>('')
+
+    /** 接收模式 */
+    const receiveMode = ref<TransferMode>('local')
+
+    /** 网络信息显示状态（接收页面） */
+    const showNetworkInfo = ref<boolean>(false)
 
     /** 事件监听器清理函数 */
     const unlistenFns: UnlistenFn[] = []
@@ -411,6 +424,38 @@ export const useTransferStore = defineStore('transfer', () => {
     }
 
     /**
+     * 设置传输模式
+     * @param mode 传输模式
+     */
+    function setTransferMode(mode: TransferMode): void {
+        transferMode.value = mode
+    }
+
+    /**
+     * 设置选中的目标设备 ID
+     * @param peerId 设备 ID
+     */
+    function setSelectedPeerId(peerId: string): void {
+        selectedPeerId.value = peerId
+    }
+
+    /**
+     * 设置接收模式
+     * @param mode 接收模式
+     */
+    function setReceiveMode(mode: TransferMode): void {
+        receiveMode.value = mode
+    }
+
+    /**
+     * 设置网络信息显示状态
+     * @param show 是否显示
+     */
+    function setShowNetworkInfo(show: boolean): void {
+        showNetworkInfo.value = show
+    }
+
+    /**
      * 销毁 store，清理事件监听器
      */
     function destroy(): void {
@@ -418,6 +463,11 @@ export const useTransferStore = defineStore('transfer', () => {
         unlistenFns.length = 0
         tasks.value.clear()
         initialized.value = false
+        // 重置页面状态
+        transferMode.value = 'local'
+        selectedPeerId.value = ''
+        receiveMode.value = 'local'
+        showNetworkInfo.value = false
     }
 
     return {
@@ -433,6 +483,10 @@ export const useTransferStore = defineStore('transfer', () => {
         loading,
         error,
         sendMode,
+        transferMode,
+        selectedPeerId,
+        receiveMode,
+        showNetworkInfo,
         // 计算属性
         taskList,
         sendTasks,
@@ -454,6 +508,10 @@ export const useTransferStore = defineStore('transfer', () => {
         cleanup,
         removeTask,
         setSendMode,
+        setTransferMode,
+        setSelectedPeerId,
+        setReceiveMode,
+        setShowNetworkInfo,
         destroy,
     }
 })

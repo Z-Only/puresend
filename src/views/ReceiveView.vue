@@ -175,11 +175,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { storeToRefs } from 'pinia'
 import { open } from '@tauri-apps/plugin-dialog'
 import { ProgressDisplay } from '../components/transfer'
 import NetworkInfo from '../components/transfer/NetworkInfo.vue'
 import { useTransferStore } from '../stores'
-import type { TransferMode } from '../types'
 import {
     mdiWifi,
     mdiWifiOff,
@@ -192,12 +192,14 @@ import {
 const { t } = useI18n()
 const transferStore = useTransferStore()
 
-const receiveMode = ref<TransferMode>('local')
+// 从 store 获取响应式状态（Tab 切换时保留）
+const { receiveMode, showNetworkInfo } = storeToRefs(transferStore)
+
+// 页面本地状态（无需持久化）
 const starting = ref(false)
 const stopping = ref(false)
 const showError = ref(false)
 const errorMessage = ref('')
-const showNetworkInfo = ref(false)
 const loadingNetworkInfo = ref(false)
 
 const isReceiving = computed(() => transferStore.receivePort > 0)

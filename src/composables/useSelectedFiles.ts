@@ -1,9 +1,12 @@
 /**
  * 已选文件管理 Composable
  * 提供文件选择、移除、统计等功能
+ *
+ * 注意：此 composable 使用 shareStore.selectedFiles 作为状态源，
+ * 以支持 Tab 切换时保留已选文件状态
  */
 
-import { ref, computed, readonly } from 'vue'
+import { computed } from 'vue'
 import type {
     SelectedFileItem,
     SelectedFilesStats,
@@ -12,6 +15,7 @@ import type {
 } from '../types/content'
 import { FILE_COUNT_LIMIT } from '../types/content'
 import { formatFileSize, inferMimeType } from '../types/file'
+import { useShareStore } from '../stores'
 
 /** 判断是否为媒体文件 */
 function isMediaFile(mimeType: string): boolean {
@@ -29,17 +33,17 @@ function generateId(path: string): string {
 
 /**
  * 已选文件管理 Composable
+ * 使用 shareStore.selectedFiles 作为状态源，支持 Tab 切换时保留状态
  */
 export function useSelectedFiles() {
-    /** 已选文件列表 */
-    const files = ref<SelectedFileItem[]>([])
+    const shareStore = useShareStore()
 
     /** 文件数量 */
-    const count = computed(() => files.value.length)
+    const count = computed(() => shareStore.selectedFiles.length)
 
     /** 总大小 */
     const totalSize = computed(() =>
-        files.value.reduce((sum, file) => sum + file.size, 0)
+        shareStore.selectedFiles.reduce((sum, file) => sum + file.size, 0)
     )
 
     /** 格式化的总大小 */
@@ -47,15 +51,17 @@ export function useSelectedFiles() {
 
     /** 媒体文件数量 */
     const mediaCount = computed(
-        () => files.value.filter((f) => f.isMedia).length
+        () => shareStore.selectedFiles.filter((f) => f.isMedia).length
     )
 
     /** 是否达到上限 */
-    const isAtLimit = computed(() => files.value.length >= FILE_COUNT_LIMIT)
+    const isAtLimit = computed(
+        () => shareStore.selectedFiles.length >= FILE_COUNT_LIMIT
+    )
 
     /** 剩余可选数量 */
-    const remainingQuota = computed(
-        () => Math.max(0, FILE_COUNT_LIMIT - files.value.length)
+    const remainingQuota = computed(() =>
+        Math.max(0, FILE_COUNT_LIMIT - shareStore.selectedFiles.length)
     )
 
     /** 统计信息 */
@@ -69,7 +75,7 @@ export function useSelectedFiles() {
 
     /** 文件路径集合（用于去重） */
     const filePathSet = computed(
-        () => new Set(files.value.map((f) => f.path))
+        () => new Set(shareStore.selectedFiles.map((f) => f.path))
     )
 
     /**
@@ -120,7 +126,7 @@ export function useSelectedFiles() {
             metadata: file.metadata,
         }
 
-        files.value.push(newItem)
+        shareStore.selectedFiles.push(newItem)
         return 'added'
     }
 
@@ -172,9 +178,9 @@ export function useSelectedFiles() {
      * 移除单个文件
      */
     function removeFile(path: string): boolean {
-        const index = files.value.findIndex((f) => f.path === path)
+        const index = shareStore.selectedFiles.findIndex((f) => f.path === path)
         if (index !== -1) {
-            files.value.splice(index, 1)
+            shareStore.selectedFiles.splice(index, 1)
             return true
         }
         return false
@@ -184,17 +190,14 @@ export function useSelectedFiles() {
      * 清空所有文件
      */
     function clearFiles(): void {
-        files.value = []
+        shareStore.clearSelectedFiles()
     }
 
     /**
      * 更新文件缩略图
      */
-    function updateThumbnail(
-        path: string,
-        thumbnail: ThumbnailInfo
-    ): boolean {
-        const file = files.value.find((f) => f.path === path)
+    function updateThumbnail(path: string, thumbnail: ThumbnailInfo): boolean {
+        const file = shareStore.selectedFiles.find((f) => f.path === path)
         if (file) {
             file.thumbnail = thumbnail
             return true
@@ -206,14 +209,14 @@ export function useSelectedFiles() {
      * 获取所有临时文件路径
      */
     function getTempFiles(): string[] {
-        return files.value
+        return shareStore.selectedFiles
             .filter((f) => f.isTemp)
             .map((f) => f.path)
     }
 
     return {
-        // 状态
-        files: readonly(files),
+        // 状态（直接使用 store 的 selectedFiles）
+        files: computed(() => shareStore.selectedFiles),
 
         // 计算属性
         count,
