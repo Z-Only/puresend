@@ -258,8 +258,7 @@
     "title": "网络信息",
     "listeningAddress": "监听地址",
     "scanToConnect": "扫码连接",
-    "shareCode": "分享码",
-    "connectionHint": "其他设备可以通过扫描二维码或输入分享码连接到您的设备",
+    "connectionHint": "其他设备可以通过扫描二维码或输入 IP 地址和端口连接到您的设备",
     "copiedToClipboard": "已复制到剪贴板",
     "qrCodeAlt": "连接二维码"
   },

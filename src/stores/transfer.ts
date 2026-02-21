@@ -55,9 +55,6 @@ export const useTransferStore = defineStore('transfer', () => {
     /** 本机网络地址 */
     const networkAddress = ref<string>('')
 
-    /** 分享码 */
-    const shareCode = ref<string>('')
-
     /** 接收目录 */
     const receiveDirectory = ref<string>('~/Downloads/PureSend')
 
@@ -388,7 +385,6 @@ export const useTransferStore = defineStore('transfer', () => {
             receivePort.value = result.port
             // Tauri 返回的是 snake_case 字段，需要手动映射
             networkAddress.value = (result as any).network_address || ''
-            shareCode.value = (result as any).share_code || ''
         } catch (e) {
             error.value = `获取网络信息失败：${e}`
             console.error('获取网络信息失败:', e)
@@ -410,7 +406,6 @@ export const useTransferStore = defineStore('transfer', () => {
             receivePort.value = result.port
             // Tauri 返回的是 snake_case 字段，需要手动映射
             networkAddress.value = (result as any).network_address || ''
-            shareCode.value = (result as any).share_code || ''
         } catch (e) {
             error.value = `启动接收失败：${e}`
             console.error('启动接收失败:', e)
@@ -428,7 +423,6 @@ export const useTransferStore = defineStore('transfer', () => {
             await stopReceivingService()
             receivePort.value = 0
             networkAddress.value = ''
-            shareCode.value = ''
         } catch (e) {
             error.value = `停止接收失败：${e}`
             console.error('停止接收失败:', e)
@@ -843,7 +837,6 @@ export const useTransferStore = defineStore('transfer', () => {
         listenPort,
         receivePort,
         networkAddress,
-        shareCode,
         receiveDirectory,
         tasks,
         selectedTaskId,

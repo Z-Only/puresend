@@ -25,7 +25,6 @@
                         <NetworkInfo
                             :network-address="transferStore.networkAddress"
                             :port="transferStore.receivePort"
-                            :share-code="transferStore.shareCode"
                         />
                     </v-card-text>
                     <v-card-text v-else class="text-center py-4">

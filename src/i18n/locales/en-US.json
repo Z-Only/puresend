@@ -258,8 +258,7 @@
     "title": "Network Info",
     "listeningAddress": "Listening Address",
     "scanToConnect": "Scan to Connect",
-    "shareCode": "Share Code",
-    "connectionHint": "Other devices can connect to your device by scanning the QR code or entering the share code",
+    "connectionHint": "Other devices can connect to your device by scanning the QR code or entering the IP address and port",
     "copiedToClipboard": "Copied to clipboard",
     "qrCodeAlt": "Connection QR Code"
   },

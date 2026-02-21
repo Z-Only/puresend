@@ -45,26 +45,6 @@
                 </v-sheet>
             </div>
 
-            <!-- 分享码 -->
-            <div class="share-code-section">
-                <div class="text-body-2 text-grey mb-2">
-                    {{ t('network.shareCode') }}
-                </div>
-                <v-chip
-                    :text="shareCode"
-                    color="primary"
-                    variant="outlined"
-                    label
-                    class="mr-2"
-                />
-                <v-btn
-                    :icon="mdiContentCopy"
-                    size="small"
-                    variant="text"
-                    @click="handleCopyShareCode"
-                />
-            </div>
-
             <!-- 提示信息 -->
             <v-alert type="info" variant="tonal" density="compact" class="mt-4">
                 {{ t('network.connectionHint') }}
@@ -89,7 +69,6 @@ const { t } = useI18n()
 const props = defineProps<{
     networkAddress: string
     port: number
-    shareCode: string
 }>()
 
 const showCopySuccess = ref(false)
@@ -103,7 +82,6 @@ const qrCodeData = computed(() => {
     return JSON.stringify({
         ip: props.networkAddress,
         port: props.port,
-        code: props.shareCode,
     })
 })
 
@@ -123,7 +101,7 @@ async function generateQRCode(): Promise<void> {
 
 // 监听数据变化，重新生成二维码
 watch(
-    [() => props.networkAddress, () => props.port, () => props.shareCode],
+    [() => props.networkAddress, () => props.port],
     () => {
         generateQRCode()
     },
@@ -136,11 +114,6 @@ onMounted(() => {
 
 function handleCopyAddress() {
     navigator.clipboard.writeText(displayAddress.value)
-    showCopySuccess.value = true
-}
-
-function handleCopyShareCode() {
-    navigator.clipboard.writeText(props.shareCode)
     showCopySuccess.value = true
 }
 </script>
@@ -164,11 +137,5 @@ function handleCopyShareCode() {
     justify-content: center;
     background: #f5f5f5;
     border-radius: 4px;
-}
-
-.share-code-section {
-    display: flex;
-    align-items: center;
-    gap: 8px;
 }
 </style>
