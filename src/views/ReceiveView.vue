@@ -14,24 +14,30 @@
                             color="primary"
                             variant="text"
                             size="small"
-                            :loading="loadingNetworkInfo"
                             @click="handleShowNetworkInfo"
                         >
-                            <v-icon :icon="mdiWifi" class="mr-2" />
-                            {{ t('receive.viewNetworkInfo') }}
+                            <v-icon
+                                :icon="
+                                    showNetworkInfo
+                                        ? mdiChevronUp
+                                        : mdiChevronDown
+                                "
+                                class="mr-2"
+                            />
+                            {{
+                                showNetworkInfo
+                                    ? t('receive.hideNetworkInfo')
+                                    : t('receive.viewNetworkInfo')
+                            }}
                         </v-btn>
                     </v-card-title>
                     <v-card-text v-if="showNetworkInfo">
                         <NetworkInfo
+                            :device-name="settingsStore.deviceName"
                             :network-address="transferStore.networkAddress"
                             :port="transferStore.receivePort"
+                            :is-receiving="isReceiving"
                         />
-                    </v-card-text>
-                    <v-card-text v-else class="text-center py-4">
-                        <v-icon :icon="mdiWifiOff" size="48" color="grey" />
-                        <div class="text-body-2 text-grey mt-2">
-                            {{ t('receive.clickToViewNetwork') }}
-                        </div>
                     </v-card-text>
                 </v-card>
 
@@ -155,17 +161,19 @@ import { useI18n } from 'vue-i18n'
 import { open } from '@tauri-apps/plugin-dialog'
 import { ProgressDisplay, ReceiveModeSelector } from '../components/transfer'
 import NetworkInfo from '../components/transfer/NetworkInfo.vue'
-import { useTransferStore } from '../stores'
+import { useTransferStore, useSettingsStore } from '../stores'
 import {
-    mdiWifi,
     mdiWifiOff,
     mdiWifiPlus,
     mdiInboxArrowDown,
     mdiFolderOpen,
+    mdiChevronUp,
+    mdiChevronDown,
 } from '@mdi/js'
 
 const { t } = useI18n()
 const transferStore = useTransferStore()
+const settingsStore = useSettingsStore()
 
 // 从 store 获取响应式状态（Tab 切换时保留）
 const showNetworkInfo = computed({
@@ -178,29 +186,12 @@ const starting = ref(false)
 const stopping = ref(false)
 const showError = ref(false)
 const errorMessage = ref('')
-const loadingNetworkInfo = ref(false)
 
 const isReceiving = computed(() => transferStore.receivePort > 0)
 
 async function handleShowNetworkInfo() {
-    if (showNetworkInfo.value && transferStore.networkAddress) {
-        // 如果已显示且有网络信息，直接返回
-        return
-    }
-
-    loadingNetworkInfo.value = true
-    showError.value = false
-
-    try {
-        // 查看网络信息时调用 getNetworkInfo 获取真实信息，但不启动接收服务
-        await transferStore.getNetworkInfo()
-        showNetworkInfo.value = true
-    } catch (error) {
-        showError.value = true
-        errorMessage.value = t('receive.getNetworkInfoFailed', { error })
-    } finally {
-        loadingNetworkInfo.value = false
-    }
+    // 仅切换 UI 显示状态，不调用后端
+    showNetworkInfo.value = !showNetworkInfo.value
 }
 
 async function handleStartReceiving() {
@@ -271,11 +262,66 @@ async function handleCleanup() {
 
 onMounted(async () => {
     await transferStore.initialize()
+    // 进入页面自动启动接收服务器
+    await autoStartReceiving()
 })
 
-onUnmounted(() => {
+onUnmounted(async () => {
+    // 离开页面时检查活跃任务后关闭服务器
+    await autoStopReceiving()
     transferStore.destroy()
 })
+
+/**
+ * 自动启动接收服务器
+ */
+async function autoStartReceiving() {
+    // 如果已经在接收，不重复启动
+    if (transferStore.receivePort > 0) {
+        return
+    }
+
+    starting.value = true
+    showError.value = false
+
+    try {
+        await transferStore.startReceiving()
+    } catch (error) {
+        showError.value = true
+        errorMessage.value = t('receive.startFailed', { error })
+    } finally {
+        starting.value = false
+    }
+}
+
+/**
+ * 自动停止接收服务器（有活跃任务时保持运行）
+ */
+async function autoStopReceiving() {
+    // 如果没有在接收，直接返回
+    if (transferStore.receivePort === 0) {
+        return
+    }
+
+    // 检查是否有活跃任务（正在传输或等待中）
+    const hasActiveTasks = transferStore.receiveTasks.some(
+        (task) => task.status === 'transferring' || task.status === 'pending'
+    )
+
+    // 有活跃任务时保持服务器运行
+    if (hasActiveTasks) {
+        return
+    }
+
+    // 无活跃任务，关闭服务器
+    try {
+        await transferStore.stopReceiving()
+        showNetworkInfo.value = false
+    } catch (error) {
+        // 静默处理错误，不影响页面离开
+        console.error('停止接收失败:', error)
+    }
+}
 </script>
 
 <style scoped>

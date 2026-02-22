@@ -357,44 +357,127 @@ pub async fn cleanup_completed_tasks(state: State<'_, TransferState>) -> Result<
     Ok(before_count - active_tasks.len())
 }
 
-/// 获取网络信息（不启动接收服务）
+/// 启动接收监听服务器
 #[tauri::command]
-pub async fn get_network_info(state: State<'_, TransferState>) -> Result<ReceivingState, String> {
+pub async fn start_receiving(
+    state: State<'_, TransferState>,
+    port: Option<u16>,
+) -> Result<ReceivingState, String> {
     use std::net::IpAddr;
     use std::str::FromStr;
 
-    let receiving_state = state.receiving_state.lock().await;
-
-    // 如果已经在接收，返回当前的接收状态
-    if receiving_state.is_receiving {
-        return Ok(ReceivingState {
-            is_receiving: receiving_state.is_receiving,
-            port: receiving_state.port,
-            network_address: receiving_state.network_address.clone(),
-            share_code: receiving_state.share_code.clone(),
-        });
+    // 检查是否已经在接收
+    {
+        let receiving_state = state.receiving_state.lock().await;
+        if receiving_state.is_receiving {
+            return Ok(ReceivingState {
+                is_receiving: true,
+                port: receiving_state.port,
+                network_address: receiving_state.network_address.clone(),
+                share_code: receiving_state.share_code.clone(),
+            });
+        }
     }
 
-    // 否则，生成临时的网络信息（不启动接收服务）
-    let network_address = get_local_ip().unwrap_or_else(|| IpAddr::from_str("127.0.0.1").unwrap());
+    // 创建新的 LocalTransport 用于接收
+    let transport = if let Some(p) = port {
+        LocalTransport::with_port(p)
+    } else {
+        LocalTransport::new()
+    };
+
+    // 初始化传输服务
+    transport.initialize().await.map_err(|e| e.to_string())?;
+
+    // 获取监听端口
+    let listen_port = transport
+        .get_listen_port()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // 获取本地 IP 地址
+    let network_address = get_local_ip()
+        .unwrap_or_else(|| IpAddr::from_str("127.0.0.1").unwrap());
     let network_address_str = network_address.to_string();
 
-    // 生成随机端口（10000-20000 范围）
-    let port = 10000
-        + (std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis()
-            % 10000) as u16;
+    // 生成分享码（6 位数字，基于端口和时间戳）
+    let share_code = format!("{:06}", (listen_port as u32 + std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u32) % 1000000);
 
-    // 生成分享码（6 位随机数字）
-    let share_code = format!("{:06}", port % 10000);
+    // 保存传输实例
+    {
+        let mut local_transport = state.local_transport.lock().await;
+        *local_transport = Some(transport);
+    }
 
+    // 更新接收状态
+    let result = {
+        let mut receiving_state = state.receiving_state.lock().await;
+        receiving_state.is_receiving = true;
+        receiving_state.port = listen_port;
+        receiving_state.network_address = network_address_str.clone();
+        receiving_state.share_code = share_code.clone();
+
+        ReceivingState {
+            is_receiving: true,
+            port: listen_port,
+            network_address: network_address_str,
+            share_code,
+        }
+    };
+
+    Ok(result)
+}
+
+/// 停止接收监听服务器
+#[tauri::command]
+pub async fn stop_receiving(state: State<'_, TransferState>) -> Result<(), String> {
+    // 检查是否有活跃任务
+    {
+        let active_tasks = state.active_tasks.lock().await;
+        let has_active_tasks = active_tasks.values().any(|t| {
+            t.status == crate::models::TaskStatus::Pending
+                || t.status == crate::models::TaskStatus::Transferring
+        });
+
+        if has_active_tasks {
+            return Err("有活跃的传输任务，无法停止接收服务".to_string());
+        }
+    }
+
+    // 关闭传输服务
+    {
+        let mut local_transport = state.local_transport.lock().await;
+        if let Some(transport) = local_transport.take() {
+            transport.shutdown().await.map_err(|e| e.to_string())?;
+        }
+    }
+
+    // 重置接收状态
+    {
+        let mut receiving_state = state.receiving_state.lock().await;
+        receiving_state.is_receiving = false;
+        receiving_state.port = 0;
+        receiving_state.network_address.clear();
+        receiving_state.share_code.clear();
+    }
+
+    Ok(())
+}
+
+/// 获取网络信息（只返回真实服务器状态）
+#[tauri::command]
+pub async fn get_network_info(state: State<'_, TransferState>) -> Result<ReceivingState, String> {
+    let receiving_state = state.receiving_state.lock().await;
+
+    // 只返回真实的接收状态，不生成临时信息
     Ok(ReceivingState {
-        is_receiving: false,
-        port,
-        network_address: network_address_str,
-        share_code,
+        is_receiving: receiving_state.is_receiving,
+        port: receiving_state.port,
+        network_address: receiving_state.network_address.clone(),
+        share_code: receiving_state.share_code.clone(),
     })
 }
 
@@ -513,4 +596,58 @@ fn get_local_ip() -> Option<std::net::IpAddr> {
         }
     }
     None
+}
+
+/// 默认接收目录
+fn get_default_receive_directory() -> String {
+    // 尝试获取用户下载目录
+    if let Some(home) = std::env::var("HOME").ok() {
+        let download_dir = PathBuf::from(home).join("Downloads").join("PureSend");
+        return download_dir.to_string_lossy().to_string();
+    }
+    // Windows 系统
+    if let Ok(userprofile) = std::env::var("USERPROFILE") {
+        let download_dir = PathBuf::from(userprofile)
+            .join("Downloads")
+            .join("PureSend");
+        return download_dir.to_string_lossy().to_string();
+    }
+    // 降级到当前目录
+    "./downloads".to_string()
+}
+
+/// 获取接收目录
+#[tauri::command]
+pub async fn get_receive_directory() -> Result<String, String> {
+    // 返回默认接收目录
+    Ok(get_default_receive_directory())
+}
+
+/// 设置接收目录
+#[tauri::command]
+pub async fn set_receive_directory(directory: String) -> Result<(), String> {
+    // 验证目录是否存在，不存在则创建
+    let path = PathBuf::from(&directory);
+    if !path.exists() {
+        std::fs::create_dir_all(&path).map_err(|e| {
+            format!(
+                "无法创建接收目录 '{}': {}",
+                directory,
+                e
+            )
+        })?;
+    }
+
+    // 验证目录是否可写
+    let test_file = path.join(".write_test");
+    if std::fs::File::create(&test_file).is_err() {
+        return Err(format!(
+            "接收目录 '{}' 不可写",
+            directory
+        ));
+    }
+    // 删除测试文件
+    let _ = std::fs::remove_file(&test_file);
+
+    Ok(())
 }

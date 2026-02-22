@@ -383,8 +383,8 @@ export const useTransferStore = defineStore('transfer', () => {
         try {
             const result = await getNetworkInfoService()
             receivePort.value = result.port
-            // Tauri 返回的是 snake_case 字段，需要手动映射
-            networkAddress.value = (result as any).network_address || ''
+            // 后端使用 camelCase 序列化，直接访问
+            networkAddress.value = result.networkAddress || ''
         } catch (e) {
             error.value = `获取网络信息失败：${e}`
             console.error('获取网络信息失败:', e)
@@ -404,8 +404,8 @@ export const useTransferStore = defineStore('transfer', () => {
         try {
             const result = await startReceivingService()
             receivePort.value = result.port
-            // Tauri 返回的是 snake_case 字段，需要手动映射
-            networkAddress.value = (result as any).network_address || ''
+            // 后端使用 camelCase 序列化，直接访问
+            networkAddress.value = result.networkAddress || ''
         } catch (e) {
             error.value = `启动接收失败：${e}`
             console.error('启动接收失败:', e)
@@ -422,7 +422,7 @@ export const useTransferStore = defineStore('transfer', () => {
         try {
             await stopReceivingService()
             receivePort.value = 0
-            networkAddress.value = ''
+            // 保留 networkAddress，停止接收时 IP 仍然可以显示
         } catch (e) {
             error.value = `停止接收失败：${e}`
             console.error('停止接收失败:', e)

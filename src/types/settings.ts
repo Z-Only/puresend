@@ -59,6 +59,8 @@ export interface AppSettings {
 /** 扩展的设置状态，包含版本信息 */
 export interface SettingsState extends AppSettings {
     version: number
+    /** 接收设置 */
+    receiveSettings?: ReceiveSettings
 }
 
 /** 默认隐私设置 */
@@ -88,5 +90,20 @@ export const DEFAULT_SETTINGS: AppSettings = {
     history: DEFAULT_HISTORY_SETTINGS,
 }
 
-/** 本地存储键名 */
+/** 接收设置 */
+export interface ReceiveSettings {
+    /** 是否自动保存 */
+    autoSave: boolean
+    /** 请求过期时间（秒） */
+    requestExpireTime: number
+    /** 最大待处理请求数量 */
+    maxPendingRequests: number
+}
+
+/** 默认接收设置 */
+export const DEFAULT_RECEIVE_SETTINGS: ReceiveSettings = {
+    autoSave: false,
+    requestExpireTime: 300,
+    maxPendingRequests: 50,
+} /** 本地存储键名 */
 export const SETTINGS_STORAGE_KEY = 'puresend-settings'

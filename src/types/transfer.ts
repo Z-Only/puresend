@@ -3,7 +3,6 @@
  */
 
 import type { FileMetadata } from './file'
-import type { PeerInfo } from './peer'
 
 /** 传输模式 */
 export type TransferMode = 'local' | 'cloud'
@@ -22,6 +21,31 @@ export type TaskStatus =
 /** 传输方向 */
 export type TransferDirection = 'send' | 'receive'
 
+/** 接收请求状态 */
+export type ReceiveRequestStatus =
+    | 'pending'
+    | 'accepted'
+    | 'rejected'
+    | 'expired'
+
+/** 接收请求 */
+export interface ReceiveRequest {
+    /** 请求 ID */
+    id: string
+    /** 发送方设备名称（仅作展示） */
+    peerName: string
+    /** 发送方真实 IP 地址 */
+    peerIp: string
+    /** 文件信息 */
+    file: FileMetadata
+    /** 请求时间戳 */
+    requestedAt: number
+    /** 请求过期时间戳 */
+    expiresAt: number
+    /** 请求状态 */
+    status: ReceiveRequestStatus
+}
+
 /** 传输任务 */
 export interface TransferTask {
     /** 任务 ID */
@@ -30,28 +54,35 @@ export interface TransferTask {
     file: FileMetadata
     /** 传输模式 */
     mode: TransferMode
-    /** 发送模式 */
-    sendMode?: SendMode
-    /** 目标设备（P2P 模式） */
-    peer?: PeerInfo
+    /** 目标设备信息 */
+    peer?: {
+        id: string
+        name: string
+        ip: string
+        port: number
+        deviceType: string
+        discoveredAt: number
+        lastSeen: number
+        status: string
+    }
     /** 任务状态 */
     status: TaskStatus
-    /** 进度百分比（0-100） */
+    /** 进度百分比 */
     progress: number
     /** 已传输字节数 */
     transferredBytes: number
     /** 传输速度（字节/秒） */
     speed: number
-    /** 创建时间戳（毫秒） */
-    createdAt: number
-    /** 完成时间戳（毫秒） */
-    completedAt?: number
-    /** 错误信息 */
-    error?: string
-    /** 传输方向 */
-    direction: TransferDirection
     /** 预估剩余时间（秒） */
     estimatedTimeRemaining?: number
+    /** 创建时间戳 */
+    createdAt: number
+    /** 完成时间戳 */
+    completedAt?: number
+    /** 传输方向 */
+    direction: TransferDirection
+    /** 错误信息 */
+    error?: string
 }
 
 /** 传输进度事件 */

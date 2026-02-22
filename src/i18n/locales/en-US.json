@@ -262,15 +262,26 @@
     "clickToStart": "Click start receiving to wait for connection",
     "getNetworkInfoFailed": "Failed to get network info: {error}",
     "startFailed": "Failed to start receiving: {error}",
-    "stopFailed": "Failed to stop receiving: {error}"
+    "stopFailed": "Failed to stop receiving: {error}",
+    "notReceiving": "Not Receiving",
+    "hideNetworkInfo": "Hide Network Info",
+    "retryNotSupported": "Retry is not supported for receive tasks",
+    "selectDirectory": "Select Receive Directory",
+    "selectDirectoryFailed": "Failed to select directory: {error}"
   },
   "network": {
     "title": "Network Info",
+    "deviceName": "Device Name",
+    "ipAddress": "IP Address",
+    "port": "Port",
     "listeningAddress": "Listening Address",
     "scanToConnect": "Scan to Connect",
     "connectionHint": "Other devices can connect to your device by scanning the QR code or entering the IP address and port",
+    "connectionHintInactive": "Click \"Start Receiving\" to start the receive service, then other devices can connect",
     "copiedToClipboard": "Copied to clipboard",
-    "qrCodeAlt": "Connection QR Code"
+    "qrCodeAlt": "Connection QR Code",
+    "notReceivingHint": "Not receiving. Network info will be available after starting the receive service.",
+    "qrCodeUnavailable": "QR Code Unavailable"
   },
   "fileSelector": {
     "releaseToUpload": "Release to upload",

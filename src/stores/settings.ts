@@ -9,8 +9,10 @@ import {
     type SettingsState,
     type HistoryPrivacySettings,
     type AutoCleanupSettings,
+    type ReceiveSettings,
     DEFAULT_SETTINGS,
     DEFAULT_HISTORY_SETTINGS,
+    DEFAULT_RECEIVE_SETTINGS,
     SETTINGS_VERSION,
     SETTINGS_STORAGE_KEY,
 } from '@/types/settings'
@@ -29,6 +31,7 @@ export const useSettingsStore = defineStore('settings', () => {
     const theme = ref<ThemeMode>(DEFAULT_SETTINGS.theme)
     const language = ref<LanguageMode>(DEFAULT_SETTINGS.language)
     const history = ref(DEFAULT_HISTORY_SETTINGS)
+    const receiveSettings = ref<ReceiveSettings>(DEFAULT_RECEIVE_SETTINGS)
     const version = ref(SETTINGS_VERSION)
 
     // ============ 计算属性 ============
@@ -175,6 +178,7 @@ export const useSettingsStore = defineStore('settings', () => {
                 theme: theme.value,
                 language: language.value,
                 history: history.value,
+                receiveSettings: receiveSettings.value,
                 version: version.value,
             }
 
@@ -214,6 +218,10 @@ export const useSettingsStore = defineStore('settings', () => {
                 language.value = settings.language
                 // 兼容旧版设置（没有 history 字段）
                 history.value = settings.history || DEFAULT_HISTORY_SETTINGS
+                // 兼容旧版设置（没有 receiveSettings 字段）
+                receiveSettings.value =
+                    (settings as any).receiveSettings ||
+                    DEFAULT_RECEIVE_SETTINGS
 
                 // 如果没有设备名称，尝试获取本机设备名
                 if (!deviceName.value) {

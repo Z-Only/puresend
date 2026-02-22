@@ -129,10 +129,10 @@ export async function cleanupCompletedTasks(): Promise<number> {
  * 获取网络信息（不启动接收服务）
  */
 export async function getNetworkInfo(): Promise<{
+    isReceiving: boolean
     port: number
-    network_address: string
-    share_code: string
-    is_receiving: boolean
+    networkAddress: string
+    shareCode: string
 }> {
     return invoke('get_network_info')
 }
@@ -142,9 +142,10 @@ export async function getNetworkInfo(): Promise<{
  * @param port 可选的指定端口，不传则自动分配
  */
 export async function startReceiving(port?: number): Promise<{
+    isReceiving: boolean
     port: number
-    network_address: string
-    share_code: string
+    networkAddress: string
+    shareCode: string
 }> {
     return invoke('start_receiving', { port })
 }
