@@ -82,9 +82,6 @@ export const useTransferStore = defineStore('transfer', () => {
     /** 接收模式 */
     const receiveMode = ref<TransferMode>('local')
 
-    /** 网络信息显示状态（接收页面） */
-    const showNetworkInfo = ref<boolean>(false)
-
     /** 事件监听器清理函数 */
     const unlistenFns: UnlistenFn[] = []
 
@@ -539,14 +536,6 @@ export const useTransferStore = defineStore('transfer', () => {
     }
 
     /**
-     * 设置网络信息显示状态
-     * @param show 是否显示
-     */
-    function setShowNetworkInfo(show: boolean): void {
-        showNetworkInfo.value = show
-    }
-
-    /**
      * 销毁 store，清理事件监听器
      */
     function destroy(): void {
@@ -558,7 +547,6 @@ export const useTransferStore = defineStore('transfer', () => {
         transferMode.value = 'local'
         selectedPeerId.value = ''
         receiveMode.value = 'local'
-        showNetworkInfo.value = false
     }
 
     // ============ 历史记录方法 ============
@@ -846,7 +834,6 @@ export const useTransferStore = defineStore('transfer', () => {
         transferMode,
         selectedPeerId,
         receiveMode,
-        showNetworkInfo,
         // 历史记录状态
         historyItems,
         historyLoaded,
@@ -881,7 +868,6 @@ export const useTransferStore = defineStore('transfer', () => {
         setTransferMode,
         setSelectedPeerId,
         setReceiveMode,
-        setShowNetworkInfo,
         destroy,
         // 历史记录方法
         loadHistory,

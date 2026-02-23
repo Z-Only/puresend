@@ -22,7 +22,6 @@ declare module 'vue' {
     LinkSharePanel: typeof import('./src/components/transfer/LinkSharePanel.vue')['default']
     MediaPicker: typeof import('./src/components/transfer/MediaPicker.vue')['default']
     ModeSwitcher: typeof import('./src/components/transfer/ModeSwitcher.vue')['default']
-    NetworkInfo: typeof import('./src/components/transfer/NetworkInfo.vue')['default']
     PeerList: typeof import('./src/components/transfer/PeerList.vue')['default']
     PinConfigDialog: typeof import('./src/components/transfer/PinConfigDialog.vue')['default']
     ProgressDisplay: typeof import('./src/components/transfer/ProgressDisplay.vue')['default']

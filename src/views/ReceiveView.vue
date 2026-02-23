@@ -2,47 +2,10 @@
 <template>
     <v-container fluid class="receive-view">
         <v-row>
-            <!-- 左侧：网络信息和接收设置 -->
+            <!-- 左侧：接收设置 -->
             <v-col cols="12" md="6">
-                <!-- 网络信息卡片 -->
-                <v-card class="mb-4">
-                    <v-card-title
-                        class="text-subtitle-1 d-flex align-center justify-space-between"
-                    >
-                        <span>{{ t('receive.networkInfo') }}</span>
-                        <v-btn
-                            color="primary"
-                            variant="text"
-                            size="small"
-                            @click="handleShowNetworkInfo"
-                        >
-                            <v-icon
-                                :icon="
-                                    showNetworkInfo
-                                        ? mdiChevronUp
-                                        : mdiChevronDown
-                                "
-                                class="mr-2"
-                            />
-                            {{
-                                showNetworkInfo
-                                    ? t('receive.hideNetworkInfo')
-                                    : t('receive.viewNetworkInfo')
-                            }}
-                        </v-btn>
-                    </v-card-title>
-                    <v-card-text v-if="showNetworkInfo">
-                        <NetworkInfo
-                            :device-name="settingsStore.deviceName"
-                            :network-address="transferStore.networkAddress"
-                            :port="transferStore.receivePort"
-                            :is-receiving="isReceiving"
-                        />
-                    </v-card-text>
-                </v-card>
-
                 <!-- 接收模式选择器 -->
-                <ReceiveModeSelector class="mt-4" />
+                <ReceiveModeSelector />
 
                 <!-- 接收目录设置 -->
                 <v-card class="mb-4">
@@ -160,26 +123,16 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { open } from '@tauri-apps/plugin-dialog'
 import { ProgressDisplay, ReceiveModeSelector } from '../components/transfer'
-import NetworkInfo from '../components/transfer/NetworkInfo.vue'
-import { useTransferStore, useSettingsStore } from '../stores'
+import { useTransferStore } from '../stores'
 import {
     mdiWifiOff,
     mdiWifiPlus,
     mdiInboxArrowDown,
     mdiFolderOpen,
-    mdiChevronUp,
-    mdiChevronDown,
 } from '@mdi/js'
 
 const { t } = useI18n()
 const transferStore = useTransferStore()
-const settingsStore = useSettingsStore()
-
-// 从 store 获取响应式状态（Tab 切换时保留）
-const showNetworkInfo = computed({
-    get: () => transferStore.showNetworkInfo,
-    set: (value) => (transferStore.showNetworkInfo = value),
-})
 
 // 页面本地状态（无需持久化）
 const starting = ref(false)
@@ -189,18 +142,12 @@ const errorMessage = ref('')
 
 const isReceiving = computed(() => transferStore.receivePort > 0)
 
-async function handleShowNetworkInfo() {
-    // 仅切换 UI 显示状态，不调用后端
-    showNetworkInfo.value = !showNetworkInfo.value
-}
-
 async function handleStartReceiving() {
     starting.value = true
     showError.value = false
 
     try {
         await transferStore.startReceiving()
-        // 启动接收后不自动显示网络信息，用户需要时可手动点击"查看网络信息"
     } catch (error) {
         showError.value = true
         errorMessage.value = t('receive.startFailed', { error })
@@ -215,8 +162,6 @@ async function handleStopReceiving() {
 
     try {
         await transferStore.stopReceiving()
-        // 停止接收后隐藏网络信息
-        showNetworkInfo.value = false
     } catch (error) {
         showError.value = true
         errorMessage.value = t('receive.stopFailed', { error })
@@ -316,7 +261,6 @@ async function autoStopReceiving() {
     // 无活跃任务，关闭服务器
     try {
         await transferStore.stopReceiving()
-        showNetworkInfo.value = false
     } catch (error) {
         // 静默处理错误，不影响页面离开
         console.error('停止接收失败:', error)
