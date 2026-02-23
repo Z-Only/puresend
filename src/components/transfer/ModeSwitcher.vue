@@ -7,44 +7,64 @@
         <v-card-text>
             <v-row>
                 <v-col v-for="mode in modes" :key="mode.value" cols="6">
-                    <v-card
-                        :color="
-                            modelValue === mode.value ? 'primary' : undefined
-                        "
-                        :variant="
-                            modelValue === mode.value ? 'flat' : 'outlined'
-                        "
-                        class="mode-card"
-                        @click="selectMode(mode.value)"
-                    >
-                        <v-card-text
-                            class="d-flex flex-column align-center pa-4"
-                        >
-                            <v-icon
-                                :icon="mode.icon"
-                                size="48"
+                    <v-tooltip :disabled="!mode.disabled" location="top">
+                        <template #activator="{ props: tooltipProps }">
+                            <v-card
+                                v-bind="tooltipProps"
                                 :color="
-                                    modelValue === mode.value
-                                        ? 'white'
-                                        : 'primary'
+                                    modelValue === mode.value && !mode.disabled
+                                        ? 'primary'
+                                        : undefined
                                 "
-                                class="mb-2"
-                            />
-                            <div class="text-subtitle-1 font-weight-medium">
-                                {{ mode.title }}
-                            </div>
-                            <div
-                                class="text-body-2 text-center mt-1"
-                                :class="
-                                    modelValue === mode.value
-                                        ? 'text-white'
-                                        : 'text-grey'
+                                :variant="
+                                    modelValue === mode.value && !mode.disabled
+                                        ? 'flat'
+                                        : 'outlined'
                                 "
+                                :class="[
+                                    'mode-card',
+                                    { 'mode-card-disabled': mode.disabled },
+                                ]"
+                                @click="selectMode(mode)"
                             >
-                                {{ mode.description }}
-                            </div>
-                        </v-card-text>
-                    </v-card>
+                                <v-card-text
+                                    class="d-flex flex-column align-center pa-4"
+                                >
+                                    <v-icon
+                                        :icon="mode.icon"
+                                        size="48"
+                                        :color="
+                                            modelValue === mode.value &&
+                                            !mode.disabled
+                                                ? 'white'
+                                                : mode.disabled
+                                                  ? 'grey'
+                                                  : 'primary'
+                                        "
+                                        class="mb-2"
+                                    />
+                                    <div
+                                        class="text-subtitle-1 font-weight-medium"
+                                        :class="{ 'text-grey': mode.disabled }"
+                                    >
+                                        {{ mode.title }}
+                                    </div>
+                                    <div
+                                        class="text-body-2 text-center mt-1"
+                                        :class="
+                                            modelValue === mode.value &&
+                                            !mode.disabled
+                                                ? 'text-white'
+                                                : 'text-grey'
+                                        "
+                                    >
+                                        {{ mode.description }}
+                                    </div>
+                                </v-card-text>
+                            </v-card>
+                        </template>
+                        <span>{{ t('transfer.mode.cloudComingSoon') }}</span>
+                    </v-tooltip>
                 </v-col>
             </v-row>
 
@@ -57,17 +77,6 @@
                 density="compact"
             >
                 {{ t('transfer.mode.noDeviceHint') }}
-            </v-alert>
-
-            <!-- 云盘提示 -->
-            <v-alert
-                v-if="modelValue === 'cloud'"
-                type="warning"
-                variant="tonal"
-                class="mt-4"
-                density="compact"
-            >
-                {{ t('transfer.mode.cloudComingSoon') }}
             </v-alert>
         </v-card-text>
     </v-card>
@@ -94,6 +103,7 @@ interface ModeOption {
     title: string
     description: string
     icon: string
+    disabled: boolean
 }
 
 const modes: ModeOption[] = [
@@ -102,17 +112,23 @@ const modes: ModeOption[] = [
         title: t('transfer.mode.local.title'),
         description: t('transfer.mode.local.description'),
         icon: mdiWifi,
+        disabled: false,
     },
     {
         value: 'cloud',
         title: t('transfer.mode.cloud.title'),
         description: t('transfer.mode.cloud.description'),
         icon: mdiCloudUpload,
+        disabled: true,
     },
 ]
 
-function selectMode(mode: TransferMode) {
-    emit('update:modelValue', mode)
+function selectMode(mode: ModeOption) {
+    // 云盘中转模式禁用，不切换
+    if (mode.disabled) {
+        return
+    }
+    emit('update:modelValue', mode.value)
 }
 </script>
 
@@ -124,5 +140,14 @@ function selectMode(mode: TransferMode) {
 
 .mode-card:hover {
     transform: translateY(-2px);
+}
+
+.mode-card-disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.mode-card-disabled:hover {
+    transform: none;
 }
 </style>

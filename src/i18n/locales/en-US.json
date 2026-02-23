@@ -77,7 +77,7 @@
     "failed": "Failed",
     "cancelled": "Cancelled",
     "mode": {
-      "title": "Select Transfer Mode",
+      "title": "Transfer Mode",
       "local": {
         "title": "Local Network",
         "description": "Direct transfer via LAN, fast speed"
@@ -245,6 +245,18 @@
     "selectFileToStart": "Select files to start sending",
     "cleanup": "Cleanup Completed"
   },
+  "receiveMode": {
+    "label": "Transfer Mode",
+    "local": {
+      "label": "Local Network",
+      "description": "Direct transfer via LAN, fast speed"
+    },
+    "cloud": {
+      "label": "Cloud Relay",
+      "description": "Transfer via cloud, cross-network",
+      "comingSoon": "Cloud relay feature coming soon"
+    }
+  },
   "receive": {
     "networkInfo": "Network Info",
     "viewNetworkInfo": "View Network Info",
@@ -303,18 +315,6 @@
       "label": "Link Share",
       "description": "Generate share link and QR code",
       "selectFileHint": "Please select files to share first"
-    }
-  },
-  "receiveMode": {
-    "label": "Receive Mode",
-    "local": {
-      "label": "Local Network",
-      "description": "Receive files via local network"
-    },
-    "cloud": {
-      "label": "Cloud Relay",
-      "description": "Receive files via cloud relay",
-      "comingSoon": "Cloud relay feature coming soon"
     }
   },
   "share": {

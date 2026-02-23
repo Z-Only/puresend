@@ -77,7 +77,7 @@
     "failed": "传输失败",
     "cancelled": "已取消",
     "mode": {
-      "title": "选择传输模式",
+      "title": "传输模式",
       "local": {
         "title": "本地网络",
         "description": "通过局域网直接传输，速度快"
@@ -245,6 +245,18 @@
     "selectFileToStart": "选择文件开始发送",
     "cleanup": "清理已完成"
   },
+  "receiveMode": {
+    "label": "传输模式",
+    "local": {
+      "label": "本地网络",
+      "description": "通过局域网直接传输，速度快"
+    },
+    "cloud": {
+      "label": "云盘中转",
+      "description": "通过云盘中转，跨网络传输",
+      "comingSoon": "云盘中转功能即将推出"
+    }
+  },
   "receive": {
     "networkInfo": "网络信息",
     "viewNetworkInfo": "查看网络信息",
@@ -303,18 +315,6 @@
       "label": "链接分享",
       "description": "生成分享链接和二维码",
       "selectFileHint": "请先选择要分享的文件"
-    }
-  },
-  "receiveMode": {
-    "label": "接收模式",
-    "local": {
-      "label": "本地网络",
-      "description": "通过局域网接收文件"
-    },
-    "cloud": {
-      "label": "云盘中转",
-      "description": "通过云盘中转接收文件",
-      "comingSoon": "云盘中转功能即将推出"
     }
   },
   "share": {

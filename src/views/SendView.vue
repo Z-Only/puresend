@@ -55,37 +55,37 @@
                     @thumbnail-error="handleThumbnailError"
                 />
 
-                <!-- 发送模式选择器 -->
+                <!-- 传输模式选择器 -->
+                <ModeSwitcher
+                    v-model="transferMode"
+                    :online-peer-count="discoveryStore.onlineCount"
+                    class="mt-4"
+                />
+
+                <!-- 发送模式选择器（仅本地网络模式下显示） -->
                 <SendModeSelector
+                    v-if="transferMode === 'local'"
                     v-model="sendMode"
                     :has-selected-files="selectedFiles.count.value > 0"
                     class="mt-4"
                     @change="handleSendModeChange"
                 />
 
-                <!-- 设备列表（P2P 模式） -->
-                <template v-if="sendMode === 'p2p'">
-                    <ModeSwitcher
-                        v-model="transferMode"
-                        :online-peer-count="discoveryStore.onlineCount"
-                        class="mt-4"
-                    />
+                <!-- 设备列表（P2P 模式 + 本地网络模式） -->
+                <PeerList
+                    v-if="sendMode === 'p2p' && transferMode === 'local'"
+                    :peers="discoveryStore.peerList"
+                    :selected-peer-id="selectedPeerId"
+                    :loading="discoveryStore.scanning"
+                    class="mt-4"
+                    @select="handlePeerSelect"
+                    @refresh="handlePeerRefresh"
+                    @add-manual="handleAddManual"
+                />
 
-                    <PeerList
-                        v-if="transferMode === 'local'"
-                        :peers="discoveryStore.peerList"
-                        :selected-peer-id="selectedPeerId"
-                        :loading="discoveryStore.scanning"
-                        class="mt-4"
-                        @select="handlePeerSelect"
-                        @refresh="handlePeerRefresh"
-                        @add-manual="handleAddManual"
-                    />
-                </template>
-
-                <!-- 分享链接面板（链接分享模式） -->
+                <!-- 分享链接面板（链接分享模式 + 本地网络模式） -->
                 <LinkSharePanel
-                    v-else-if="sendMode === 'link'"
+                    v-else-if="sendMode === 'link' && transferMode === 'local'"
                     :files="[...selectedFiles.files.value]"
                     class="mt-4"
                     @start-share="handleStartShare"
