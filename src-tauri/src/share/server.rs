@@ -180,15 +180,35 @@ async fn index_handler(
         }
     }
 
-    // 检查是否需要 PIN 或需要自动创建请求
+    // 检查是否需要 PIN 验证
     {
         let mut share_state = state.share_state.lock().await;
         
         let has_pin = share_state.settings.pin.is_some() && !share_state.settings.pin.as_ref().map_or(true, String::is_empty);
-        let _is_verified = share_state.is_ip_verified(&client_ip);
-        let has_request = share_state.access_requests.values().any(|r| r.ip == client_ip);
+        let is_verified = share_state.is_ip_verified(&client_ip);
         let has_access = share_state.is_ip_allowed(&client_ip);
-                // 如果没有 PIN 且开启了自动接受，且没有请求记录，自动创建已接受的请求
+        
+        // 如果启用了 PIN 且访问者未验证
+        if has_pin && !is_verified && !has_access {
+            // 检查是否被锁定
+            let pin_attempt = share_state.pin_attempts.get(&client_ip).cloned();
+            
+            if let Some(attempt) = &pin_attempt {
+                if attempt.is_still_locked() {
+                    // 显示锁定页面
+                    let remaining_ms = attempt.remaining_lock_time();
+                    let remaining_secs = remaining_ms / 1000;
+                    let locked_html = generate_locked_html(remaining_secs);
+                    return Html(locked_html).into_response();
+                }
+            }
+            
+            // 显示 PIN 输入页面
+            return Html(PIN_INPUT_HTML).into_response();
+        }
+        
+        // 如果没有 PIN 且开启了自动接受，且没有请求记录，自动创建已接受的请求
+        let has_request = share_state.access_requests.values().any(|r| r.ip == client_ip);
         if !has_pin && share_state.settings.auto_accept && !has_request {
             let mut new_request = super::models::AccessRequest::new(client_ip.clone(), Some(user_agent.to_string()));
             new_request.status = super::models::AccessRequestStatus::Accepted;
@@ -381,29 +401,155 @@ struct VerifyPinRequest {
 /// PIN 验证处理器
 async fn verify_pin_handler(
     ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
     AxumState(state): AxumState<Arc<ServerState>>,
     Json(payload): Json<VerifyPinRequest>,
 ) -> impl IntoResponse {
     let client_ip = client_addr.ip().to_string();
+    let user_agent = headers
+        .get(header::USER_AGENT)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| parse_user_agent(s).to_string());
     let mut share_state = state.share_state.lock().await;
 
-    let result = share_state.verify_pin(&client_ip, &payload.pin);
 
-    if result.success {
-        // 获取新创建的访问请求并发送事件通知
-        if let Some(request) = share_state.access_requests.values().find(|r| r.ip == client_ip) {
-            // 发送新请求事件（无论状态如何都发送，让前端知道有新请求）
-            let _ = state.app_handle.emit("access-request", request.clone());
-            
-            // 如果是自动接受，同时发送接受事件
-            if request.status == super::models::AccessRequestStatus::Accepted {
-                let _ = state.app_handle.emit("access-request-accepted", request.clone());
-            }
+    // 检查是否被锁定
+    if let Some(attempt) = share_state.pin_attempts.get(&client_ip) {
+        if attempt.is_still_locked() {
+            return (
+                StatusCode::FORBIDDEN,
+                Json(super::models::PinVerifyResult {
+                    success: false,
+                    remaining_attempts: Some(0),
+                    locked: true,
+                    locked_until: attempt.locked_until,
+                }),
+            );
         }
-        (StatusCode::OK, Json(result))
-    } else {
-        (StatusCode::UNAUTHORIZED, Json(result))
     }
+
+    // 获取正确的 PIN 码
+    let correct_pin = match &share_state.settings.pin {
+        Some(pin) if !pin.is_empty() => pin,
+        _ => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(super::models::PinVerifyResult {
+                    success: false,
+                    remaining_attempts: None,
+                    locked: false,
+                    locked_until: None,
+                }),
+            );
+        }
+    };
+
+    // 验证 PIN
+    if payload.pin == *correct_pin {
+        // 验证成功，清理 PIN 尝试状态
+        share_state.pin_attempts.remove(&client_ip);
+        
+        // 添加到已验证 IP 列表（无论是否自动接受，PIN 验证成功都标记为已验证）
+        if !share_state.verified_ips.contains(&client_ip) {
+            share_state.verified_ips.push(client_ip.clone());
+        }
+        
+        // 创建访问请求
+        let mut new_request = super::models::AccessRequest::new(client_ip.clone(), user_agent);
+        
+        // 根据 auto_accept 设置决定状态
+        if share_state.settings.auto_accept {
+            new_request.status = super::models::AccessRequestStatus::Accepted;
+        }
+        
+        share_state.access_requests.insert(new_request.id.clone(), new_request.clone());
+        
+        // 发送事件通知前端
+        let _ = state.app_handle.emit("access-request", new_request.clone());
+        if new_request.status == super::models::AccessRequestStatus::Accepted {
+            let _ = state.app_handle.emit("access-request-accepted", new_request);
+        }
+        
+        (
+            StatusCode::OK,
+            Json(super::models::PinVerifyResult {
+                success: true,
+                remaining_attempts: None,
+                locked: false,
+                locked_until: None,
+            }),
+        )
+    } else {
+        // 验证失败，记录失败尝试
+        let attempt = share_state
+            .pin_attempts
+            .entry(client_ip.clone())
+            .or_insert_with(|| super::models::PinAttemptState::new(client_ip.clone()));
+        
+        attempt.record_failure();
+        
+        let remaining = 3u32.saturating_sub(attempt.attempts);
+        
+        (
+            StatusCode::UNAUTHORIZED,
+            Json(super::models::PinVerifyResult {
+                success: false,
+                remaining_attempts: Some(remaining),
+                locked: attempt.locked,
+                locked_until: attempt.locked_until,
+            }),
+        )
+    }
+}
+
+/// 生成锁定页面 HTML
+fn generate_locked_html(remaining_secs: u64) -> String {
+    let minutes = remaining_secs / 60;
+    let seconds = remaining_secs % 60;
+    let time_str = if minutes > 0 {
+        format!("{} 分 {} 秒", minutes, seconds)
+    } else {
+        format!("{} 秒", seconds)
+    };
+    
+    format!(r#"<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/favicon.ico">
+    <title>PureSend - 已锁定</title>
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 400px; margin: 100px auto; padding: 20px; text-align: center; }}
+        h1 {{ color: #d32f2f; }}
+        .lock-icon {{ font-size: 48px; margin: 20px 0; }}
+        .message {{ color: #666; margin-top: 20px; }}
+        .timer {{ font-size: 24px; color: #1976d2; margin: 20px 0; font-weight: bold; }}
+    </style>
+</head>
+<body>
+    <h1>访问已锁定</h1>
+    <div class="lock-icon">🔒</div>
+    <div class="message">PIN 码验证失败次数过多，请稍后再试</div>
+    <div class="timer" id="timer">剩余时间：{}</div>
+    <script>
+        let remaining = {};
+        function updateTimer() {{
+            if (remaining <= 0) {{
+                window.location.reload();
+                return;
+            }}
+            remaining--;
+            const min = Math.floor(remaining / 60);
+            const sec = remaining % 60;
+            const timeStr = min > 0 ? min + ' 分 ' + sec + ' 秒' : sec + ' 秒';
+            document.getElementById('timer').textContent = '剩余时间：' + timeStr;
+            setTimeout(updateTimer, 1000);
+        }}
+        updateTimer();
+    </script>
+</body>
+</html>"#, time_str, remaining_secs)
 }
 
 /// 请求状态响应
@@ -887,9 +1033,10 @@ static PIN_INPUT_HTML: &str = r#"
                     if (result.locked) {
                         errorDiv.textContent = '尝试次数过多，已锁定 5 分钟';
                     } else {
-                        errorDiv.textContent = 'PIN 码错误，剩余尝试次数：' + (result.remaining_attempts || 0);
+                        errorDiv.textContent = 'PIN 码错误，剩余尝试次数：' + (result.remainingAttempts || 0);
                     }
                 }
+
             } catch (e) {
                 errorDiv.textContent = '验证失败，请重试';
             }
@@ -942,18 +1089,18 @@ static WAITING_RESPONSE_HTML: &str = r#"
                     // 请求已被接受，刷新页面显示文件
                     setTimeout(() => {
                         window.location.reload();
-                    }, 1000);
+                    }, 500);
                 } else if (result.status === 'rejected') {
                     statusDiv.textContent = '✗ 访问请求被拒绝';
                     statusDiv.style.color = '#f44336';
                 } else {
                     // 继续轮询（包括 waiting_response=true、status=null、status='pending' 等情况）
                     statusDiv.textContent = '等待分享方接受...';
-                    setTimeout(checkStatus, 3000);
+                    setTimeout(checkStatus, 1000);
                 }
             } catch (e) {
                 console.error('检查状态失败:', e);
-                setTimeout(checkStatus, 5000);
+                setTimeout(checkStatus, 2000);
             }
         }
         

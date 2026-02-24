@@ -130,6 +130,86 @@ pub struct TransferProgress {
     pub completed_at: Option<u64>,
 }
 
+/// PIN 尝试状态（用于 PIN 验证前的锁定机制）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PinAttemptState {
+    /// 访问者 IP 地址
+    pub ip: String,
+    /// PIN 验证失败次数
+    pub attempts: u32,
+    /// 是否被锁定
+    pub locked: bool,
+    /// 锁定解除时间（毫秒）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub locked_until: Option<u64>,
+}
+
+impl PinAttemptState {
+    /// 创建新的 PIN 尝试状态
+    pub fn new(ip: String) -> Self {
+        Self {
+            ip,
+            attempts: 0,
+            locked: false,
+            locked_until: None,
+        }
+    }
+
+    /// 记录 PIN 验证失败
+    pub fn record_failure(&mut self) {
+        self.attempts += 1;
+        if self.attempts >= 3 {
+            self.locked = true;
+            let locked_until = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64
+                + 5 * 60 * 1000; // 锁定 5 分钟
+            self.locked_until = Some(locked_until);
+        }
+    }
+
+    /// 检查是否仍然锁定
+    pub fn is_still_locked(&self) -> bool {
+        if !self.locked {
+            return false;
+        }
+        if let Some(locked_until) = self.locked_until {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
+            if now >= locked_until {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// 获取剩余锁定时间（毫秒）
+    pub fn remaining_lock_time(&self) -> u64 {
+        if !self.locked {
+            return 0;
+        }
+        if let Some(locked_until) = self.locked_until {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
+            if now >= locked_until {
+                0
+            } else {
+                locked_until - now
+            }
+        } else {
+            0
+        }
+    }
+
+
+}
+
 /// 访问请求
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -176,44 +256,6 @@ impl AccessRequest {
             user_agent,
             transfer_progress: None,
         }
-    }
-
-    /// 记录 PIN 验证失败
-    pub fn record_pin_failure(&mut self) {
-        self.pin_attempts += 1;
-        if self.pin_attempts >= 3 {
-            self.locked = true;
-            let locked_until = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64
-                + 5 * 60 * 1000; // 锁定 5 分钟
-            self.locked_until = Some(locked_until);
-        }
-    }
-
-    /// 检查是否仍然锁定
-    pub fn is_still_locked(&self) -> bool {
-        if !self.locked {
-            return false;
-        }
-        if let Some(locked_until) = self.locked_until {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64;
-            if now >= locked_until {
-                return false;
-            }
-        }
-        true
-    }
-
-    /// 重置锁定状态
-    pub fn reset_lock(&mut self) {
-        self.locked = false;
-        self.locked_until = None;
-        self.pin_attempts = 0;
     }
 
     /// 接受请求
@@ -318,6 +360,8 @@ pub struct ShareState {
     pub verified_ips: Vec<String>,
     /// 被拒绝的 IP 地址
     pub rejected_ips: Vec<String>,
+    /// PIN 尝试状态（IP -> PinAttemptState）
+    pub pin_attempts: HashMap<String, PinAttemptState>,
 }
 
 impl ShareState {
@@ -329,6 +373,7 @@ impl ShareState {
             settings: ShareSettings::default(),
             verified_ips: Vec::new(),
             rejected_ips: Vec::new(),
+            pin_attempts: HashMap::new(),
         }
     }
 
@@ -350,6 +395,7 @@ impl ShareState {
         self.access_requests.clear();
         self.verified_ips.clear();
         self.rejected_ips.clear();
+        self.pin_attempts.clear();
     }
 
     /// 添加访问请求
@@ -410,143 +456,6 @@ impl ShareState {
     #[allow(dead_code)]
     pub fn get_request_by_ip(&mut self, ip: &str) -> Option<&mut AccessRequest> {
         self.access_requests.values_mut().find(|r| r.ip == ip)
-    }
-
-    /// 验证 PIN 码
-    pub fn verify_pin(&mut self, ip: &str, pin: &str) -> PinVerifyResult {
-        // 检查是否被拒绝
-        if self.is_ip_rejected(ip) {
-            return PinVerifyResult {
-                success: false,
-                remaining_attempts: None,
-                locked: false,
-                locked_until: None,
-            };
-        }
-
-        // 获取或创建访问请求
-        let existing_request = self.access_requests.values_mut().find(|r| r.ip == ip);
-
-        if let Some(request) = existing_request {
-            // 检查是否锁定
-            if request.is_still_locked() {
-                return PinVerifyResult {
-                    success: false,
-                    remaining_attempts: Some(0),
-                    locked: true,
-                    locked_until: request.locked_until,
-                };
-            }
-
-            // 如果请求已被接受，直接通过
-            if request.status == AccessRequestStatus::Accepted {
-                return PinVerifyResult {
-                    success: true,
-                    remaining_attempts: None,
-                    locked: false,
-                    locked_until: None,
-                };
-            }
-
-            // 验证 PIN
-            if let Some(ref correct_pin) = self.settings.pin {
-                if pin == correct_pin {
-                    request.reset_lock();
-                    // 根据 auto_accept 设置决定是否自动接受
-                    if self.settings.auto_accept {
-                        // 自动接受：添加到已验证 IP 列表
-                        if !self.verified_ips.contains(&ip.to_string()) {
-                            self.verified_ips.push(ip.to_string());
-                        }
-                        request.accept();
-                    }
-                    // 如果 auto_accept=false，保持 Pending 状态，不添加到 verified_ips
-                    return PinVerifyResult {
-                        success: true,
-                        remaining_attempts: None,
-                        locked: false,
-                        locked_until: None,
-                    };
-                } else {
-                    request.record_pin_failure();
-                    let remaining = 3u32.saturating_sub(request.pin_attempts);
-                    return PinVerifyResult {
-                        success: false,
-                        remaining_attempts: Some(remaining),
-                        locked: request.locked,
-                        locked_until: request.locked_until,
-                    };
-                }
-            }
-        } else {
-            // 创建新的访问请求
-            let mut new_request = AccessRequest::new(ip.to_string(), None);
-
-            // 验证 PIN
-            if let Some(ref correct_pin) = self.settings.pin {
-                if pin == correct_pin {
-                    // 根据 auto_accept 设置决定是否自动接受
-                    if self.settings.auto_accept {
-                        // 自动接受：添加到已验证 IP 列表
-                        if !self.verified_ips.contains(&ip.to_string()) {
-                            self.verified_ips.push(ip.to_string());
-                        }
-                        new_request.status = AccessRequestStatus::Accepted;
-                    }
-                    // 如果 auto_accept=false，保持 Pending 状态，不添加到 verified_ips
-                    // 无论是否自动接受，都添加到请求列表
-                    self.access_requests
-                        .insert(new_request.id.clone(), new_request);
-                    return PinVerifyResult {
-                        success: true,
-                        remaining_attempts: None,
-                        locked: false,
-                        locked_until: None,
-                    };
-                } else {
-                    new_request.record_pin_failure();
-                    let remaining = 3u32.saturating_sub(new_request.pin_attempts);
-                    let locked_until = new_request.locked_until;
-                    let locked = new_request.locked;
-                    self.access_requests
-                        .insert(new_request.id.clone(), new_request);
-                    return PinVerifyResult {
-                        success: false,
-                        remaining_attempts: Some(remaining),
-                        locked,
-                        locked_until,
-                    };
-                }
-            } else {
-                // 没有设置 PIN，根据 auto_accept 设置决定是否自动接受
-                if self.settings.auto_accept {
-                    new_request.status = AccessRequestStatus::Accepted;
-                    if !self.verified_ips.contains(&ip.to_string()) {
-                        self.verified_ips.push(ip.to_string());
-                    }
-                }
-                // 添加到请求列表
-                self.access_requests
-                    .insert(new_request.id.clone(), new_request);
-                return PinVerifyResult {
-                    success: true,
-                    remaining_attempts: None,
-                    locked: false,
-                    locked_until: None,
-                };
-            }
-        }
-
-        // 没有设置 PIN 且没有 auto_accept，创建 Pending 状态的请求
-        let new_request = AccessRequest::new(ip.to_string(), None);
-        self.access_requests
-            .insert(new_request.id.clone(), new_request);
-        PinVerifyResult {
-            success: true,
-            remaining_attempts: None,
-            locked: false,
-            locked_until: None,
-        }
     }
 }
 
