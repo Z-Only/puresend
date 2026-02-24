@@ -204,7 +204,7 @@ export type ShareTransferStatus =
     | 'cancelled'
     | 'failed'
 
-/** 分享传输进度信息 */
+/** 分享传输进度信息（保留用于兼容） */
 export interface ShareTransferProgress {
     /** 当前下载的文件名 */
     fileName: string
@@ -228,6 +228,46 @@ export interface ShareTransferProgress {
     completedAt?: number
 }
 
+/** 下载记录 */
+export interface DownloadRecord {
+    /** 下载记录唯一 ID */
+    id: string
+    /** 文件名 */
+    fileName: string
+    /** 已下载字节数 */
+    downloadedBytes: number
+    /** 总字节数 */
+    totalBytes: number
+    /** 进度百分比（0-100） */
+    progress: number
+    /** 下载速度（字节/秒） */
+    speed: number
+    /** 下载状态 */
+    status: ShareTransferStatus
+    /** 开始时间（毫秒） */
+    startedAt: number
+    /** 完成时间（毫秒） */
+    completedAt?: number
+}
+
+/** 下载进度事件载荷 */
+export interface DownloadProgress {
+    /** 下载记录 ID */
+    downloadId: string
+    /** 文件名 */
+    fileName: string
+    /** 进度百分比（0-100） */
+    progress: number
+    /** 已下载字节数 */
+    downloadedBytes: number
+    /** 总字节数 */
+    totalBytes: number
+    /** 下载速度（字节/秒） */
+    speed: number
+    /** 访问者 IP */
+    clientIp: string
+}
+
 /** 访问请求 */
 export interface AccessRequest {
     /** 请求 ID */
@@ -246,8 +286,8 @@ export interface AccessRequest {
     lockedUntil?: number
     /** 用户代理（浏览器/平台信息，如 "Chrome(Android)"） */
     userAgent?: string
-    /** 传输进度信息 */
-    transferProgress?: ShareTransferProgress
+    /** 下载记录列表 */
+    downloadRecords: DownloadRecord[]
 }
 
 /** 分享设置 */

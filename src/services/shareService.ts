@@ -130,6 +130,8 @@ export async function onDownloadProgress(
 }
 /** 下载开始事件载荷 */
 export interface DownloadStartPayload {
+    /** 下载记录 ID */
+    download_id: string
     /** 文件名 */
     file_name: string
     /** 文件大小 */
@@ -140,6 +142,8 @@ export interface DownloadStartPayload {
 
 /** 下载完成事件载荷 */
 export interface DownloadCompletePayload {
+    /** 下载记录 ID */
+    download_id: string
     /** 文件名 */
     file_name: string
     /** 文件大小 */

@@ -363,7 +363,11 @@
       }
     },
     "downloads": {
-      "title": "Download Progress"
+      "title": "Download Progress",
+      "moreRecords": "{count} more download records",
+      "expand": "Expand All",
+      "collapse": "Collapse",
+      "noRecords": "No download records"
     },
     "transfer": {
       "transferring": "Transferring",

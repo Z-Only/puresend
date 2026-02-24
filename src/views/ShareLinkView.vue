@@ -99,139 +99,57 @@
                     </v-card-title>
                     <v-card-text>
                         <v-list v-if="shareStore.accessRequests.size > 0">
-                            <v-list-item
+                            <template
                                 v-for="request in shareStore.accessRequests.values()"
                                 :key="request.id"
                             >
-                                <v-list-item-title>
-                                    {{ request.ip }}
-                                    <span
-                                        v-if="request.userAgent"
-                                        class="text-grey ml-2"
-                                    >
-                                        {{ request.userAgent }}
-                                    </span>
-                                </v-list-item-title>
-                                <v-list-item-subtitle>
-                                    {{ formatTime(request.requestedAt) }}
-                                    <!-- 显示传输进度信息 -->
-                                    <template v-if="request.transferProgress">
-                                        <span class="ml-2">
-                                            -
-                                            {{
-                                                request.transferProgress
-                                                    .fileName
-                                            }}
-                                            <span
-                                                v-if="
-                                                    request.transferProgress
-                                                        .status ===
-                                                    'transferring'
-                                                "
-                                            >
-                                                ({{
-                                                    request.transferProgress.progress.toFixed(
-                                                        1
-                                                    )
-                                                }}%)
-                                            </span>
-                                            <span
-                                                v-else-if="
-                                                    request.transferProgress
-                                                        .status === 'completed'
-                                                "
-                                            >
-                                                ✓
-                                            </span>
-                                        </span>
-                                    </template>
-                                </v-list-item-subtitle>
-                                <!-- 传输进度条 -->
-                                <v-progress-linear
-                                    v-if="
-                                        request.transferProgress &&
-                                        request.transferProgress.status ===
-                                            'transferring'
-                                    "
-                                    :model-value="
-                                        request.transferProgress.progress
-                                    "
-                                    color="primary"
-                                    height="4"
-                                    class="mt-2"
-                                />
-                                <template v-slot:append>
-                                    <!-- 待处理状态：显示同意/拒绝按钮 -->
-                                    <template
-                                        v-if="request.status === 'pending'"
-                                    >
-                                        <v-btn
-                                            :icon="mdiCheck"
-                                            size="small"
-                                            variant="text"
-                                            color="success"
-                                            @click="
-                                                handleAcceptRequest(request.id)
-                                            "
-                                        />
-                                        <v-btn
-                                            :icon="mdiClose"
-                                            size="small"
-                                            variant="text"
-                                            color="error"
-                                            @click="
-                                                handleRejectRequest(request.id)
-                                            "
-                                        />
-                                    </template>
-                                    <!-- 已接受状态：显示传输进度 -->
-                                    <template
-                                        v-else-if="
-                                            request.status === 'accepted'
-                                        "
-                                    >
-                                        <!-- 传输中状态 -->
-                                        <template
-                                            v-if="
-                                                request.transferProgress &&
-                                                request.transferProgress
-                                                    .status === 'transferring'
-                                            "
+                                <v-list-item>
+                                    <v-list-item-title>
+                                        {{ request.ip }}
+                                        <span
+                                            v-if="request.userAgent"
+                                            class="text-grey ml-2"
                                         >
-                                            <v-chip
-                                                color="primary"
+                                            {{ request.userAgent }}
+                                        </span>
+                                    </v-list-item-title>
+                                    <v-list-item-subtitle>
+                                        {{ formatTime(request.requestedAt) }}
+                                    </v-list-item-subtitle>
+                                    <template v-slot:append>
+                                        <!-- 待处理状态：显示同意/拒绝按钮 -->
+                                        <template
+                                            v-if="request.status === 'pending'"
+                                        >
+                                            <v-btn
+                                                :icon="mdiCheck"
                                                 size="small"
-                                                label
-                                            >
-                                                {{
-                                                    t(
-                                                        'share.transfer.transferring'
+                                                variant="text"
+                                                color="success"
+                                                @click="
+                                                    handleAcceptRequest(
+                                                        request.id
                                                     )
-                                                }}
-                                            </v-chip>
+                                                "
+                                            />
+                                            <v-btn
+                                                :icon="mdiClose"
+                                                size="small"
+                                                variant="text"
+                                                color="error"
+                                                @click="
+                                                    handleRejectRequest(
+                                                        request.id
+                                                    )
+                                                "
+                                            />
                                         </template>
-                                        <!-- 已完成状态 -->
+                                        <!-- 已接受状态 -->
                                         <template
                                             v-else-if="
-                                                request.transferProgress &&
-                                                request.transferProgress
-                                                    .status === 'completed'
+                                                request.status === 'accepted'
                                             "
                                         >
-                                            <v-chip
-                                                color="success"
-                                                size="small"
-                                                label
-                                            >
-                                                {{
-                                                    t(
-                                                        'share.transfer.completed'
-                                                    )
-                                                }}
-                                            </v-chip>
-                                        </template>
-                                        <!-- 其他状态 -->
-                                        <template v-else>
                                             <v-chip
                                                 color="success"
                                                 size="small"
@@ -244,23 +162,256 @@
                                                 }}
                                             </v-chip>
                                         </template>
+                                        <!-- 已拒绝状态 -->
+                                        <template v-else>
+                                            <v-chip
+                                                color="error"
+                                                size="small"
+                                                label
+                                            >
+                                                {{
+                                                    t(
+                                                        'share.requests.status.rejected'
+                                                    )
+                                                }}
+                                            </v-chip>
+                                        </template>
                                     </template>
-                                    <!-- 已拒绝状态：显示状态标签 -->
-                                    <template v-else>
-                                        <v-chip
-                                            color="error"
-                                            size="small"
-                                            label
+                                </v-list-item>
+
+                                <!-- 下载记录列表 -->
+                                <div
+                                    v-if="
+                                        request.downloadRecords &&
+                                        request.downloadRecords.length > 0
+                                    "
+                                    class="download-records-container ml-4 mr-4 mb-2"
+                                >
+                                    <!-- 折叠状态：显示前 3 条 -->
+                                    <div
+                                        v-for="record in getVisibleRecords(
+                                            request
+                                        )"
+                                        :key="record.id"
+                                        class="download-record-item"
+                                    >
+                                        <div
+                                            class="d-flex align-center justify-space-between"
                                         >
-                                            {{
-                                                t(
-                                                    'share.requests.status.rejected'
-                                                )
-                                            }}
-                                        </v-chip>
-                                    </template>
-                                </template>
-                            </v-list-item>
+                                            <div
+                                                class="d-flex align-center flex-grow-1 text-truncate"
+                                                style="max-width: 65%"
+                                            >
+                                                <span
+                                                    class="text-body-2 text-truncate"
+                                                >
+                                                    {{ record.fileName }}
+                                                </span>
+                                                <span
+                                                    class="text-caption text-grey ml-2"
+                                                    style="white-space: nowrap"
+                                                >
+                                                    {{
+                                                        formatTime(
+                                                            record.startedAt
+                                                        )
+                                                    }}
+                                                </span>
+                                            </div>
+                                            <div
+                                                class="d-flex align-center ga-2"
+                                            >
+                                                <span
+                                                    v-if="
+                                                        record.status ===
+                                                        'transferring'
+                                                    "
+                                                    class="text-body-2 text-grey"
+                                                >
+                                                    {{
+                                                        formatSpeed(
+                                                            record.speed
+                                                        )
+                                                    }}
+                                                </span>
+                                                <span class="text-body-2">
+                                                    {{
+                                                        record.progress.toFixed(
+                                                            1
+                                                        )
+                                                    }}%
+                                                </span>
+                                                <v-chip
+                                                    :color="
+                                                        getDownloadStatusColor(
+                                                            record.status
+                                                        )
+                                                    "
+                                                    size="x-small"
+                                                    label
+                                                >
+                                                    {{
+                                                        getDownloadStatusText(
+                                                            record.status
+                                                        )
+                                                    }}
+                                                </v-chip>
+                                            </div>
+                                        </div>
+                                        <v-progress-linear
+                                            v-if="
+                                                record.status === 'transferring'
+                                            "
+                                            :model-value="record.progress"
+                                            color="primary"
+                                            height="3"
+                                            class="mt-1"
+                                        />
+                                    </div>
+
+                                    <!-- 展开状态：显示全部记录（可滚动） -->
+                                    <v-expand-transition>
+                                        <div
+                                            v-if="
+                                                isExpanded(request.id) &&
+                                                request.downloadRecords.length >
+                                                    3
+                                            "
+                                            class="expanded-records"
+                                        >
+                                            <div
+                                                v-for="record in getHiddenRecords(
+                                                    request
+                                                )"
+                                                :key="record.id"
+                                                class="download-record-item"
+                                            >
+                                                <div
+                                                    class="d-flex align-center justify-space-between"
+                                                >
+                                                    <div
+                                                        class="d-flex align-center flex-grow-1 text-truncate"
+                                                        style="max-width: 65%"
+                                                    >
+                                                        <span
+                                                            class="text-body-2 text-truncate"
+                                                        >
+                                                            {{
+                                                                record.fileName
+                                                            }}
+                                                        </span>
+                                                        <span
+                                                            class="text-caption text-grey ml-2"
+                                                            style="
+                                                                white-space: nowrap;
+                                                            "
+                                                        >
+                                                            {{
+                                                                formatTime(
+                                                                    record.startedAt
+                                                                )
+                                                            }}
+                                                        </span>
+                                                    </div>
+                                                    <div
+                                                        class="d-flex align-center ga-2"
+                                                    >
+                                                        <span
+                                                            v-if="
+                                                                record.status ===
+                                                                'transferring'
+                                                            "
+                                                            class="text-body-2 text-grey"
+                                                        >
+                                                            {{
+                                                                formatSpeed(
+                                                                    record.speed
+                                                                )
+                                                            }}
+                                                        </span>
+                                                        <span
+                                                            class="text-body-2"
+                                                        >
+                                                            {{
+                                                                record.progress.toFixed(
+                                                                    1
+                                                                )
+                                                            }}%
+                                                        </span>
+                                                        <v-chip
+                                                            :color="
+                                                                getDownloadStatusColor(
+                                                                    record.status
+                                                                )
+                                                            "
+                                                            size="x-small"
+                                                            label
+                                                        >
+                                                            {{
+                                                                getDownloadStatusText(
+                                                                    record.status
+                                                                )
+                                                            }}
+                                                        </v-chip>
+                                                    </div>
+                                                </div>
+                                                <v-progress-linear
+                                                    v-if="
+                                                        record.status ===
+                                                        'transferring'
+                                                    "
+                                                    :model-value="
+                                                        record.progress
+                                                    "
+                                                    color="primary"
+                                                    height="3"
+                                                    class="mt-1"
+                                                />
+                                            </div>
+                                        </div>
+                                    </v-expand-transition>
+
+                                    <!-- 折叠/展开控件（超过 3 条时显示） -->
+                                    <div
+                                        v-if="
+                                            request.downloadRecords.length > 3
+                                        "
+                                        class="text-center mt-1"
+                                    >
+                                        <v-btn
+                                            variant="text"
+                                            size="small"
+                                            density="compact"
+                                            @click="toggleExpand(request.id)"
+                                        >
+                                            <template
+                                                v-if="!isExpanded(request.id)"
+                                            >
+                                                {{
+                                                    t(
+                                                        'share.downloads.moreRecords',
+                                                        {
+                                                            count:
+                                                                request
+                                                                    .downloadRecords
+                                                                    .length - 3,
+                                                        }
+                                                    )
+                                                }}
+                                            </template>
+                                            <template v-else>
+                                                {{
+                                                    t(
+                                                        'share.downloads.collapse'
+                                                    )
+                                                }}
+                                            </template>
+                                        </v-btn>
+                                    </div>
+                                </div>
+
+                                <v-divider />
+                            </template>
                         </v-list>
                         <div v-else class="text-body-2 text-grey">
                             {{ t('share.noRequests') }}
@@ -305,7 +456,12 @@ import {
     PinConfigDialog,
 } from '../components/transfer'
 import { updateShareSettingsService } from '../services/shareService'
-import type { ShareSettings } from '../types'
+import type {
+    ShareSettings,
+    AccessRequest,
+    ShareTransferStatus,
+} from '../types'
+import { formatSpeed } from '../types/transfer'
 import { mdiArrowLeft, mdiCheck, mdiClose } from '@mdi/js'
 
 const router = useRouter()
@@ -323,9 +479,67 @@ const shareSettings = ref<ShareSettings>({
     autoAccept: false,
 })
 
+/** 每个访问请求的折叠/展开状态 */
+const expandedRequests = ref<Set<string>>(new Set())
+
 // 格式化时间
 function formatTime(timestamp: number): string {
     return new Date(timestamp).toLocaleTimeString()
+}
+
+// 判断某个请求的下载记录列表是否展开
+function isExpanded(requestId: string): boolean {
+    return expandedRequests.value.has(requestId)
+}
+
+// 切换折叠/展开状态
+function toggleExpand(requestId: string): void {
+    const newSet = new Set(expandedRequests.value)
+    if (newSet.has(requestId)) {
+        newSet.delete(requestId)
+    } else {
+        newSet.add(requestId)
+    }
+    expandedRequests.value = newSet
+}
+
+// 获取可见的下载记录（折叠状态下最多 3 条）
+function getVisibleRecords(request: AccessRequest) {
+    if (!request.downloadRecords) return []
+    if (request.downloadRecords.length <= 3 || isExpanded(request.id)) {
+        return request.downloadRecords
+    }
+    return request.downloadRecords.slice(0, 3)
+}
+
+// 获取隐藏的下载记录（展开时显示第 4 条及之后的记录）
+function getHiddenRecords(request: AccessRequest) {
+    if (!request.downloadRecords) return []
+    return request.downloadRecords.slice(3)
+}
+
+// 获取下载状态颜色
+function getDownloadStatusColor(status: ShareTransferStatus): string {
+    const colorMap: Record<ShareTransferStatus, string> = {
+        idle: 'grey',
+        transferring: 'primary',
+        completed: 'success',
+        failed: 'error',
+        cancelled: 'warning',
+    }
+    return colorMap[status] || 'grey'
+}
+
+// 获取下载状态文本
+function getDownloadStatusText(status: ShareTransferStatus): string {
+    const keyMap: Record<ShareTransferStatus, string> = {
+        idle: 'share.transfer.idle',
+        transferring: 'share.transfer.transferring',
+        completed: 'share.transfer.completed',
+        failed: 'share.transfer.failed',
+        cancelled: 'share.transfer.cancelled',
+    }
+    return t(keyMap[status] || 'share.transfer.idle')
 }
 
 // 返回发送页面
@@ -443,5 +657,25 @@ onUnmounted(() => {
 .share-link-view {
     max-width: 1200px;
     margin: 0 auto;
+}
+
+.download-records-container {
+    background: rgba(var(--v-theme-surface-variant), 0.05);
+    border-radius: 4px;
+    padding: 8px;
+}
+
+.download-record-item {
+    padding: 4px 8px;
+    border-bottom: 1px solid rgba(var(--v-border-color), 0.08);
+}
+
+.download-record-item:last-child {
+    border-bottom: none;
+}
+
+.expanded-records {
+    max-height: 400px;
+    overflow-y: auto;
 }
 </style>

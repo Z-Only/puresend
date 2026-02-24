@@ -10,6 +10,8 @@ import type {
     ShareSettings,
     FileMetadata,
     ContentType,
+    DownloadRecord,
+    DownloadProgress,
 } from '../types'
 import { DEFAULT_MAX_HISTORY_COUNT } from '../types/transfer'
 import type { SelectedFileItem } from '../types/content'
@@ -127,34 +129,28 @@ export const useShareStore = defineStore('share', () => {
     /**
      * 处理下载进度事件
      */
-    function handleDownloadProgress(progress: {
-        downloadId: string
-        fileName: string
-        progress: number
-        downloadedBytes: number
-        totalBytes: number
-        speed: number
-        clientIp: string
-    }) {
-        // 更新对应访问请求的传输进度
-        const request = Array.from(accessRequests.value.values()).find(
-            (r) => r.ip === progress.clientIp
-        )
-        if (request) {
-            accessRequests.value.set(request.id, {
-                ...request,
-                transferProgress: {
-                    fileName: progress.fileName,
+    function handleDownloadProgress(progress: DownloadProgress) {
+        // 根据 downloadId 定位对应的访问请求和下载记录
+        for (const [requestId, request] of accessRequests.value.entries()) {
+            const recordIndex = request.downloadRecords.findIndex(
+                (r) => r.id === progress.downloadId
+            )
+            if (recordIndex !== -1) {
+                const updatedRecords = [...request.downloadRecords]
+                updatedRecords[recordIndex] = {
+                    ...updatedRecords[recordIndex],
                     downloadedBytes: progress.downloadedBytes,
                     totalBytes: progress.totalBytes,
                     progress: progress.progress,
                     speed: progress.speed,
-                    completedFiles: 0,
-                    totalFiles: 1,
                     status: 'transferring',
-                    startedAt: Date.now(),
-                },
-            })
+                }
+                accessRequests.value.set(requestId, {
+                    ...request,
+                    downloadRecords: updatedRecords,
+                })
+                break
+            }
         }
     }
 
@@ -163,24 +159,24 @@ export const useShareStore = defineStore('share', () => {
      */
     function handleDownloadStart(payload: DownloadStartPayload) {
         console.log('下载开始:', payload)
-        // 更新对应访问请求的传输进度状态
+        // 找到对应的访问请求，在下载记录列表头部插入新记录
         const request = Array.from(accessRequests.value.values()).find(
             (r) => r.ip === payload.client_ip
         )
         if (request) {
+            const newRecord: DownloadRecord = {
+                id: payload.download_id,
+                fileName: payload.file_name,
+                downloadedBytes: 0,
+                totalBytes: payload.file_size,
+                progress: 0,
+                speed: 0,
+                status: 'transferring',
+                startedAt: Date.now(),
+            }
             accessRequests.value.set(request.id, {
                 ...request,
-                transferProgress: {
-                    fileName: payload.file_name,
-                    downloadedBytes: 0,
-                    totalBytes: payload.file_size,
-                    progress: 0,
-                    speed: 0,
-                    completedFiles: 0,
-                    totalFiles: shareInfo.value?.files.length || 1,
-                    status: 'transferring',
-                    startedAt: Date.now(),
-                },
+                downloadRecords: [newRecord, ...request.downloadRecords],
             })
         }
     }
@@ -190,6 +186,29 @@ export const useShareStore = defineStore('share', () => {
      */
     async function handleDownloadComplete(payload: DownloadCompletePayload) {
         console.log('下载完成:', payload)
+
+        // 根据 downloadId 定位并标记对应记录为已完成
+        for (const [requestId, request] of accessRequests.value.entries()) {
+            const recordIndex = request.downloadRecords.findIndex(
+                (r) => r.id === payload.download_id
+            )
+            if (recordIndex !== -1) {
+                const updatedRecords = [...request.downloadRecords]
+                updatedRecords[recordIndex] = {
+                    ...updatedRecords[recordIndex],
+                    downloadedBytes: updatedRecords[recordIndex].totalBytes,
+                    progress: 100,
+                    speed: 0,
+                    status: 'completed',
+                    completedAt: Date.now(),
+                }
+                accessRequests.value.set(requestId, {
+                    ...request,
+                    downloadRecords: updatedRecords,
+                })
+                break
+            }
+        }
 
         // 检查是否需要记录历史
         const settingsStore = useSettingsStore()

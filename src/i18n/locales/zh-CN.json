@@ -351,7 +351,11 @@
       }
     },
     "downloads": {
-      "title": "下载进度"
+      "title": "下载进度",
+      "moreRecords": "还有 {count} 条下载记录",
+      "expand": "展开全部",
+      "collapse": "收起",
+      "noRecords": "暂无下载记录"
     },
     "transfer": {
       "transferring": "传输中",

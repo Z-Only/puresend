@@ -10,7 +10,11 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use bytes::Bytes;
+use futures::Stream;
 use sha2::{Digest, Sha256};
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use tokio::fs::File;
 use tokio_util::io::ReaderStream;
 use serde::{Deserialize, Serialize};
@@ -21,7 +25,7 @@ use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
 use tauri::{AppHandle, Emitter};
 
-use super::models::ShareState;
+use super::models::{DownloadRecord, ShareState};
 use crate::models::FileMetadata;
 
 /// Favicon 图标数据（嵌入二进制）
@@ -719,8 +723,6 @@ async fn download_handler(
                 .unwrap_or("download")
                 .to_string();
 
-            // 获取文件大小
-            // 获取文件大小
             let file_size = std::fs::metadata(&path)
                 .map(|m| m.len())
                 .unwrap_or(0);
@@ -729,53 +731,47 @@ async fn download_handler(
             
             eprintln!("开始传输文件 - file_name: {}, mime_type: {}", file_name, mime_type);
 
-            // 更新传输进度状态为传输中
+            // 创建下载记录并追加到访问请求的下载记录列表
+            let download_record = DownloadRecord::new(file_name.clone(), file_size);
+            let download_id = download_record.id.clone();
             {
                 let mut share_state = state.share_state.lock().await;
-                let total_files = share_state.share_info.as_ref().map(|s| s.files.len() as u32).unwrap_or(1);
                 if let Some(request) = share_state.access_requests.values_mut().find(|r| r.ip == client_ip) {
-                    let now = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
-                        .as_millis() as u64;
-                    request.transfer_progress = Some(super::models::TransferProgress {
-                        file_name: file_name.clone(),
-                        downloaded_bytes: 0,
-                        total_bytes: file_size,
-                        progress: 0.0,
-                        speed: 0,
-                        completed_files: 0,
-                        total_files,
-                        status: super::models::TransferStatus::Transferring,
-                        started_at: Some(now),
-                        completed_at: None,
-                    });
+                    request.download_records.insert(0, download_record);
                 }
             }
 
             // 发送下载开始事件到前端
             let _ = state.app_handle.emit("download-start", DownloadStartPayload {
+                download_id: download_id.clone(),
                 file_name: file_name.clone(),
                 file_size: file_size as i64,
                 client_ip: client_ip.clone(),
             });
 
-            // 使用流式传输文件，避免大文件内存问题
+            // 使用流式传输文件，通过 ProgressTrackingStream 跟踪进度
             match File::open(&path).await {
                 Ok(file) => {
-                    let stream = ReaderStream::new(file);
-                    let body = Body::from_stream(stream);
+                    let reader_stream = ReaderStream::new(file);
+                    let progress_stream = ProgressTrackingStream::new(
+                        reader_stream,
+                        state.app_handle.clone(),
+                        state.share_state.clone(),
+                        download_id,
+                        file_name.clone(),
+                        client_ip.clone(),
+                        file_size,
+                    );
+                    let body = Body::from_stream(progress_stream);
 
                     let mut response = Response::new(body);
                     *response.status_mut() = StatusCode::OK;
                     let headers = response.headers_mut();
-                    // 安全地设置 Content-Type，避免 parse 失败
                     if let Ok(mime_header) = mime_type.parse() {
                         headers.insert(header::CONTENT_TYPE, mime_header);
                     } else {
                         headers.insert(header::CONTENT_TYPE, "application/octet-stream".parse().unwrap());
                     }
-                    // 使用 URL 编码文件名以支持中文等特殊字符
                     let encoded_filename = urlencoding::encode(&file_name);
                     headers.insert(
                         header::CONTENT_DISPOSITION,
@@ -784,66 +780,18 @@ async fn download_handler(
                             .unwrap(),
                     );
                     
-                    // 更新传输进度状态为已完成
-                    {
-                        let mut share_state = state.share_state.lock().await;
-                        let total_files = share_state.share_info.as_ref().map(|s| s.files.len() as u32).unwrap_or(1);
-                        if let Some(request) = share_state.access_requests.values_mut().find(|r| r.ip == client_ip) {
-                            let now = std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .unwrap()
-                                .as_millis() as u64;
-                            if let Some(ref mut progress) = request.transfer_progress {
-                                progress.downloaded_bytes = file_size;
-                                progress.progress = 100.0;
-                                progress.status = super::models::TransferStatus::Completed;
-                                progress.completed_at = Some(now);
-                                progress.completed_files += 1;
-                            } else {
-                                request.transfer_progress = Some(super::models::TransferProgress {
-                                    file_name: file_name.clone(),
-                                    downloaded_bytes: file_size,
-                                    total_bytes: file_size,
-                                    progress: 100.0,
-                                    speed: 0,
-                                    completed_files: 1,
-                                    total_files,
-                                    status: super::models::TransferStatus::Completed,
-                                    started_at: None,
-                                    completed_at: Some(now),
-                                });
-                            }
-                        }
-                    }
-                    
-                    // 发送下载完成事件到前端
-                    let _ = state.app_handle.emit("download-complete", DownloadCompletePayload {
-                        file_name: file_name.clone(),
-                        file_size: file_size as i64,
-                        client_ip: client_ip.clone(),
-                    });
-                    
                     eprintln!("文件传输响应已发送 - file_name: {}", file_name);
                     return response;
                 }
                 Err(e) => {
-                    // 更新传输进度状态为失败
+                    // 更新下载记录状态为失败
                     {
                         let mut share_state = state.share_state.lock().await;
-                        let total_files = share_state.share_info.as_ref().map(|s| s.files.len() as u32).unwrap_or(1);
-                        if let Some(request) = share_state.access_requests.values_mut().find(|r| r.ip == client_ip) {
-                            request.transfer_progress = Some(super::models::TransferProgress {
-                                file_name: file_name.clone(),
-                                downloaded_bytes: 0,
-                                total_bytes: file_size,
-                                progress: 0.0,
-                                speed: 0,
-                                completed_files: 0,
-                                total_files,
-                                status: super::models::TransferStatus::Failed,
-                                started_at: None,
-                                completed_at: None,
-                            });
+                        for request in share_state.access_requests.values_mut() {
+                            if let Some(record) = request.download_records.iter_mut().find(|r| r.id == download_id) {
+                                record.status = super::models::TransferStatus::Failed;
+                                break;
+                            }
                         }
                     }
                     eprintln!("打开文件失败：{:?}", e);
@@ -863,6 +811,8 @@ async fn download_handler(
 /// 下载开始事件载荷
 #[derive(Debug, Clone, Serialize)]
 struct DownloadStartPayload {
+    /// 下载记录 ID
+    download_id: String,
     /// 文件名
     file_name: String,
     /// 文件大小
@@ -874,12 +824,182 @@ struct DownloadStartPayload {
 /// 下载完成事件载荷
 #[derive(Debug, Clone, Serialize)]
 struct DownloadCompletePayload {
+    /// 下载记录 ID
+    download_id: String,
     /// 文件名
     file_name: String,
     /// 文件大小
     file_size: i64,
     /// 客户端 IP
     client_ip: String,
+}
+
+/// 进度跟踪流，包装 ReaderStream 以在传输过程中发送进度事件
+struct ProgressTrackingStream {
+    inner: ReaderStream<File>,
+    app_handle: AppHandle,
+    share_state: Arc<Mutex<ShareState>>,
+    download_id: String,
+    file_name: String,
+    client_ip: String,
+    total_bytes: u64,
+    transferred_bytes: u64,
+    last_emit_time: std::time::Instant,
+    last_emit_progress: f64,
+    start_time: std::time::Instant,
+}
+
+impl ProgressTrackingStream {
+    fn new(
+        inner: ReaderStream<File>,
+        app_handle: AppHandle,
+        share_state: Arc<Mutex<ShareState>>,
+        download_id: String,
+        file_name: String,
+        client_ip: String,
+        total_bytes: u64,
+    ) -> Self {
+        Self {
+            inner,
+            app_handle,
+            share_state,
+            download_id,
+            file_name,
+            client_ip,
+            total_bytes,
+            transferred_bytes: 0,
+            last_emit_time: std::time::Instant::now(),
+            last_emit_progress: 0.0,
+            start_time: std::time::Instant::now(),
+        }
+    }
+
+    fn calculate_speed(&self) -> u64 {
+        let elapsed = self.start_time.elapsed().as_secs_f64();
+        if elapsed > 0.0 {
+            (self.transferred_bytes as f64 / elapsed) as u64
+        } else {
+            0
+        }
+    }
+
+    fn should_emit_progress(&self, current_progress: f64) -> bool {
+        let time_elapsed = self.last_emit_time.elapsed() >= std::time::Duration::from_millis(500);
+        let progress_changed = (current_progress - self.last_emit_progress) >= 1.0;
+        time_elapsed || progress_changed
+    }
+
+    fn emit_progress(&mut self, progress: f64, speed: u64) {
+        let payload = super::models::DownloadProgress {
+            download_id: self.download_id.clone(),
+            file_name: self.file_name.clone(),
+            progress,
+            downloaded_bytes: self.transferred_bytes,
+            total_bytes: self.total_bytes,
+            speed,
+            client_ip: self.client_ip.clone(),
+        };
+        let _ = self.app_handle.emit("download-progress", payload);
+        self.last_emit_time = std::time::Instant::now();
+        self.last_emit_progress = progress;
+    }
+
+    fn emit_complete(&self) {
+        let speed = self.calculate_speed();
+        let payload = super::models::DownloadProgress {
+            download_id: self.download_id.clone(),
+            file_name: self.file_name.clone(),
+            progress: 100.0,
+            downloaded_bytes: self.total_bytes,
+            total_bytes: self.total_bytes,
+            speed,
+            client_ip: self.client_ip.clone(),
+        };
+        let _ = self.app_handle.emit("download-progress", payload);
+
+        let _ = self.app_handle.emit("download-complete", DownloadCompletePayload {
+            download_id: self.download_id.clone(),
+            file_name: self.file_name.clone(),
+            file_size: self.total_bytes as i64,
+            client_ip: self.client_ip.clone(),
+        });
+    }
+}
+
+impl Stream for ProgressTrackingStream {
+    type Item = Result<Bytes, std::io::Error>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = unsafe { self.get_unchecked_mut() };
+        let inner = unsafe { Pin::new_unchecked(&mut this.inner) };
+
+        match inner.poll_next(cx) {
+            Poll::Ready(Some(Ok(chunk))) => {
+                this.transferred_bytes += chunk.len() as u64;
+
+                let progress = if this.total_bytes > 0 {
+                    (this.transferred_bytes as f64 / this.total_bytes as f64) * 100.0
+                } else {
+                    0.0
+                };
+
+                let speed = this.calculate_speed();
+
+                if this.should_emit_progress(progress) {
+                    this.emit_progress(progress, speed);
+
+                    // 异步更新 share_state 中的下载记录
+                    let share_state = this.share_state.clone();
+                    let download_id = this.download_id.clone();
+                    let transferred = this.transferred_bytes;
+                    let prog = progress;
+                    let spd = speed;
+                    tokio::spawn(async move {
+                        let mut state = share_state.lock().await;
+                        for request in state.access_requests.values_mut() {
+                            if let Some(record) = request.download_records.iter_mut().find(|r| r.id == download_id) {
+                                record.downloaded_bytes = transferred;
+                                record.progress = prog;
+                                record.speed = spd;
+                                break;
+                            }
+                        }
+                    });
+                }
+
+                Poll::Ready(Some(Ok(chunk)))
+            }
+            Poll::Ready(Some(Err(err))) => Poll::Ready(Some(Err(err))),
+            Poll::Ready(None) => {
+                // 流结束，发送最终进度和完成事件
+                this.transferred_bytes = this.total_bytes;
+                this.emit_complete();
+
+                // 异步更新 share_state 中的下载记录为已完成
+                let share_state = this.share_state.clone();
+                let download_id = this.download_id.clone();
+                tokio::spawn(async move {
+                    let mut state = share_state.lock().await;
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u64;
+                    for request in state.access_requests.values_mut() {
+                        if let Some(record) = request.download_records.iter_mut().find(|r| r.id == download_id) {
+                            record.downloaded_bytes = record.total_bytes;
+                            record.progress = 100.0;
+                            record.status = super::models::TransferStatus::Completed;
+                            record.completed_at = Some(now);
+                            break;
+                        }
+                    }
+                });
+
+                Poll::Ready(None)
+            }
+            Poll::Pending => Poll::Pending,
+        }
+    }
 }
 
 /// 文件信息响应
