@@ -128,6 +128,15 @@ export async function onDownloadProgress(
         callback(event.payload)
     })
 }
+/** 下载开始事件载荷 */
+export interface DownloadStartPayload {
+    /** 文件名 */
+    file_name: string
+    /** 文件大小 */
+    file_size: number
+    /** 客户端 IP */
+    client_ip: string
+}
 
 /** 下载完成事件载荷 */
 export interface DownloadCompletePayload {
@@ -137,6 +146,18 @@ export interface DownloadCompletePayload {
     file_size: number
     /** 客户端 IP */
     client_ip: string
+}
+
+/**
+ * 监听下载开始事件
+ * @param callback 回调函数
+ */
+export async function onDownloadStart(
+    callback: (payload: DownloadStartPayload) => void
+): Promise<UnlistenFn> {
+    return listen<DownloadStartPayload>('download-start', (event) => {
+        callback(event.payload)
+    })
 }
 
 /**
@@ -150,7 +171,6 @@ export async function onDownloadComplete(
         callback(event.payload)
     })
 }
-
 /**
  * 监听分享停止事件
  * @param callback 回调函数

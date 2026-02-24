@@ -81,6 +81,55 @@ impl Default for ShareStatus {
     }
 }
 
+/// 传输状态
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TransferStatus {
+    /// 空闲
+    Idle,
+    /// 传输中
+    Transferring,
+    /// 已完成
+    Completed,
+    /// 已取消
+    Cancelled,
+    /// 失败
+    Failed,
+}
+
+impl Default for TransferStatus {
+    fn default() -> Self {
+        Self::Idle
+    }
+}
+
+/// 传输进度信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransferProgress {
+    /// 当前下载的文件名
+    pub file_name: String,
+    /// 已下载字节数
+    pub downloaded_bytes: u64,
+    /// 总字节数
+    pub total_bytes: u64,
+    /// 进度百分比（0-100）
+    pub progress: f64,
+    /// 下载速度（字节/秒）
+    pub speed: u64,
+    /// 已完成文件数
+    pub completed_files: u32,
+    /// 总文件数
+    pub total_files: u32,
+    /// 传输状态
+    pub status: TransferStatus,
+    /// 开始时间（毫秒）
+    pub started_at: Option<u64>,
+    /// 完成时间（毫秒）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completed_at: Option<u64>,
+}
+
 /// 访问请求
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -103,6 +152,9 @@ pub struct AccessRequest {
     /// 用户代理（浏览器/平台信息，如 "Chrome(Android)"）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_agent: Option<String>,
+    /// 传输进度信息
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transfer_progress: Option<TransferProgress>,
 }
 
 impl AccessRequest {
@@ -122,6 +174,7 @@ impl AccessRequest {
             locked: false,
             locked_until: None,
             user_agent,
+            transfer_progress: None,
         }
     }
 

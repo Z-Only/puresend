@@ -245,18 +245,6 @@
     "selectFileToStart": "选择文件开始发送",
     "cleanup": "清理已完成"
   },
-  "receiveMode": {
-    "label": "传输模式",
-    "local": {
-      "label": "本地网络",
-      "description": "通过局域网直接传输，速度快"
-    },
-    "cloud": {
-      "label": "云盘中转",
-      "description": "通过云盘中转，跨网络传输",
-      "comingSoon": "云盘中转功能即将推出"
-    }
-  },
   "receive": {
     "networkInfo": "网络信息",
     "viewNetworkInfo": "查看网络信息",
@@ -364,6 +352,13 @@
     },
     "downloads": {
       "title": "下载进度"
+    },
+    "transfer": {
+      "transferring": "传输中",
+      "completed": "传输完成",
+      "failed": "传输失败",
+      "cancelled": "已取消",
+      "idle": "空闲"
     },
     "actions": {
       "stop": "停止分享"

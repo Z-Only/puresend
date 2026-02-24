@@ -365,6 +365,13 @@
     "downloads": {
       "title": "Download Progress"
     },
+    "transfer": {
+      "transferring": "Transferring",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Cancelled",
+      "idle": "Idle"
+    },
     "actions": {
       "stop": "Stop Sharing"
     },

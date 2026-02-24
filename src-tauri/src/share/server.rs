@@ -24,6 +24,10 @@ use tauri::{AppHandle, Emitter};
 use super::models::ShareState;
 use crate::models::FileMetadata;
 
+/// Favicon 图标数据（嵌入二进制）
+/// 使用 32x32 PNG 格式，从项目图标转换
+static FAVICON_ICO: &[u8] = include_bytes!("../../icons/32x32.png");
+
 /// 分享服务器状态
 #[derive(Debug)]
 pub struct ServerState {
@@ -88,6 +92,7 @@ impl ShareServer {
         // 创建路由
         let app = Router::new()
             .route("/", get(index_handler))
+            .route("/favicon.ico", get(favicon_handler))
             .route("/api/files", get(list_files_handler))
             .route("/api/verify-pin", post(verify_pin_handler))
             .route("/api/request-status", get(request_status_handler))
@@ -136,6 +141,16 @@ impl ShareServer {
     }
 }
 
+/// Favicon 处理器
+async fn favicon_handler() -> impl IntoResponse {
+    let mut response = Response::new(Body::from(FAVICON_ICO));
+    *response.status_mut() = StatusCode::OK;
+    let headers = response.headers_mut();
+    headers.insert(header::CONTENT_TYPE, "image/png".parse().unwrap());
+    headers.insert(header::CACHE_CONTROL, "max-age=86400".parse().unwrap());
+    response
+}
+
 /// 首页处理器
 async fn index_handler(
     ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
@@ -170,17 +185,10 @@ async fn index_handler(
         let mut share_state = state.share_state.lock().await;
         
         let has_pin = share_state.settings.pin.is_some() && !share_state.settings.pin.as_ref().map_or(true, String::is_empty);
-        let is_verified = share_state.is_ip_verified(&client_ip);
+        let _is_verified = share_state.is_ip_verified(&client_ip);
         let has_request = share_state.access_requests.values().any(|r| r.ip == client_ip);
         let has_access = share_state.is_ip_allowed(&client_ip);
-        
-        // 如果需要 PIN 且没有请求记录，显示 PIN 输入页面
-        let needs_pin = has_pin && !is_verified && !has_request;
-        if needs_pin {
-            return Html(PIN_INPUT_HTML).into_response();
-        }
-        
-        // 如果没有 PIN 且开启了自动接受，且没有请求记录，自动创建已接受的请求
+                // 如果没有 PIN 且开启了自动接受，且没有请求记录，自动创建已接受的请求
         if !has_pin && share_state.settings.auto_accept && !has_request {
             let mut new_request = super::models::AccessRequest::new(client_ip.clone(), Some(user_agent.to_string()));
             new_request.status = super::models::AccessRequestStatus::Accepted;
@@ -196,6 +204,15 @@ async fn index_handler(
             // 同时发送已接受事件
             let _ = state.app_handle.emit("access-request-accepted", 
                 share_state.access_requests.values().find(|r| r.ip == client_ip).cloned());
+        }
+        
+        // 如果没有 PIN 且没有开启自动接受，且没有请求记录，创建待处理的请求
+        if !has_pin && !share_state.settings.auto_accept && !has_request {
+            let new_request = super::models::AccessRequest::new(client_ip.clone(), Some(user_agent.to_string()));
+            share_state.access_requests.insert(new_request.id.clone(), new_request.clone());
+            
+            // 发送事件通知前端有新的访问请求
+            let _ = state.app_handle.emit("access-request", new_request);
         }
         
         // 如果没有访问权限，显示等待响应页面
@@ -250,6 +267,7 @@ async fn index_handler(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/favicon.ico">
     <title>PureSend - 文件分享</title>
     <style>
         body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }}
@@ -556,13 +574,45 @@ async fn download_handler(
                 .to_string();
 
             // 获取文件大小
+            // 获取文件大小
             let file_size = std::fs::metadata(&path)
-                .map(|m| m.len() as i64)
+                .map(|m| m.len())
                 .unwrap_or(0);
 
             let mime_type = FileMetadata::infer_mime_type(&file_name);
             
             eprintln!("开始传输文件 - file_name: {}, mime_type: {}", file_name, mime_type);
+
+            // 更新传输进度状态为传输中
+            {
+                let mut share_state = state.share_state.lock().await;
+                let total_files = share_state.share_info.as_ref().map(|s| s.files.len() as u32).unwrap_or(1);
+                if let Some(request) = share_state.access_requests.values_mut().find(|r| r.ip == client_ip) {
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u64;
+                    request.transfer_progress = Some(super::models::TransferProgress {
+                        file_name: file_name.clone(),
+                        downloaded_bytes: 0,
+                        total_bytes: file_size,
+                        progress: 0.0,
+                        speed: 0,
+                        completed_files: 0,
+                        total_files,
+                        status: super::models::TransferStatus::Transferring,
+                        started_at: Some(now),
+                        completed_at: None,
+                    });
+                }
+            }
+
+            // 发送下载开始事件到前端
+            let _ = state.app_handle.emit("download-start", DownloadStartPayload {
+                file_name: file_name.clone(),
+                file_size: file_size as i64,
+                client_ip: client_ip.clone(),
+            });
 
             // 使用流式传输文件，避免大文件内存问题
             match File::open(&path).await {
@@ -588,10 +638,42 @@ async fn download_handler(
                             .unwrap(),
                     );
                     
+                    // 更新传输进度状态为已完成
+                    {
+                        let mut share_state = state.share_state.lock().await;
+                        let total_files = share_state.share_info.as_ref().map(|s| s.files.len() as u32).unwrap_or(1);
+                        if let Some(request) = share_state.access_requests.values_mut().find(|r| r.ip == client_ip) {
+                            let now = std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap()
+                                .as_millis() as u64;
+                            if let Some(ref mut progress) = request.transfer_progress {
+                                progress.downloaded_bytes = file_size;
+                                progress.progress = 100.0;
+                                progress.status = super::models::TransferStatus::Completed;
+                                progress.completed_at = Some(now);
+                                progress.completed_files += 1;
+                            } else {
+                                request.transfer_progress = Some(super::models::TransferProgress {
+                                    file_name: file_name.clone(),
+                                    downloaded_bytes: file_size,
+                                    total_bytes: file_size,
+                                    progress: 100.0,
+                                    speed: 0,
+                                    completed_files: 1,
+                                    total_files,
+                                    status: super::models::TransferStatus::Completed,
+                                    started_at: None,
+                                    completed_at: Some(now),
+                                });
+                            }
+                        }
+                    }
+                    
                     // 发送下载完成事件到前端
                     let _ = state.app_handle.emit("download-complete", DownloadCompletePayload {
                         file_name: file_name.clone(),
-                        file_size,
+                        file_size: file_size as i64,
                         client_ip: client_ip.clone(),
                     });
                     
@@ -599,6 +681,25 @@ async fn download_handler(
                     return response;
                 }
                 Err(e) => {
+                    // 更新传输进度状态为失败
+                    {
+                        let mut share_state = state.share_state.lock().await;
+                        let total_files = share_state.share_info.as_ref().map(|s| s.files.len() as u32).unwrap_or(1);
+                        if let Some(request) = share_state.access_requests.values_mut().find(|r| r.ip == client_ip) {
+                            request.transfer_progress = Some(super::models::TransferProgress {
+                                file_name: file_name.clone(),
+                                downloaded_bytes: 0,
+                                total_bytes: file_size,
+                                progress: 0.0,
+                                speed: 0,
+                                completed_files: 0,
+                                total_files,
+                                status: super::models::TransferStatus::Failed,
+                                started_at: None,
+                                completed_at: None,
+                            });
+                        }
+                    }
                     eprintln!("打开文件失败：{:?}", e);
                     let error_html =
                         format!("<html><body><h1>打开文件失败：{}</h1></body></html>", e);
@@ -613,6 +714,17 @@ async fn download_handler(
     }
 }
 
+/// 下载开始事件载荷
+#[derive(Debug, Clone, Serialize)]
+struct DownloadStartPayload {
+    /// 文件名
+    file_name: String,
+    /// 文件大小
+    file_size: i64,
+    /// 客户端 IP
+    client_ip: String,
+}
+
 /// 下载完成事件载荷
 #[derive(Debug, Clone, Serialize)]
 struct DownloadCompletePayload {
@@ -622,7 +734,7 @@ struct DownloadCompletePayload {
     file_size: i64,
     /// 客户端 IP
     client_ip: String,
-}/// 文件信息响应
+}
 
 /// 文件信息响应
 #[derive(Debug, Serialize)]
@@ -723,12 +835,14 @@ fn parse_user_agent(ua: &str) -> &'static str {
 }
 
 /// PIN 输入页面模板（内嵌）
+#[allow(dead_code)]
 static PIN_INPUT_HTML: &str = r#"
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/favicon.ico">
     <title>PureSend - PIN 验证</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 400px; margin: 100px auto; padding: 20px; text-align: center; }
@@ -798,6 +912,7 @@ static WAITING_RESPONSE_HTML: &str = r#"
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/favicon.ico">
     <title>PureSend - 等待响应</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 400px; margin: 100px auto; padding: 20px; text-align: center; }

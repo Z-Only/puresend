@@ -193,6 +193,41 @@ export interface ShareLinkInfo {
 /** 分享状态 */
 export type ShareStatus = 'active' | 'stopped' | 'expired'
 
+/** 访问请求状态 */
+export type AccessRequestStatus = 'pending' | 'accepted' | 'rejected'
+
+/** 分享传输状态 */
+export type ShareTransferStatus =
+    | 'idle'
+    | 'transferring'
+    | 'completed'
+    | 'cancelled'
+    | 'failed'
+
+/** 分享传输进度信息 */
+export interface ShareTransferProgress {
+    /** 当前下载的文件名 */
+    fileName: string
+    /** 已下载字节数 */
+    downloadedBytes: number
+    /** 总字节数 */
+    totalBytes: number
+    /** 进度百分比（0-100） */
+    progress: number
+    /** 下载速度（字节/秒） */
+    speed: number
+    /** 已完成文件数 */
+    completedFiles: number
+    /** 总文件数 */
+    totalFiles: number
+    /** 传输状态 */
+    status: ShareTransferStatus
+    /** 开始时间（毫秒） */
+    startedAt?: number
+    /** 完成时间（毫秒） */
+    completedAt?: number
+}
+
 /** 访问请求 */
 export interface AccessRequest {
     /** 请求 ID */
@@ -211,10 +246,9 @@ export interface AccessRequest {
     lockedUntil?: number
     /** 用户代理（浏览器/平台信息，如 "Chrome(Android)"） */
     userAgent?: string
+    /** 传输进度信息 */
+    transferProgress?: ShareTransferProgress
 }
-
-/** 访问请求状态 */
-export type AccessRequestStatus = 'pending' | 'accepted' | 'rejected'
 
 /** 分享设置 */
 export interface ShareSettings {

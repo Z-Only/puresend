@@ -24,7 +24,9 @@ import {
     onAccessRequestRejected,
     onDownloadProgress,
     onDownloadComplete,
+    onDownloadStart,
     type DownloadCompletePayload,
+    type DownloadStartPayload,
 } from '../services/shareService'
 import { useSettingsStore } from './settings'
 
@@ -134,8 +136,53 @@ export const useShareStore = defineStore('share', () => {
         speed: number
         clientIp: string
     }) {
-        // 可以在这里更新下载进度状态或通知用户
-        console.log('下载进度:', progress)
+        // 更新对应访问请求的传输进度
+        const request = Array.from(accessRequests.value.values()).find(
+            (r) => r.ip === progress.clientIp
+        )
+        if (request) {
+            accessRequests.value.set(request.id, {
+                ...request,
+                transferProgress: {
+                    fileName: progress.fileName,
+                    downloadedBytes: progress.downloadedBytes,
+                    totalBytes: progress.totalBytes,
+                    progress: progress.progress,
+                    speed: progress.speed,
+                    completedFiles: 0,
+                    totalFiles: 1,
+                    status: 'transferring',
+                    startedAt: Date.now(),
+                },
+            })
+        }
+    }
+
+    /**
+     * 处理下载开始事件
+     */
+    function handleDownloadStart(payload: DownloadStartPayload) {
+        console.log('下载开始:', payload)
+        // 更新对应访问请求的传输进度状态
+        const request = Array.from(accessRequests.value.values()).find(
+            (r) => r.ip === payload.client_ip
+        )
+        if (request) {
+            accessRequests.value.set(request.id, {
+                ...request,
+                transferProgress: {
+                    fileName: payload.file_name,
+                    downloadedBytes: 0,
+                    totalBytes: payload.file_size,
+                    progress: 0,
+                    speed: 0,
+                    completedFiles: 0,
+                    totalFiles: shareInfo.value?.files.length || 1,
+                    status: 'transferring',
+                    startedAt: Date.now(),
+                },
+            })
+        }
     }
 
     /**
@@ -189,6 +236,7 @@ export const useShareStore = defineStore('share', () => {
             await onAccessRequestAccepted(handleAccessRequestAccepted),
             await onAccessRequestRejected(handleAccessRequestRejected),
             await onDownloadProgress(handleDownloadProgress),
+            await onDownloadStart(handleDownloadStart),
             await onDownloadComplete(handleDownloadComplete)
         )
     }

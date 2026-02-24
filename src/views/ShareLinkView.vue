@@ -114,7 +114,52 @@
                                 </v-list-item-title>
                                 <v-list-item-subtitle>
                                     {{ formatTime(request.requestedAt) }}
+                                    <!-- 显示传输进度信息 -->
+                                    <template v-if="request.transferProgress">
+                                        <span class="ml-2">
+                                            -
+                                            {{
+                                                request.transferProgress
+                                                    .fileName
+                                            }}
+                                            <span
+                                                v-if="
+                                                    request.transferProgress
+                                                        .status ===
+                                                    'transferring'
+                                                "
+                                            >
+                                                ({{
+                                                    request.transferProgress.progress.toFixed(
+                                                        1
+                                                    )
+                                                }}%)
+                                            </span>
+                                            <span
+                                                v-else-if="
+                                                    request.transferProgress
+                                                        .status === 'completed'
+                                                "
+                                            >
+                                                ✓
+                                            </span>
+                                        </span>
+                                    </template>
                                 </v-list-item-subtitle>
+                                <!-- 传输进度条 -->
+                                <v-progress-linear
+                                    v-if="
+                                        request.transferProgress &&
+                                        request.transferProgress.status ===
+                                            'transferring'
+                                    "
+                                    :model-value="
+                                        request.transferProgress.progress
+                                    "
+                                    color="primary"
+                                    height="4"
+                                    class="mt-2"
+                                />
                                 <template v-slot:append>
                                     <!-- 待处理状态：显示同意/拒绝按钮 -->
                                     <template
@@ -139,25 +184,78 @@
                                             "
                                         />
                                     </template>
-                                    <!-- 已处理状态：显示状态标签 -->
+                                    <!-- 已接受状态：显示传输进度 -->
+                                    <template
+                                        v-else-if="
+                                            request.status === 'accepted'
+                                        "
+                                    >
+                                        <!-- 传输中状态 -->
+                                        <template
+                                            v-if="
+                                                request.transferProgress &&
+                                                request.transferProgress
+                                                    .status === 'transferring'
+                                            "
+                                        >
+                                            <v-chip
+                                                color="primary"
+                                                size="small"
+                                                label
+                                            >
+                                                {{
+                                                    t(
+                                                        'share.transfer.transferring'
+                                                    )
+                                                }}
+                                            </v-chip>
+                                        </template>
+                                        <!-- 已完成状态 -->
+                                        <template
+                                            v-else-if="
+                                                request.transferProgress &&
+                                                request.transferProgress
+                                                    .status === 'completed'
+                                            "
+                                        >
+                                            <v-chip
+                                                color="success"
+                                                size="small"
+                                                label
+                                            >
+                                                {{
+                                                    t(
+                                                        'share.transfer.completed'
+                                                    )
+                                                }}
+                                            </v-chip>
+                                        </template>
+                                        <!-- 其他状态 -->
+                                        <template v-else>
+                                            <v-chip
+                                                color="success"
+                                                size="small"
+                                                label
+                                            >
+                                                {{
+                                                    t(
+                                                        'share.requests.status.accepted'
+                                                    )
+                                                }}
+                                            </v-chip>
+                                        </template>
+                                    </template>
+                                    <!-- 已拒绝状态：显示状态标签 -->
                                     <template v-else>
                                         <v-chip
-                                            :color="
-                                                request.status === 'accepted'
-                                                    ? 'success'
-                                                    : 'error'
-                                            "
+                                            color="error"
                                             size="small"
                                             label
                                         >
                                             {{
-                                                request.status === 'accepted'
-                                                    ? t(
-                                                          'share.requests.status.accepted'
-                                                      )
-                                                    : t(
-                                                          'share.requests.status.rejected'
-                                                      )
+                                                t(
+                                                    'share.requests.status.rejected'
+                                                )
                                             }}
                                         </v-chip>
                                     </template>
