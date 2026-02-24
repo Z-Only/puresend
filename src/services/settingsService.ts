@@ -59,7 +59,7 @@ export interface TauriStoreResult<T> {
  */
 export async function isTauriStoreAvailable(): Promise<boolean> {
     try {
-        if (!await isTauriEnvironmentAvailable()) {
+        if (!(await isTauriEnvironmentAvailable())) {
             return false
         }
         // 尝试动态导入 plugin-store 来验证是否可用
@@ -88,7 +88,8 @@ export async function saveToTauriStore<T>(
         await store.save()
         return { success: true }
     } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error)
+        const errorMessage =
+            error instanceof Error ? error.message : String(error)
         console.error('[SettingsService] Tauri Store 保存失败:', error)
         return { success: false, error: errorMessage }
     }
@@ -109,7 +110,8 @@ export async function loadFromTauriStore<T>(
         const data = await store.get<T>(key)
         return { success: true, data: data ?? null }
     } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error)
+        const errorMessage =
+            error instanceof Error ? error.message : String(error)
         console.warn('[SettingsService] Tauri Store 加载失败:', error)
         return { success: false, error: errorMessage, data: null }
     }
@@ -126,15 +128,69 @@ export async function onSettingsChange(
     callback: (key: string, value: unknown) => void
 ): Promise<UnlistenFn | null> {
     try {
-        if (!await isTauriEnvironmentAvailable()) {
+        if (!(await isTauriEnvironmentAvailable())) {
             return null
         }
         const { listen } = await import('@tauri-apps/api/event')
-        return listen<{ key: string; value: unknown }>('settings-change', (event) => {
-            callback(event.payload.key, event.payload.value)
-        })
+        return listen<{ key: string; value: unknown }>(
+            'settings-change',
+            (event) => {
+                callback(event.payload.key, event.payload.value)
+            }
+        )
     } catch (error) {
         console.warn('[SettingsService] 事件监听注册失败:', error)
         return null
+    }
+}
+
+// ============ 接收设置 ============
+
+/** 接收设置 */
+export interface ReceiveSettings {
+    autoReceive: boolean
+    fileOverwrite: boolean
+}
+
+/**
+ * 获取接收设置
+ */
+export async function getReceiveSettings(): Promise<ReceiveSettings> {
+    try {
+        if (await isTauriEnvironmentAvailable()) {
+            const { invoke } = await import('@tauri-apps/api/core')
+            return await invoke<ReceiveSettings>('get_receive_settings')
+        }
+    } catch (error) {
+        console.warn('[SettingsService] 获取接收设置失败:', error)
+    }
+    return { autoReceive: false, fileOverwrite: false }
+}
+
+/**
+ * 设置自动接收
+ */
+export async function setAutoReceive(enabled: boolean): Promise<void> {
+    try {
+        if (await isTauriEnvironmentAvailable()) {
+            const { invoke } = await import('@tauri-apps/api/core')
+            await invoke('set_auto_receive', { enabled })
+        }
+    } catch (error) {
+        console.warn('[SettingsService] 设置自动接收失败:', error)
+    }
+}
+
+/**
+ * 设置文件覆盖
+ */
+export async function setFileOverwrite(enabled: boolean): Promise<void> {
+    try {
+        if (await isTauriEnvironmentAvailable()) {
+            const { invoke } = await import('@tauri-apps/api/core')
+            await invoke('set_file_overwrite', { enabled })
+        }
+    } catch (error) {
+        console.warn('[SettingsService] 设置文件覆盖失败:', error)
     }
 }

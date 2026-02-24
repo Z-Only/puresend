@@ -9,7 +9,7 @@ export type ThemeMode = 'light' | 'dark' | 'system'
 export type LanguageMode = 'zh-CN' | 'en-US' | 'system'
 
 /** 设置存储版本，用于迁移兼容 */
-export const SETTINGS_VERSION = 2
+export const SETTINGS_VERSION = 3
 
 /** 清理策略 */
 export type CleanupStrategy = 'byTime' | 'byCount' | 'disabled'
@@ -92,8 +92,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
 
 /** 接收设置 */
 export interface ReceiveSettings {
-    /** 是否自动保存 */
-    autoSave: boolean
+    /** 是否自动接收（原 autoSave） */
+    autoReceive: boolean
+    /** 是否覆盖同名文件 */
+    fileOverwrite: boolean
     /** 请求过期时间（秒） */
     requestExpireTime: number
     /** 最大待处理请求数量 */
@@ -102,7 +104,8 @@ export interface ReceiveSettings {
 
 /** 默认接收设置 */
 export const DEFAULT_RECEIVE_SETTINGS: ReceiveSettings = {
-    autoSave: false,
+    autoReceive: false,
+    fileOverwrite: false,
     requestExpireTime: 300,
     maxPendingRequests: 50,
 } /** 本地存储键名 */

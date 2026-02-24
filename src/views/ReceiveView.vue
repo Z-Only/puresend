@@ -7,23 +7,8 @@
                 <!-- 接收模式选择器 -->
                 <ReceiveModeSelector />
 
-                <!-- 接收目录设置 -->
-                <v-card class="mb-4">
-                    <v-card-title class="text-subtitle-1">
-                        {{ t('receive.receiveDirectory') }}
-                    </v-card-title>
-                    <v-card-text>
-                        <v-text-field
-                            :model-value="transferStore.receiveDirectory"
-                            :label="t('receive.saveLocation')"
-                            readonly
-                            variant="outlined"
-                            density="compact"
-                            :append-icon="mdiFolderOpen"
-                            @click:append="handleSelectDirectory"
-                        />
-                    </v-card-text>
-                </v-card>
+                <!-- 接收设置卡片 -->
+                <ReceiveSettingsCard />
 
                 <!-- 控制按钮 -->
                 <v-card>
@@ -121,15 +106,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { open } from '@tauri-apps/plugin-dialog'
-import { ProgressDisplay, ReceiveModeSelector } from '../components/transfer'
-import { useTransferStore } from '../stores'
 import {
-    mdiWifiOff,
-    mdiWifiPlus,
-    mdiInboxArrowDown,
-    mdiFolderOpen,
-} from '@mdi/js'
+    ProgressDisplay,
+    ReceiveModeSelector,
+    ReceiveSettingsCard,
+} from '../components/transfer'
+import { useTransferStore } from '../stores'
+import { mdiWifiOff, mdiWifiPlus, mdiInboxArrowDown } from '@mdi/js'
 
 const { t } = useI18n()
 const transferStore = useTransferStore()
@@ -167,23 +150,6 @@ async function handleStopReceiving() {
         errorMessage.value = t('receive.stopFailed', { error })
     } finally {
         stopping.value = false
-    }
-}
-
-async function handleSelectDirectory() {
-    try {
-        const selected = await open({
-            directory: true,
-            multiple: false,
-            title: t('receive.selectDirectory'),
-        })
-
-        if (selected && typeof selected === 'string') {
-            await transferStore.updateReceiveDirectory(selected)
-        }
-    } catch (error) {
-        showError.value = true
-        errorMessage.value = t('receive.selectDirectoryFailed', { error })
     }
 }
 

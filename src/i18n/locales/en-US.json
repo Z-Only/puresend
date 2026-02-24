@@ -279,7 +279,14 @@
     "hideNetworkInfo": "Hide Network Info",
     "retryNotSupported": "Retry is not supported for receive tasks",
     "selectDirectory": "Select Receive Directory",
-    "selectDirectoryFailed": "Failed to select directory: {error}"
+    "selectDirectoryFailed": "Failed to select directory: {error}",
+    "settings": {
+      "title": "Receive Settings",
+      "autoReceive": "Auto Receive",
+      "autoReceiveHint": "Automatically accept receive requests without manual confirmation",
+      "fileOverwrite": "File Overwrite",
+      "fileOverwriteHint": "Overwrite existing files with the same name, or auto-rename if disabled"
+    }
   },
   "network": {
     "title": "Network Info",

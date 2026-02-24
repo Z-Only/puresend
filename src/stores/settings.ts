@@ -22,6 +22,8 @@ import {
     getDeviceName as getDeviceNameFromService,
     saveToTauriStore,
     loadFromTauriStore,
+    setAutoReceive as setAutoReceiveBackend,
+    setFileOverwrite as setFileOverwriteBackend,
 } from '@/services/settingsService'
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -160,12 +162,39 @@ export const useSettingsStore = defineStore('settings', () => {
         console.log(
             `[Settings] 迁移设置从版本 ${oldSettings.version} 到 ${SETTINGS_VERSION}`
         )
-        return {
-            ...oldSettings,
-            version: SETTINGS_VERSION,
-            // 兼容旧版设置
-            history: oldSettings.history || DEFAULT_HISTORY_SETTINGS,
+
+        const migrated = { ...oldSettings, version: SETTINGS_VERSION }
+
+        // 兼容旧版设置
+        migrated.history = oldSettings.history || DEFAULT_HISTORY_SETTINGS
+
+        // 接收设置迁移
+        const oldReceiveSettings = (oldSettings as any).receiveSettings || {}
+
+        // 迁移 autoSave → autoReceive
+        if (
+            'autoSave' in oldReceiveSettings &&
+            !('autoReceive' in oldReceiveSettings)
+        ) {
+            console.log('[Settings] 迁移 autoSave → autoReceive')
+            migrated.receiveSettings = {
+                ...oldReceiveSettings,
+                autoReceive: oldReceiveSettings.autoSave,
+                fileOverwrite: oldReceiveSettings.fileOverwrite ?? false,
+            }
+            delete (migrated.receiveSettings as any).autoSave
+        } else {
+            // 确保新字段存在
+            migrated.receiveSettings = {
+                autoReceive: oldReceiveSettings.autoReceive ?? false,
+                fileOverwrite: oldReceiveSettings.fileOverwrite ?? false,
+                requestExpireTime: oldReceiveSettings.requestExpireTime ?? 300,
+                maxPendingRequests: oldReceiveSettings.maxPendingRequests ?? 50,
+            }
         }
+
+        console.log('[Settings] 迁移完成:', migrated.receiveSettings)
+        return migrated
     }
 
     /**
@@ -321,6 +350,40 @@ export const useSettingsStore = defineStore('settings', () => {
     }
 
     /**
+     * 设置自动接收
+     */
+    async function setAutoReceive(enabled: boolean): Promise<boolean> {
+        receiveSettings.value = {
+            ...receiveSettings.value,
+            autoReceive: enabled,
+        }
+        // 同步到后端
+        try {
+            await setAutoReceiveBackend(enabled)
+        } catch (error) {
+            console.error('[Settings] 同步自动接收设置到后端失败:', error)
+        }
+        return saveSettings()
+    }
+
+    /**
+     * 设置文件覆盖
+     */
+    async function setFileOverwrite(enabled: boolean): Promise<boolean> {
+        receiveSettings.value = {
+            ...receiveSettings.value,
+            fileOverwrite: enabled,
+        }
+        // 同步到后端
+        try {
+            await setFileOverwriteBackend(enabled)
+        } catch (error) {
+            console.error('[Settings] 同步文件覆盖设置到后端失败:', error)
+        }
+        return saveSettings()
+    }
+
+    /**
      * 监听系统主题变化
      */
     function watchSystemTheme(
@@ -356,6 +419,7 @@ export const useSettingsStore = defineStore('settings', () => {
         theme,
         language,
         history,
+        receiveSettings,
         version,
 
         // 计算属性
@@ -371,6 +435,8 @@ export const useSettingsStore = defineStore('settings', () => {
         setRecordHistory,
         setHistoryPrivacy,
         setAutoCleanup,
+        setAutoReceive,
+        setFileOverwrite,
         saveSettings,
         loadSettings,
         watchSystemTheme,

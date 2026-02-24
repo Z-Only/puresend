@@ -146,6 +146,8 @@ export async function startReceiving(port?: number): Promise<{
     port: number
     networkAddress: string
     shareCode: string
+    autoReceive: boolean
+    fileOverwrite: boolean
 }> {
     return invoke('start_receiving', { port })
 }

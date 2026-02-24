@@ -279,7 +279,14 @@
     "hideNetworkInfo": "收起网络信息",
     "retryNotSupported": "接收任务暂不支持重试",
     "selectDirectory": "选择接收目录",
-    "selectDirectoryFailed": "选择目录失败：{error}"
+    "selectDirectoryFailed": "选择目录失败：{error}",
+    "settings": {
+      "title": "接收设置",
+      "autoReceive": "自动接收",
+      "autoReceiveHint": "开启后接收请求将自动同意，无需手动确认",
+      "fileOverwrite": "文件覆盖",
+      "fileOverwriteHint": "开启后同名文件将被覆盖，关闭则自动重命名"
+    }
   },
   "network": {
     "title": "网络信息",

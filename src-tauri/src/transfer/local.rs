@@ -5,6 +5,7 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -13,6 +14,17 @@ use tokio::sync::{mpsc, Mutex, RwLock};
 use crate::error::{TransferError, TransferResult};
 use crate::models::{FileMetadata, TransferMode, TransferProgress, TransferTask};
 use crate::transfer::{FileChunker, IntegrityChecker, Transport};
+
+/// 接收配置
+#[derive(Debug, Clone, Default)]
+pub struct ReceiveConfig {
+    /// 是否自动接收（无需确认）
+    pub auto_receive: bool,
+    /// 是否覆盖同名文件
+    pub file_overwrite: bool,
+    /// 接收目录
+    pub receive_directory: PathBuf,
+}
 
 /// 传输协议魔数
 const PROTOCOL_MAGIC: &[u8; 4] = b"PSEN";
@@ -114,6 +126,8 @@ pub struct LocalTransport {
     initialized: Arc<Mutex<bool>>,
     /// 取消信号发送器
     cancel_senders: Arc<RwLock<HashMap<String, mpsc::Sender<()>>>>,
+    /// 接收配置
+    receive_config: Arc<RwLock<Option<ReceiveConfig>>>,
 }
 
 /// 传输任务状态
@@ -137,6 +151,7 @@ impl LocalTransport {
             listener: Arc::new(Mutex::new(None)),
             initialized: Arc::new(Mutex::new(false)),
             cancel_senders: Arc::new(RwLock::new(HashMap::new())),
+            receive_config: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -151,7 +166,19 @@ impl LocalTransport {
             listener: Arc::new(Mutex::new(None)),
             initialized: Arc::new(Mutex::new(false)),
             cancel_senders: Arc::new(RwLock::new(HashMap::new())),
+            receive_config: Arc::new(RwLock::new(None)),
         }
+    }
+
+    /// 设置接收配置
+    pub async fn set_receive_config(&self, config: ReceiveConfig) {
+        let mut receive_config = self.receive_config.write().await;
+        *receive_config = Some(config);
+    }
+
+    /// 获取接收配置
+    pub async fn get_receive_config(&self) -> Option<ReceiveConfig> {
+        self.receive_config.read().await.clone()
     }
 
     /// 获取监听端口
@@ -319,10 +346,29 @@ impl LocalTransport {
                 stream.read_exact(&mut metadata_buf).await?;
                 let metadata: FileMetadata = serde_json::from_slice(&metadata_buf)?;
 
-                // 发送响应（这里简化处理，总是接受）
+                // 获取接收配置
+                let config = self.get_receive_config().await;
+                let auto_receive = config.as_ref().map(|c| c.auto_receive).unwrap_or(false);
+                let file_overwrite = config.as_ref().map(|c| c.file_overwrite).unwrap_or(false);
+                let receive_directory = config
+                    .as_ref()
+                    .map(|c| c.receive_directory.clone())
+                    .unwrap_or_else(std::env::temp_dir);
+
+                // 根据 auto_receive 设置决定是否自动接受
+                let (accepted, reason) = if auto_receive {
+                    (true, None)
+                } else {
+                    // 非自动接收模式下，拒绝请求，发送方需要等待接收方手动确认
+                    // 注意：实际的文件接收确认流程需要通过事件通知前端，
+                    // 前端用户确认后再建立新的连接。这里直接拒绝当前请求。
+                    (false, Some("需要接收方确认".to_string()))
+                };
+
+                // 发送响应
                 let response = FileResponse {
-                    accepted: true,
-                    reason: None,
+                    accepted,
+                    reason: reason.clone(),
                 };
                 let response_json = serde_json::to_vec(&response)?;
                 let response_header =
@@ -330,8 +376,16 @@ impl LocalTransport {
                 stream.write_all(&response_header.to_bytes()).await?;
                 stream.write_all(&response_json).await?;
 
-                // 接收文件分块
-                self.receive_file_chunks(&mut stream, &metadata).await?;
+                if accepted {
+                    // 接收文件分块（使用配置）
+                    self.receive_file_chunks_with_config(
+                        &mut stream,
+                        &metadata,
+                        &receive_directory,
+                        file_overwrite,
+                    )
+                    .await?;
+                }
             }
             _ => {
                 return Err(TransferError::Network("未预期的消息类型".to_string()));
@@ -341,14 +395,29 @@ impl LocalTransport {
         Ok(())
     }
 
-    /// 接收文件分块
+    /// 接收文件分块（使用指定配置）
     #[allow(dead_code)]
-    async fn receive_file_chunks(
+    async fn receive_file_chunks_with_config(
         &self,
         stream: &mut TcpStream,
         metadata: &FileMetadata,
+        receive_directory: &PathBuf,
+        file_overwrite: bool,
     ) -> TransferResult<()> {
-        let save_path = std::env::temp_dir().join(&metadata.name);
+        // 确保接收目录存在
+        if !receive_directory.exists() {
+            std::fs::create_dir_all(receive_directory).map_err(|e| {
+                TransferError::Internal(format!("无法创建接收目录: {}", e))
+            })?;
+        }
+
+        // 根据 file_overwrite 设置决定保存路径
+        let save_path = if file_overwrite {
+            receive_directory.join(&metadata.name)
+        } else {
+            // 生成唯一文件名避免覆盖
+            self.get_unique_file_path(receive_directory, &metadata.name)?
+        };
 
         for _ in 0..metadata.chunks.len() {
             // 读取分块消息头
@@ -390,7 +459,82 @@ impl LocalTransport {
 
         Ok(())
     }
+
+    /// 生成不冲突的文件路径
+    fn get_unique_file_path(
+        &self,
+        directory: &PathBuf,
+        original_name: &str,
+    ) -> TransferResult<PathBuf> {
+        let path = directory.join(original_name);
+
+        // 如果文件不存在，直接使用原文件名
+        if !path.exists() {
+            return Ok(path);
+        }
+
+        // 解析文件名和扩展名
+        let (stem, extension) = Self::parse_filename(original_name);
+
+        // 尝试找到可用的文件名
+        let mut counter = 1u32;
+        loop {
+            let new_name = if extension.is_empty() {
+                format!("{} ({})", stem, counter)
+            } else {
+                format!("{} ({}).{}", stem, counter, extension)
+            };
+
+            let new_path = directory.join(&new_name);
+            if !new_path.exists() {
+                return Ok(new_path);
+            }
+
+            counter += 1;
+
+            // 防止无限循环（最多尝试 10000 次）
+            if counter > 10000 {
+                return Err(TransferError::Internal(format!(
+                    "无法生成唯一文件名：{}",
+                    original_name
+                )));
+            }
+        }
+    }
+
+    /// 解析文件名为（主文件名，扩展名）
+    fn parse_filename(filename: &str) -> (String, String) {
+        // 特殊情况：以点开头的隐藏文件（只有一个点）
+        if filename.starts_with('.') && filename.matches('.').count() == 1 {
+            return (filename.to_string(), String::new());
+        }
+
+        // 查找最后一个点
+        if let Some(dot_pos) = filename.rfind('.') {
+            let stem = &filename[..dot_pos];
+            let ext = &filename[dot_pos + 1..];
+
+            // 检查是否为复合扩展名（如 .tar.gz）
+            if let Some(inner_dot) = stem.rfind('.') {
+                let inner_ext = &stem[inner_dot + 1..];
+                // 常见复合扩展名
+                const COMPOUND_EXTENSIONS: &[&str] = &["tar", "zip"];
+                if COMPOUND_EXTENSIONS.contains(&inner_ext) {
+                    return (
+                        stem[..inner_dot].to_string(),
+                        format!("{}.{}", inner_ext, ext),
+                    );
+                }
+            }
+
+            (stem.to_string(), ext.to_string())
+        } else {
+            (filename.to_string(), String::new())
+        }
+    }
 }
+
+/// 文件传输请求响应
 
 /// 文件传输请求响应
 #[derive(Debug, serde::Serialize, serde::Deserialize)]

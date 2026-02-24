@@ -52,6 +52,11 @@ pub fn run() {
             crate::transfer::get_active_tasks,
             crate::transfer::verify_file_integrity,
             crate::transfer::cleanup_completed_tasks,
+            // Receive settings commands
+            crate::transfer::get_receive_settings,
+            crate::transfer::set_auto_receive,
+            crate::transfer::set_file_overwrite,
+            crate::transfer::get_unique_file_path,
             // Share commands
             crate::share::start_share,
             crate::share::stop_share,
