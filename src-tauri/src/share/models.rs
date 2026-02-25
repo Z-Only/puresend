@@ -108,15 +108,15 @@ impl Default for TransferStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransferProgress {
-    /// 当前下载的文件名
+    /// 当前上传的文件名
     pub file_name: String,
-    /// 已下载字节数
-    pub downloaded_bytes: u64,
+    /// 已上传字节数
+    pub uploaded_bytes: u64,
     /// 总字节数
     pub total_bytes: u64,
     /// 进度百分比（0-100）
     pub progress: f64,
-    /// 下载速度（字节/秒）
+    /// 上传速度（字节/秒）
     pub speed: u64,
     /// 已完成文件数
     pub completed_files: u32,
@@ -131,23 +131,26 @@ pub struct TransferProgress {
     pub completed_at: Option<u64>,
 }
 
-/// 下载记录
+/// 上传记录
+///
+/// 从分享者（应用）视角来看，接收者通过链接获取文件时，
+/// 应用作为文件提供方，实际上是在上传文件给接收者。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DownloadRecord {
-    /// 下载记录唯一 ID
+pub struct UploadRecord {
+    /// 上传记录唯一 ID
     pub id: String,
     /// 文件名
     pub file_name: String,
-    /// 已下载字节数
-    pub downloaded_bytes: u64,
+    /// 已上传字节数
+    pub uploaded_bytes: u64,
     /// 总字节数
     pub total_bytes: u64,
     /// 进度百分比（0-100）
     pub progress: f64,
-    /// 下载速度（字节/秒）
+    /// 上传速度（字节/秒）
     pub speed: u64,
-    /// 下载状态
+    /// 上传状态
     pub status: TransferStatus,
     /// 开始时间（毫秒）
     pub started_at: u64,
@@ -156,8 +159,8 @@ pub struct DownloadRecord {
     pub completed_at: Option<u64>,
 }
 
-impl DownloadRecord {
-    /// 创建新的下载记录
+impl UploadRecord {
+    /// 创建新的上传记录
     pub fn new(file_name: String, total_bytes: u64) -> Self {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -167,7 +170,7 @@ impl DownloadRecord {
         Self {
             id: Uuid::new_v4().to_string(),
             file_name,
-            downloaded_bytes: 0,
+            uploaded_bytes: 0,
             total_bytes,
             progress: 0.0,
             speed: 0,
@@ -280,8 +283,8 @@ pub struct AccessRequest {
     /// 用户代理（浏览器/平台信息，如 "Chrome(Android)"）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_agent: Option<String>,
-    /// 下载记录列表
-    pub download_records: Vec<DownloadRecord>,
+    /// 上传记录列表
+    pub upload_records: Vec<UploadRecord>,
 }
 
 impl AccessRequest {
@@ -301,7 +304,7 @@ impl AccessRequest {
             locked: false,
             locked_until: None,
             user_agent,
-            download_records: Vec::new(),
+            upload_records: Vec::new(),
         }
     }
 
@@ -373,24 +376,26 @@ pub struct PinVerifyResult {
     pub locked_until: Option<u64>,
 }
 
-/// 下载进度
+/// 上传进度
+///
+/// 从分享者视角，文件被接收者获取时的传输进度。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[allow(dead_code)]
-pub struct DownloadProgress {
-    /// 下载 ID
-    pub download_id: String,
+pub struct UploadProgress {
+    /// 上传 ID
+    pub upload_id: String,
     /// 文件名
     pub file_name: String,
     /// 进度百分比（0-100）
     pub progress: f64,
-    /// 已下载字节数
-    pub downloaded_bytes: u64,
+    /// 已上传字节数
+    pub uploaded_bytes: u64,
     /// 总字节数
     pub total_bytes: u64,
-    /// 下载速度（字节/秒）
+    /// 上传速度（字节/秒）
     pub speed: u64,
-    /// 访问者 IP
+    /// 接收者 IP
     pub client_ip: String,
 }
 
@@ -503,6 +508,11 @@ impl ShareState {
     #[allow(dead_code)]
     pub fn get_request_by_ip(&mut self, ip: &str) -> Option<&mut AccessRequest> {
         self.access_requests.values_mut().find(|r| r.ip == ip)
+    }
+
+    /// 移除单个访问请求
+    pub fn remove_request(&mut self, request_id: &str) -> Option<AccessRequest> {
+        self.access_requests.remove(request_id)
     }
 }
 

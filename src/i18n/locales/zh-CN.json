@@ -8,6 +8,7 @@
   "common": {
     "cancel": "取消",
     "delete": "删除",
+    "remove": "移除",
     "confirm": "确认",
     "enabled": "已启用",
     "disabled": "已禁用",
@@ -245,6 +246,18 @@
     "selectFileToStart": "选择文件开始发送",
     "cleanup": "清理已完成"
   },
+  "receiveMode": {
+    "label": "传输模式",
+    "local": {
+      "label": "本地网络",
+      "description": "通过局域网直接传输，速度快"
+    },
+    "cloud": {
+      "label": "云盘中转",
+      "description": "通过云盘中转，跨网络传输",
+      "comingSoon": "云盘中转功能即将推出"
+    }
+  },
   "receive": {
     "networkInfo": "网络信息",
     "viewNetworkInfo": "查看网络信息",
@@ -273,7 +286,70 @@
       "autoReceive": "自动接收",
       "autoReceiveHint": "开启后接收请求将自动同意，无需手动确认",
       "fileOverwrite": "文件覆盖",
-      "fileOverwriteHint": "开启后同名文件将被覆盖，关闭则自动重命名"
+      "fileOverwriteHint": "开启后同名文件将被覆盖，关闭则自动重命名",
+      "webUpload": "Web 上传",
+      "webUploadHint": "开启后启动 HTTP 服务器，其他设备可通过浏览器上传文件",
+      "webUploadLink": "上传链接",
+      "webUploadQrcode": "扫码上传",
+      "webUploadStartFailed": "启动 Web 上传服务失败：{error}",
+      "webUploadStopFailed": "停止 Web 上传服务失败：{error}"
+    },
+    "task": {
+      "fileCount": "{count} 个文件",
+      "from": "来自 {sender}",
+      "approval": {
+        "pending": "等待确认",
+        "accepted": "已接受",
+        "rejected": "已拒绝",
+        "expired": "已过期"
+      },
+      "expandFiles": "展开文件列表",
+      "collapseFiles": "收起文件列表",
+      "moreFiles": "还有 {count} 个文件",
+      "expand": "展开全部",
+      "collapse": "收起",
+      "clearAll": "移除全部",
+      "removeConfirm": {
+        "title": "移除任务",
+        "message": "确定要移除该接收任务吗？"
+      },
+      "clearAllConfirm": {
+        "title": "移除全部任务",
+        "message": "确定要移除所有 {count} 条接收任务吗？"
+      },
+      "acceptError": "接受请求失败：{error}",
+      "rejectError": "拒绝请求失败：{error}",
+      "fileStatus": {
+        "pending": "等待中",
+        "transferring": "传输中",
+        "completed": "已完成",
+        "failed": "失败",
+        "cancelled": "已取消"
+      }
+    },
+    "webUpload": {
+      "requests": "上传请求",
+      "noRequests": "暂无上传请求",
+      "waitingForUpload": "等待浏览器上传文件",
+      "accept": "接受",
+      "reject": "拒绝",
+      "fileCount": "{count} 个文件",
+      "fromIp": "来自 {ip}",
+      "status": {
+        "pending": "等待确认",
+        "accepted": "已接受",
+        "rejected": "已拒绝",
+        "expired": "已过期"
+      },
+      "progress": {
+        "title": "上传进度",
+        "moreRecords": "还有 {count} 条上传记录",
+        "expand": "展开全部",
+        "collapse": "收起",
+        "noRecords": "暂无上传记录"
+      },
+      "acceptError": "接受上传请求失败：{error}",
+      "rejectError": "拒绝上传请求失败：{error}"
     }
   },
   "network": {
@@ -313,7 +389,7 @@
     }
   },
   "share": {
-    "backToSend": "返回发送",
+    "backToSend": "返回",
     "startError": "开始分享失败：{error}",
     "stopError": "停止分享失败：{error}",
     "acceptError": "接受请求失败：{error}",
@@ -344,18 +420,30 @@
       "title": "访问请求",
       "accept": "接受",
       "reject": "拒绝",
+      "clearAll": "移除全部",
       "status": {
         "pending": "等待响应",
         "accepted": "已同意",
         "rejected": "已拒绝"
       }
     },
-    "downloads": {
-      "title": "下载进度",
-      "moreRecords": "还有 {count} 条下载记录",
+    "removeConfirm": {
+      "title": "移除请求",
+      "message": "确定要移除该访问请求吗？"
+    },
+    "clearAllConfirm": {
+      "title": "移除全部请求",
+      "message": "确定要移除所有 {count} 条访问请求吗？"
+    },
+    "removeError": "移除请求失败：{error}",
+    "clearAllError": "清除请求失败：{error}",
+    "uploads": {
+      "title": "上传进度",
+      "fileCount": "{count} 个文件",
+      "moreRecords": "还有 {count} 条上传记录",
       "expand": "展开全部",
       "collapse": "收起",
-      "noRecords": "暂无下载记录"
+      "noRecords": "暂无上传记录"
     },
     "transfer": {
       "transferring": "传输中",

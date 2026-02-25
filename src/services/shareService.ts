@@ -12,11 +12,12 @@ import type {
     AccessRequest,
     ShareSettings,
     FileMetadata,
-    DownloadProgress,
+    UploadProgress,
 } from '../types'
 
 // 重新导出类型供外部使用
-export type { AccessRequest, DownloadProgress, ShareLinkInfo, ShareSettings }
+export type { AccessRequest, ShareLinkInfo, ShareSettings }
+export type { UploadProgress }
 
 // ============ 命令调用 ============
 
@@ -70,6 +71,21 @@ export async function rejectAccessRequest(requestId: string): Promise<void> {
 }
 
 /**
+ * 移除单个访问请求
+ * @param requestId 请求 ID
+ */
+export async function removeAccessRequest(requestId: string): Promise<void> {
+    return invoke('remove_access_request', { requestId })
+}
+
+/**
+ * 移除所有访问请求
+ */
+export async function clearAccessRequests(): Promise<void> {
+    return invoke('clear_access_requests')
+}
+
+/**
  * 更新分享设置
  * @param settings 分享设置
  */
@@ -118,63 +134,77 @@ export async function onAccessRequestRejected(
 }
 
 /**
- * 监听下载进度事件
+ * 监听上传进度事件（分享者向接收者传输文件的进度）
  * @param callback 回调函数
  */
-export async function onDownloadProgress(
-    callback: (progress: DownloadProgress) => void
+export async function onUploadProgress(
+    callback: (progress: UploadProgress) => void
 ): Promise<UnlistenFn> {
-    return listen<DownloadProgress>('download-progress', (event) => {
+    return listen<UploadProgress>('upload-progress', (event) => {
         callback(event.payload)
     })
 }
-/** 下载开始事件载荷 */
-export interface DownloadStartPayload {
-    /** 下载记录 ID */
-    download_id: string
+
+/** 上传开始事件载荷 */
+export interface UploadStartPayload {
+    /** 上传记录 ID */
+    upload_id: string
     /** 文件名 */
     file_name: string
     /** 文件大小 */
     file_size: number
-    /** 客户端 IP */
+    /** 接收者 IP */
     client_ip: string
 }
 
-/** 下载完成事件载荷 */
-export interface DownloadCompletePayload {
-    /** 下载记录 ID */
-    download_id: string
+/** 上传完成事件载荷 */
+export interface UploadCompletePayload {
+    /** 上传记录 ID */
+    upload_id: string
     /** 文件名 */
     file_name: string
     /** 文件大小 */
     file_size: number
-    /** 客户端 IP */
+    /** 接收者 IP */
     client_ip: string
 }
 
 /**
- * 监听下载开始事件
+ * 监听上传开始事件（分享者开始向接收者传输文件）
  * @param callback 回调函数
  */
-export async function onDownloadStart(
-    callback: (payload: DownloadStartPayload) => void
+export async function onUploadStart(
+    callback: (payload: UploadStartPayload) => void
 ): Promise<UnlistenFn> {
-    return listen<DownloadStartPayload>('download-start', (event) => {
+    return listen<UploadStartPayload>('upload-start', (event) => {
         callback(event.payload)
     })
 }
 
 /**
- * 监听下载完成事件
+ * 监听上传完成事件（分享者完成向接收者传输文件）
  * @param callback 回调函数
  */
-export async function onDownloadComplete(
-    callback: (payload: DownloadCompletePayload) => void
+export async function onUploadComplete(
+    callback: (payload: UploadCompletePayload) => void
 ): Promise<UnlistenFn> {
-    return listen<DownloadCompletePayload>('download-complete', (event) => {
+    return listen<UploadCompletePayload>('upload-complete', (event) => {
         callback(event.payload)
     })
 }
+
+/**
+ * 监听访问请求被移除事件
+ * @param callback 回调函数
+ */
+export async function onAccessRequestRemoved(
+    callback: (requestId: string) => void
+): Promise<UnlistenFn> {
+    return listen<string>('access-request-removed', (event) => {
+        callback(event.payload)
+    })
+}
+
 /**
  * 监听分享停止事件
  * @param callback 回调函数

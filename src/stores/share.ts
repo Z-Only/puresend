@@ -10,8 +10,8 @@ import type {
     ShareSettings,
     FileMetadata,
     ContentType,
-    DownloadRecord,
-    DownloadProgress,
+    UploadRecord,
+    UploadProgress,
 } from '../types'
 import { DEFAULT_MAX_HISTORY_COUNT } from '../types/transfer'
 import type { SelectedFileItem } from '../types/content'
@@ -21,14 +21,17 @@ import {
     stopShareService,
     acceptAccessRequest,
     rejectAccessRequest,
+    removeAccessRequest,
+    clearAccessRequests,
     onAccessRequest,
     onAccessRequestAccepted,
     onAccessRequestRejected,
-    onDownloadProgress,
-    onDownloadComplete,
-    onDownloadStart,
-    type DownloadCompletePayload,
-    type DownloadStartPayload,
+    onAccessRequestRemoved,
+    onUploadProgress,
+    onUploadComplete,
+    onUploadStart,
+    type UploadCompletePayload,
+    type UploadStartPayload,
 } from '../services/shareService'
 import { useSettingsStore } from './settings'
 
@@ -127,19 +130,18 @@ export const useShareStore = defineStore('share', () => {
     }
 
     /**
-     * 处理下载进度事件
+     * 处理上传进度事件
      */
-    function handleDownloadProgress(progress: DownloadProgress) {
-        // 根据 downloadId 定位对应的访问请求和下载记录
+    function handleUploadProgress(progress: UploadProgress) {
         for (const [requestId, request] of accessRequests.value.entries()) {
-            const recordIndex = request.downloadRecords.findIndex(
-                (r) => r.id === progress.downloadId
+            const recordIndex = request.uploadRecords.findIndex(
+                (r) => r.id === progress.uploadId
             )
             if (recordIndex !== -1) {
-                const updatedRecords = [...request.downloadRecords]
+                const updatedRecords = [...request.uploadRecords]
                 updatedRecords[recordIndex] = {
                     ...updatedRecords[recordIndex],
-                    downloadedBytes: progress.downloadedBytes,
+                    uploadedBytes: progress.uploadedBytes,
                     totalBytes: progress.totalBytes,
                     progress: progress.progress,
                     speed: progress.speed,
@@ -147,7 +149,7 @@ export const useShareStore = defineStore('share', () => {
                 }
                 accessRequests.value.set(requestId, {
                     ...request,
-                    downloadRecords: updatedRecords,
+                    uploadRecords: updatedRecords,
                 })
                 break
             }
@@ -155,19 +157,18 @@ export const useShareStore = defineStore('share', () => {
     }
 
     /**
-     * 处理下载开始事件
+     * 处理上传开始事件
      */
-    function handleDownloadStart(payload: DownloadStartPayload) {
-        console.log('下载开始:', payload)
-        // 找到对应的访问请求，在下载记录列表头部插入新记录
+    function handleUploadStart(payload: UploadStartPayload) {
+        console.log('上传开始:', payload)
         const request = Array.from(accessRequests.value.values()).find(
             (r) => r.ip === payload.client_ip
         )
         if (request) {
-            const newRecord: DownloadRecord = {
-                id: payload.download_id,
+            const newRecord: UploadRecord = {
+                id: payload.upload_id,
                 fileName: payload.file_name,
-                downloadedBytes: 0,
+                uploadedBytes: 0,
                 totalBytes: payload.file_size,
                 progress: 0,
                 speed: 0,
@@ -176,27 +177,26 @@ export const useShareStore = defineStore('share', () => {
             }
             accessRequests.value.set(request.id, {
                 ...request,
-                downloadRecords: [newRecord, ...request.downloadRecords],
+                uploadRecords: [newRecord, ...request.uploadRecords],
             })
         }
     }
 
     /**
-     * 处理下载完成事件
+     * 处理上传完成事件
      */
-    async function handleDownloadComplete(payload: DownloadCompletePayload) {
-        console.log('下载完成:', payload)
+    async function handleUploadComplete(payload: UploadCompletePayload) {
+        console.log('上传完成:', payload)
 
-        // 根据 downloadId 定位并标记对应记录为已完成
         for (const [requestId, request] of accessRequests.value.entries()) {
-            const recordIndex = request.downloadRecords.findIndex(
-                (r) => r.id === payload.download_id
+            const recordIndex = request.uploadRecords.findIndex(
+                (r) => r.id === payload.upload_id
             )
             if (recordIndex !== -1) {
-                const updatedRecords = [...request.downloadRecords]
+                const updatedRecords = [...request.uploadRecords]
                 updatedRecords[recordIndex] = {
                     ...updatedRecords[recordIndex],
-                    downloadedBytes: updatedRecords[recordIndex].totalBytes,
+                    uploadedBytes: updatedRecords[recordIndex].totalBytes,
                     progress: 100,
                     speed: 0,
                     status: 'completed',
@@ -204,7 +204,7 @@ export const useShareStore = defineStore('share', () => {
                 }
                 accessRequests.value.set(requestId, {
                     ...request,
-                    downloadRecords: updatedRecords,
+                    uploadRecords: updatedRecords,
                 })
                 break
             }
@@ -247,6 +247,13 @@ export const useShareStore = defineStore('share', () => {
     }
 
     /**
+     * 处理访问请求被移除事件
+     */
+    function handleAccessRequestRemoved(requestId: string) {
+        accessRequests.value.delete(requestId)
+    }
+
+    /**
      * 设置事件监听器
      */
     async function setupEventListeners(): Promise<void> {
@@ -254,9 +261,10 @@ export const useShareStore = defineStore('share', () => {
             await onAccessRequest(handleAccessRequest),
             await onAccessRequestAccepted(handleAccessRequestAccepted),
             await onAccessRequestRejected(handleAccessRequestRejected),
-            await onDownloadProgress(handleDownloadProgress),
-            await onDownloadStart(handleDownloadStart),
-            await onDownloadComplete(handleDownloadComplete)
+            await onAccessRequestRemoved(handleAccessRequestRemoved),
+            await onUploadProgress(handleUploadProgress),
+            await onUploadStart(handleUploadStart),
+            await onUploadComplete(handleUploadComplete)
         )
     }
 
@@ -370,6 +378,48 @@ export const useShareStore = defineStore('share', () => {
     }
 
     /**
+     * 移除单个访问请求
+     * @param requestId 请求 ID
+     */
+    async function removeRequest(requestId: string): Promise<void> {
+        const request = accessRequests.value.get(requestId)
+        if (!request) return
+
+        loading.value = true
+        error.value = ''
+
+        try {
+            await removeAccessRequest(requestId)
+            // 状态会在 handleAccessRequestRemoved 中自动移除
+        } catch (e) {
+            error.value = `移除请求失败：${e}`
+            console.error('移除请求失败:', e)
+            throw e
+        } finally {
+            loading.value = false
+        }
+    }
+
+    /**
+     * 移除所有访问请求
+     */
+    async function clearRequests(): Promise<void> {
+        loading.value = true
+        error.value = ''
+
+        try {
+            await clearAccessRequests()
+            // 状态会在 handleAccessRequestRemoved 中自动移除
+        } catch (e) {
+            error.value = `清除请求失败：${e}`
+            console.error('清除请求失败:', e)
+            throw e
+        } finally {
+            loading.value = false
+        }
+    }
+
+    /**
      * 更新分享设置
      * @param newSettings 新设置
      */
@@ -417,13 +467,6 @@ export const useShareStore = defineStore('share', () => {
      */
     function setQRCode(url: string): void {
         qrCodeDataUrl.value = url
-    }
-
-    /**
-     * 清除所有访问请求
-     */
-    function clearRequests(): void {
-        accessRequests.value.clear()
     }
 
     /**
@@ -476,9 +519,10 @@ export const useShareStore = defineStore('share', () => {
         stopShare,
         acceptRequest,
         rejectRequest,
+        removeRequest,
+        clearRequests,
         updateSettings,
         resetStore,
-        clearRequests,
         addAccessRequest,
         setQRCode,
         setSelectedFiles,

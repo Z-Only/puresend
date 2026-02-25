@@ -25,7 +25,7 @@ use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
 use tauri::{AppHandle, Emitter};
 
-use super::models::{DownloadRecord, ShareState};
+use super::models::{UploadRecord, ShareState};
 use crate::models::FileMetadata;
 
 /// Favicon 图标数据（嵌入二进制）
@@ -97,10 +97,10 @@ impl ShareServer {
         let app = Router::new()
             .route("/", get(index_handler))
             .route("/favicon.ico", get(favicon_handler))
-            .route("/api/files", get(list_files_handler))
-            .route("/api/verify-pin", post(verify_pin_handler))
-            .route("/api/request-status", get(request_status_handler))
-            .route("/download/{file_id}", get(download_handler))
+            .route("/files", get(list_files_handler))
+            .route("/verify-pin", post(verify_pin_handler))
+            .route("/request-status", get(request_status_handler))
+            .route("/download/{file_id}", get(upload_handler))
             .fallback(fallback_handler)
             .layer(
                 CorsLayer::new()
@@ -651,28 +651,28 @@ async fn fallback_handler(uri: axum::http::Uri) -> impl IntoResponse {
     )))
 }
 
-/// 文件下载处理器
-async fn download_handler(
+/// 文件上传处理器（向接收者提供文件）
+async fn upload_handler(
     ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
     AxumState(state): AxumState<Arc<ServerState>>,
     Path(file_id): Path<String>,
 ) -> Response {
     let client_ip = client_addr.ip().to_string();
 
-    // 调试：记录下载请求
-    eprintln!("下载请求开始 - client_ip: {}, file_id: {}", client_ip, file_id);
+    // 调试：记录上传请求
+    eprintln!("上传请求开始 - client_ip: {}, file_id: {}", client_ip, file_id);
 
     // 检查访问权限
     {
         let share_state = state.share_state.lock().await;
 
         if share_state.share_info.is_none() {
-            eprintln!("下载失败 - 分享已结束");
+            eprintln!("上传失败 - 分享已结束");
             return Html("<html><body><h1>分享已结束</h1></body></html>").into_response();
         }
 
         if share_state.is_ip_rejected(&client_ip) {
-            eprintln!("下载失败 - IP 被拒绝: {}", client_ip);
+            eprintln!("上传失败 - IP 被拒绝: {}", client_ip);
             return Html("<html><body><h1>访问被拒绝</h1></body></html>").into_response();
         }
 
@@ -683,19 +683,19 @@ async fn download_handler(
         
         // 如果需要 PIN，优先显示提示
         if needs_pin {
-            eprintln!("下载失败 - 需要 PIN 验证: {}", client_ip);
+            eprintln!("上传失败 - 需要 PIN 验证: {}", client_ip);
             return Html("<html><body><h1>需要验证 PIN</h1></body></html>").into_response();
         }
         
         // 检查是否有访问权限
         let has_access = share_state.is_ip_allowed(&client_ip);
         
-        eprintln!("下载权限检查 - client_ip: {}, has_access: {}, auto_accept: {}", 
+        eprintln!("上传权限检查 - client_ip: {}, has_access: {}, auto_accept: {}", 
             client_ip, has_access, share_state.settings.auto_accept);
         
         // 如果没有访问权限，显示等待响应
         if !has_access {
-            eprintln!("下载失败 - 没有访问权限: {}", client_ip);
+            eprintln!("上传失败 - 没有访问权限: {}", client_ip);
             return Html("<html><body><h1>等待访问授权中，请稍后重试</h1><p>请先在分享方接受您的访问请求</p></body></html>").into_response();
         }
     }
@@ -731,19 +731,19 @@ async fn download_handler(
             
             eprintln!("开始传输文件 - file_name: {}, mime_type: {}", file_name, mime_type);
 
-            // 创建下载记录并追加到访问请求的下载记录列表
-            let download_record = DownloadRecord::new(file_name.clone(), file_size);
-            let download_id = download_record.id.clone();
+            // 创建上传记录并追加到访问请求的上传记录列表
+            let upload_record = UploadRecord::new(file_name.clone(), file_size);
+            let upload_id = upload_record.id.clone();
             {
                 let mut share_state = state.share_state.lock().await;
                 if let Some(request) = share_state.access_requests.values_mut().find(|r| r.ip == client_ip) {
-                    request.download_records.insert(0, download_record);
+                    request.upload_records.insert(0, upload_record);
                 }
             }
 
-            // 发送下载开始事件到前端
-            let _ = state.app_handle.emit("download-start", DownloadStartPayload {
-                download_id: download_id.clone(),
+            // 发送上传开始事件到前端
+            let _ = state.app_handle.emit("upload-start", UploadStartPayload {
+                upload_id: upload_id.clone(),
                 file_name: file_name.clone(),
                 file_size: file_size as i64,
                 client_ip: client_ip.clone(),
@@ -757,7 +757,7 @@ async fn download_handler(
                         reader_stream,
                         state.app_handle.clone(),
                         state.share_state.clone(),
-                        download_id,
+                        upload_id,
                         file_name.clone(),
                         client_ip.clone(),
                         file_size,
@@ -784,11 +784,11 @@ async fn download_handler(
                     return response;
                 }
                 Err(e) => {
-                    // 更新下载记录状态为失败
+                    // 更新上传记录状态为失败
                     {
                         let mut share_state = state.share_state.lock().await;
                         for request in share_state.access_requests.values_mut() {
-                            if let Some(record) = request.download_records.iter_mut().find(|r| r.id == download_id) {
+                            if let Some(record) = request.upload_records.iter_mut().find(|r| r.id == upload_id) {
                                 record.status = super::models::TransferStatus::Failed;
                                 break;
                             }
@@ -808,29 +808,29 @@ async fn download_handler(
     }
 }
 
-/// 下载开始事件载荷
+/// 上传开始事件载荷
 #[derive(Debug, Clone, Serialize)]
-struct DownloadStartPayload {
-    /// 下载记录 ID
-    download_id: String,
+struct UploadStartPayload {
+    /// 上传记录 ID
+    upload_id: String,
     /// 文件名
     file_name: String,
     /// 文件大小
     file_size: i64,
-    /// 客户端 IP
+    /// 接收者 IP
     client_ip: String,
 }
 
-/// 下载完成事件载荷
+/// 上传完成事件载荷
 #[derive(Debug, Clone, Serialize)]
-struct DownloadCompletePayload {
-    /// 下载记录 ID
-    download_id: String,
+struct UploadCompletePayload {
+    /// 上传记录 ID
+    upload_id: String,
     /// 文件名
     file_name: String,
     /// 文件大小
     file_size: i64,
-    /// 客户端 IP
+    /// 接收者 IP
     client_ip: String,
 }
 
@@ -839,7 +839,7 @@ struct ProgressTrackingStream {
     inner: ReaderStream<File>,
     app_handle: AppHandle,
     share_state: Arc<Mutex<ShareState>>,
-    download_id: String,
+    upload_id: String,
     file_name: String,
     client_ip: String,
     total_bytes: u64,
@@ -854,7 +854,7 @@ impl ProgressTrackingStream {
         inner: ReaderStream<File>,
         app_handle: AppHandle,
         share_state: Arc<Mutex<ShareState>>,
-        download_id: String,
+        upload_id: String,
         file_name: String,
         client_ip: String,
         total_bytes: u64,
@@ -863,7 +863,7 @@ impl ProgressTrackingStream {
             inner,
             app_handle,
             share_state,
-            download_id,
+            upload_id,
             file_name,
             client_ip,
             total_bytes,
@@ -890,35 +890,35 @@ impl ProgressTrackingStream {
     }
 
     fn emit_progress(&mut self, progress: f64, speed: u64) {
-        let payload = super::models::DownloadProgress {
-            download_id: self.download_id.clone(),
+        let payload = super::models::UploadProgress {
+            upload_id: self.upload_id.clone(),
             file_name: self.file_name.clone(),
             progress,
-            downloaded_bytes: self.transferred_bytes,
+            uploaded_bytes: self.transferred_bytes,
             total_bytes: self.total_bytes,
             speed,
             client_ip: self.client_ip.clone(),
         };
-        let _ = self.app_handle.emit("download-progress", payload);
+        let _ = self.app_handle.emit("upload-progress", payload);
         self.last_emit_time = std::time::Instant::now();
         self.last_emit_progress = progress;
     }
 
     fn emit_complete(&self) {
         let speed = self.calculate_speed();
-        let payload = super::models::DownloadProgress {
-            download_id: self.download_id.clone(),
+        let payload = super::models::UploadProgress {
+            upload_id: self.upload_id.clone(),
             file_name: self.file_name.clone(),
             progress: 100.0,
-            downloaded_bytes: self.total_bytes,
+            uploaded_bytes: self.total_bytes,
             total_bytes: self.total_bytes,
             speed,
             client_ip: self.client_ip.clone(),
         };
-        let _ = self.app_handle.emit("download-progress", payload);
+        let _ = self.app_handle.emit("upload-progress", payload);
 
-        let _ = self.app_handle.emit("download-complete", DownloadCompletePayload {
-            download_id: self.download_id.clone(),
+        let _ = self.app_handle.emit("upload-complete", UploadCompletePayload {
+            upload_id: self.upload_id.clone(),
             file_name: self.file_name.clone(),
             file_size: self.total_bytes as i64,
             client_ip: self.client_ip.clone(),
@@ -948,17 +948,17 @@ impl Stream for ProgressTrackingStream {
                 if this.should_emit_progress(progress) {
                     this.emit_progress(progress, speed);
 
-                    // 异步更新 share_state 中的下载记录
+                    // 异步更新 share_state 中的上传记录
                     let share_state = this.share_state.clone();
-                    let download_id = this.download_id.clone();
+                    let upload_id = this.upload_id.clone();
                     let transferred = this.transferred_bytes;
                     let prog = progress;
                     let spd = speed;
                     tokio::spawn(async move {
                         let mut state = share_state.lock().await;
                         for request in state.access_requests.values_mut() {
-                            if let Some(record) = request.download_records.iter_mut().find(|r| r.id == download_id) {
-                                record.downloaded_bytes = transferred;
+                            if let Some(record) = request.upload_records.iter_mut().find(|r| r.id == upload_id) {
+                                record.uploaded_bytes = transferred;
                                 record.progress = prog;
                                 record.speed = spd;
                                 break;
@@ -975,9 +975,9 @@ impl Stream for ProgressTrackingStream {
                 this.transferred_bytes = this.total_bytes;
                 this.emit_complete();
 
-                // 异步更新 share_state 中的下载记录为已完成
+                // 异步更新 share_state 中的上传记录为已完成
                 let share_state = this.share_state.clone();
-                let download_id = this.download_id.clone();
+                let upload_id = this.upload_id.clone();
                 tokio::spawn(async move {
                     let mut state = share_state.lock().await;
                     let now = std::time::SystemTime::now()
@@ -985,8 +985,8 @@ impl Stream for ProgressTrackingStream {
                         .unwrap()
                         .as_millis() as u64;
                     for request in state.access_requests.values_mut() {
-                        if let Some(record) = request.download_records.iter_mut().find(|r| r.id == download_id) {
-                            record.downloaded_bytes = record.total_bytes;
+                        if let Some(record) = request.upload_records.iter_mut().find(|r| r.id == upload_id) {
+                            record.uploaded_bytes = record.total_bytes;
                             record.progress = 100.0;
                             record.status = super::models::TransferStatus::Completed;
                             record.completed_at = Some(now);
@@ -1139,7 +1139,7 @@ static PIN_INPUT_HTML: &str = r#"
             }
             
             try {
-                const response = await fetch('/api/verify-pin', {
+                const response = await fetch('/verify-pin', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ pin })
@@ -1198,7 +1198,7 @@ static WAITING_RESPONSE_HTML: &str = r#"
     <script>
         async function checkStatus() {
             try {
-                const response = await fetch('/api/request-status');
+                const response = await fetch('/request-status');
                 const result = await response.json();
                 
                 const statusDiv = document.getElementById('status');
@@ -1265,7 +1265,7 @@ static _PIN_INPUT_HTML_OLD: &str = r#"
             }
             
             try {
-                const response = await fetch('/api/verify-pin', {
+                const response = await fetch('/verify-pin', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ pin })

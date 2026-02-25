@@ -8,6 +8,7 @@
   "common": {
     "cancel": "Cancel",
     "delete": "Delete",
+    "remove": "Remove",
     "confirm": "Confirm",
     "enabled": "Enabled",
     "disabled": "Disabled",
@@ -285,7 +286,70 @@
       "autoReceive": "Auto Receive",
       "autoReceiveHint": "Automatically accept receive requests without manual confirmation",
       "fileOverwrite": "File Overwrite",
-      "fileOverwriteHint": "Overwrite existing files with the same name, or auto-rename if disabled"
+      "fileOverwriteHint": "Overwrite existing files with the same name, or auto-rename if disabled",
+      "webUpload": "Web Upload",
+      "webUploadHint": "Start HTTP server to allow other devices to upload files via browser",
+      "webUploadLink": "Upload Link",
+      "webUploadQrcode": "Scan to Upload",
+      "webUploadStartFailed": "Failed to start Web Upload: {error}",
+      "webUploadStopFailed": "Failed to stop Web Upload: {error}"
+    },
+    "task": {
+      "fileCount": "{count} file(s)",
+      "from": "From {sender}",
+      "approval": {
+        "pending": "Pending",
+        "accepted": "Accepted",
+        "rejected": "Rejected",
+        "expired": "Expired"
+      },
+      "expandFiles": "Expand file list",
+      "collapseFiles": "Collapse file list",
+      "moreFiles": "{count} more file(s)",
+      "expand": "Expand All",
+      "collapse": "Collapse",
+      "clearAll": "Clear All",
+      "removeConfirm": {
+        "title": "Remove Task",
+        "message": "Are you sure you want to remove this receive task?"
+      },
+      "clearAllConfirm": {
+        "title": "Clear All Tasks",
+        "message": "Are you sure you want to remove all {count} receive tasks?"
+      },
+      "acceptError": "Failed to accept request: {error}",
+      "rejectError": "Failed to reject request: {error}",
+      "fileStatus": {
+        "pending": "Pending",
+        "transferring": "Transferring",
+        "completed": "Completed",
+        "failed": "Failed",
+        "cancelled": "Cancelled"
+      }
+    },
+    "webUpload": {
+      "requests": "Upload Requests",
+      "noRequests": "No upload requests",
+      "waitingForUpload": "Waiting for browser file upload",
+      "accept": "Accept",
+      "reject": "Reject",
+      "fileCount": "{count} file(s)",
+      "fromIp": "From {ip}",
+      "status": {
+        "pending": "Pending",
+        "accepted": "Accepted",
+        "rejected": "Rejected",
+        "expired": "Expired"
+      },
+      "progress": {
+        "title": "Upload Progress",
+        "moreRecords": "{count} more upload records",
+        "expand": "Expand All",
+        "collapse": "Collapse",
+        "noRecords": "No upload records"
+      },
+      "acceptError": "Failed to accept upload request: {error}",
+      "rejectError": "Failed to reject upload request: {error}"
     }
   },
   "network": {
@@ -325,7 +389,7 @@
     }
   },
   "share": {
-    "backToSend": "Back to Send",
+    "backToSend": "Back",
     "startError": "Failed to start sharing: {error}",
     "stopError": "Failed to stop sharing: {error}",
     "acceptError": "Failed to accept request: {error}",
@@ -356,18 +420,30 @@
       "title": "Access Requests",
       "accept": "Accept",
       "reject": "Reject",
+      "clearAll": "Clear All",
       "status": {
         "pending": "Waiting",
         "accepted": "Accepted",
         "rejected": "Rejected"
       }
     },
-    "downloads": {
-      "title": "Download Progress",
-      "moreRecords": "{count} more download records",
+    "removeConfirm": {
+      "title": "Remove Request",
+      "message": "Are you sure you want to remove this access request?"
+    },
+    "clearAllConfirm": {
+      "title": "Clear All Requests",
+      "message": "Are you sure you want to remove all {count} access requests?"
+    },
+    "removeError": "Failed to remove request: {error}",
+    "clearAllError": "Failed to clear requests: {error}",
+    "uploads": {
+      "title": "Upload Progress",
+      "fileCount": "{count} file(s)",
+      "moreRecords": "{count} more upload records",
       "expand": "Expand All",
       "collapse": "Collapse",
-      "noRecords": "No download records"
+      "noRecords": "No upload records"
     },
     "transfer": {
       "transferring": "Transferring",

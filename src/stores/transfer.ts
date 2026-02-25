@@ -14,6 +14,13 @@ import type {
     HistoryFilter,
     HistorySortOption,
     TransferHistoryStorage,
+    WebUploadRequest,
+    WebUploadInfo,
+    WebUploadFileStartEvent,
+    WebUploadFileProgressEvent,
+    WebUploadFileCompleteEvent,
+    ReceiveTaskItem,
+    ReceiveTaskFileItem,
 } from '../types'
 import {
     HISTORY_STORAGE_VERSION,
@@ -36,6 +43,15 @@ import {
     getReceiveDirectory,
     setReceiveDirectory,
     getNetworkInfo as getNetworkInfoService,
+    startWebUpload as startWebUploadService,
+    stopWebUpload as stopWebUploadService,
+    acceptWebUpload as acceptWebUploadService,
+    rejectWebUpload as rejectWebUploadService,
+    onWebUploadTask,
+    onWebUploadStatusChanged,
+    onWebUploadFileStart,
+    onWebUploadFileProgress,
+    onWebUploadFileComplete,
 } from '../services'
 import type { UnlistenFn } from '@tauri-apps/api/event'
 import { useSettingsStore } from './settings'
@@ -81,6 +97,20 @@ export const useTransferStore = defineStore('transfer', () => {
 
     /** 接收模式 */
     const receiveMode = ref<TransferMode>('local')
+
+    // ============ Web 上传状态 ============
+
+    /** Web 上传是否已启用 */
+    const webUploadEnabled = ref(false)
+
+    /** Web 上传服务器信息 */
+    const webUploadInfo = ref<WebUploadInfo | null>(null)
+
+    /** Web 上传请求列表 */
+    const webUploadRequests = ref<Map<string, WebUploadRequest>>(new Map())
+
+    /** 统一接收任务列表（包含 P2P 和 Web 上传） */
+    const receiveTaskItems = ref<Map<string, ReceiveTaskItem>>(new Map())
 
     /** 事件监听器清理函数 */
     const unlistenFns: UnlistenFn[] = []
@@ -143,6 +173,68 @@ export const useTransferStore = defineStore('transfer', () => {
 
     /** 是否有正在传输的任务 */
     const isTransferring = computed(() => transferringTasks.value.length > 0)
+
+    /** Web 上传请求列表（数组形式） */
+    const webUploadRequestList = computed(() =>
+        Array.from(webUploadRequests.value.values()).sort(
+            (a, b) => b.createdAt - a.createdAt
+        )
+    )
+
+    /** 待处理的 Web 上传请求 */
+    const pendingWebUploadRequests = computed(() =>
+        webUploadRequestList.value.filter((r) => r.status === 'pending')
+    )
+
+    /** 统一接收任务列表（合并 P2P 接收任务和 Web 上传任务，按创建时间倒序） */
+    const unifiedReceiveTasks = computed<ReceiveTaskItem[]>(() => {
+        // 将 P2P 接收任务转换为 ReceiveTaskItem
+        const p2pItems: ReceiveTaskItem[] = receiveTasks.value.map(
+            (task): ReceiveTaskItem => ({
+                id: `p2p-${task.id}`,
+                source: 'p2p',
+                senderLabel: task.peer?.name || task.peer?.ip || '',
+                senderIp: task.peer?.ip || '',
+                files: [
+                    {
+                        name: task.file.name,
+                        size: task.file.size,
+                        transferredBytes: task.transferredBytes,
+                        progress: task.progress,
+                        speed: task.speed,
+                        status: task.status,
+                        startedAt: task.createdAt,
+                    },
+                ],
+                fileCount: 1,
+                totalSize: task.file.size,
+                totalTransferredBytes: task.transferredBytes,
+                approvalStatus: 'accepted',
+                transferStatus: task.status,
+                progress: task.progress,
+                speed: task.speed,
+                createdAt: task.createdAt,
+                completedAt: task.completedAt,
+                error: task.error,
+                originalTaskId: task.id,
+            })
+        )
+
+        // 从 receiveTaskItems 获取 Web 上传任务
+        const webItems = Array.from(receiveTaskItems.value.values())
+
+        // 合并并按创建时间倒序排列
+        return [...p2pItems, ...webItems].sort(
+            (a, b) => b.createdAt - a.createdAt
+        )
+    })
+
+    /** 待审批的统一接收任务 */
+    const pendingReceiveTasks = computed(() =>
+        unifiedReceiveTasks.value.filter(
+            (task) => task.approvalStatus === 'pending'
+        )
+    )
 
     // ============ 历史记录计算属性 ============
 
@@ -535,6 +627,406 @@ export const useTransferStore = defineStore('transfer', () => {
         receiveMode.value = mode
     }
 
+    // ============ Web 上传方法 ============
+
+    /**
+     * 启动 Web 上传服务器
+     */
+    async function startWebUpload(): Promise<void> {
+        const settingsStore = useSettingsStore()
+        try {
+            const info = await startWebUploadService(
+                receiveDirectory.value,
+                settingsStore.receiveSettings.autoReceive,
+                settingsStore.receiveSettings.fileOverwrite
+            )
+            webUploadInfo.value = info
+            webUploadEnabled.value = true
+            webUploadRequests.value.clear()
+
+            // 注册 Web 上传事件监听
+            unlistenFns.push(
+                await onWebUploadTask(handleWebUploadTask),
+                await onWebUploadStatusChanged(handleWebUploadStatusChanged),
+                await onWebUploadFileStart(handleWebUploadFileStart),
+                await onWebUploadFileProgress(handleWebUploadFileProgress),
+                await onWebUploadFileComplete(handleWebUploadFileComplete)
+            )
+        } catch (e) {
+            error.value = `启动 Web 上传失败：${e}`
+            console.error('启动 Web 上传失败:', e)
+            throw e
+        }
+    }
+
+    /**
+     * 停止 Web 上传服务器
+     */
+    async function stopWebUpload(): Promise<void> {
+        try {
+            await stopWebUploadService()
+            webUploadEnabled.value = false
+            webUploadInfo.value = null
+            webUploadRequests.value.clear()
+        } catch (e) {
+            error.value = `停止 Web 上传失败：${e}`
+            console.error('停止 Web 上传失败:', e)
+            throw e
+        }
+    }
+
+    /**
+     * 同意 Web 上传请求
+     */
+    async function acceptWebUploadRequest(requestId: string): Promise<void> {
+        try {
+            await acceptWebUploadService(requestId)
+        } catch (e) {
+            console.error('同意上传请求失败:', e)
+            throw e
+        }
+    }
+
+    /**
+     * 拒绝 Web 上传请求
+     */
+    async function rejectWebUploadRequest(requestId: string): Promise<void> {
+        try {
+            await rejectWebUploadService(requestId)
+        } catch (e) {
+            console.error('拒绝上传请求失败:', e)
+            throw e
+        }
+    }
+
+    /**
+     * 从 User-Agent 字符串中解析出浏览器名称和操作系统，
+     * 返回类似 "Chrome(Android)" 的简短设备标识
+     */
+    function parseUserAgent(userAgent?: string): string {
+        if (!userAgent) return ''
+
+        const browser = detectBrowser(userAgent)
+        const operatingSystem = detectOperatingSystem(userAgent)
+        return operatingSystem ? `${browser}(${operatingSystem})` : browser
+    }
+
+    function detectBrowser(userAgent: string): string {
+        if (userAgent.includes('Edg/') || userAgent.includes('Edge/')) {
+            return 'Edge'
+        }
+        if (userAgent.includes('Chrome/') && !userAgent.includes('Edg/')) {
+            return 'Chrome'
+        }
+        if (userAgent.includes('Safari/') && !userAgent.includes('Chrome/')) {
+            return 'Safari'
+        }
+        if (userAgent.includes('Firefox/')) {
+            return 'Firefox'
+        }
+        if (userAgent.includes('Opera/') || userAgent.includes('OPR/')) {
+            return 'Opera'
+        }
+        return 'Browser'
+    }
+
+    function detectOperatingSystem(userAgent: string): string {
+        if (userAgent.includes('Android')) {
+            return 'Android'
+        }
+        if (userAgent.includes('iPhone') || userAgent.includes('iPad')) {
+            return 'iOS'
+        }
+        if (userAgent.includes('Mac OS')) {
+            return 'macOS'
+        }
+        if (userAgent.includes('Windows')) {
+            return 'Windows'
+        }
+        if (userAgent.includes('Linux')) {
+            return 'Linux'
+        }
+        return ''
+    }
+
+    /**
+     * 处理 Web 上传任务事件：按 IP 创建统一的 ReceiveTaskItem（初始无文件列表）
+     */
+    function handleWebUploadTask(request: WebUploadRequest) {
+        webUploadRequests.value.set(request.id, request)
+
+        // 如果该请求已有对应的 ReceiveTaskItem，则不重复创建
+        if (receiveTaskItems.value.has(`web-${request.id}`)) {
+            return
+        }
+
+        const isAccepted = request.status === 'accepted'
+        const isRejected = request.status === 'rejected'
+
+        const taskItem: ReceiveTaskItem = {
+            id: `web-${request.id}`,
+            source: 'webUpload',
+            senderLabel: parseUserAgent(request.userAgent) || request.clientIp,
+            senderIp: request.clientIp,
+            files: [],
+            fileCount: 0,
+            totalSize: 0,
+            totalTransferredBytes: 0,
+            approvalStatus: isAccepted
+                ? 'accepted'
+                : isRejected
+                  ? 'rejected'
+                  : 'pending',
+            transferStatus: isAccepted ? 'transferring' : 'pending',
+            progress: 0,
+            speed: 0,
+            createdAt: request.createdAt,
+            originalRequestId: request.id,
+        }
+
+        receiveTaskItems.value.set(taskItem.id, taskItem)
+    }
+
+    /**
+     * 处理 Web 上传状态变更事件：更新对应 ReceiveTaskItem 的审批状态
+     */
+    function handleWebUploadStatusChanged(request: WebUploadRequest) {
+        webUploadRequests.value.set(request.id, request)
+
+        const taskItem = receiveTaskItems.value.get(`web-${request.id}`)
+        if (taskItem) {
+            if (request.status === 'accepted') {
+                taskItem.approvalStatus = 'accepted'
+                taskItem.transferStatus = 'transferring'
+            } else if (request.status === 'rejected') {
+                taskItem.approvalStatus = 'rejected'
+                taskItem.transferStatus = 'cancelled'
+            } else if (request.status === 'expired') {
+                taskItem.approvalStatus = 'expired'
+                taskItem.transferStatus = 'cancelled'
+            }
+        }
+    }
+
+    /**
+     * 处理 Web 上传文件开始事件：向对应 ReceiveTaskItem 添加新文件条目
+     */
+    function handleWebUploadFileStart(event: WebUploadFileStartEvent) {
+        const taskItem = receiveTaskItems.value.get(`web-${event.requestId}`)
+        if (!taskItem) return
+
+        const fileItem: ReceiveTaskFileItem = {
+            name: event.fileName,
+            size: event.totalBytes,
+            transferredBytes: 0,
+            progress: 0,
+            speed: 0,
+            status: 'transferring',
+            startedAt: Date.now(),
+        }
+
+        taskItem.files.push(fileItem)
+        taskItem.fileCount = taskItem.files.length
+        taskItem.totalSize = taskItem.files.reduce(
+            (sum, file) => sum + file.size,
+            0
+        )
+        taskItem.transferStatus = 'transferring'
+    }
+
+    /**
+     * 处理 Web 上传文件进度事件：更新对应文件条目的进度
+     */
+    function handleWebUploadFileProgress(event: WebUploadFileProgressEvent) {
+        const taskItem = receiveTaskItems.value.get(`web-${event.requestId}`)
+        if (!taskItem) return
+
+        // 通过 recordId 匹配文件（recordId 存储在文件名旁，用文件名 + 顺序匹配）
+        // 由于 ReceiveTaskFileItem 没有 recordId 字段，按文件名匹配最后一个同名文件
+        const fileItem = findFileByRecord(
+            taskItem,
+            event.recordId,
+            event.fileName
+        )
+        if (!fileItem) return
+
+        fileItem.transferredBytes = event.uploadedBytes
+        fileItem.progress = event.progress
+        fileItem.speed = event.speed
+        if (event.totalBytes > 0 && fileItem.size === 0) {
+            fileItem.size = event.totalBytes
+        }
+
+        // 更新整体进度
+        updateTaskItemProgress(taskItem, event.speed)
+    }
+
+    /**
+     * 处理 Web 上传文件完成事件：标记对应文件条目为完成或失败
+     */
+    function handleWebUploadFileComplete(event: WebUploadFileCompleteEvent) {
+        const taskItem = receiveTaskItems.value.get(`web-${event.requestId}`)
+        if (!taskItem) return
+
+        const fileItem = findFileByRecord(
+            taskItem,
+            event.recordId,
+            event.fileName
+        )
+        if (fileItem) {
+            fileItem.status =
+                event.status === 'completed' ? 'completed' : 'failed'
+            fileItem.transferredBytes = event.totalBytes
+            if (event.totalBytes > 0) {
+                fileItem.size = event.totalBytes
+            }
+            fileItem.progress =
+                event.status === 'completed' ? 100 : fileItem.progress
+            fileItem.speed = 0
+        }
+
+        // 更新整体进度
+        updateTaskItemProgress(taskItem, 0)
+
+        // 检查是否所有文件都已完成
+        const allCompleted =
+            taskItem.files.length > 0 &&
+            taskItem.files.every(
+                (file) =>
+                    file.status === 'completed' || file.status === 'failed'
+            )
+        if (allCompleted) {
+            const hasFailure = taskItem.files.some(
+                (file) => file.status === 'failed'
+            )
+            taskItem.transferStatus = hasFailure ? 'failed' : 'completed'
+            taskItem.completedAt = Date.now()
+            taskItem.speed = 0
+        }
+    }
+
+    /**
+     * 通过 recordId 和文件名查找 ReceiveTaskItem 中的文件条目。
+     * 由于 ReceiveTaskFileItem 没有 recordId 字段，
+     * 使用 recordId → 文件名映射缓存来精确匹配。
+     */
+    const recordIdToFileIndex = new Map<
+        string,
+        { taskId: string; index: number }
+    >()
+
+    function findFileByRecord(
+        taskItem: ReceiveTaskItem,
+        recordId: string,
+        fileName: string
+    ): ReceiveTaskFileItem | null {
+        // 先从缓存中查找
+        const cached = recordIdToFileIndex.get(recordId)
+        if (
+            cached &&
+            cached.taskId === taskItem.id &&
+            cached.index < taskItem.files.length
+        ) {
+            return taskItem.files[cached.index]
+        }
+
+        // 缓存未命中，按文件名查找最后一个正在传输的同名文件
+        for (let i = taskItem.files.length - 1; i >= 0; i--) {
+            if (
+                taskItem.files[i].name === fileName &&
+                taskItem.files[i].status === 'transferring'
+            ) {
+                recordIdToFileIndex.set(recordId, {
+                    taskId: taskItem.id,
+                    index: i,
+                })
+                return taskItem.files[i]
+            }
+        }
+
+        // 兜底：按文件名查找最后一个匹配的文件
+        for (let i = taskItem.files.length - 1; i >= 0; i--) {
+            if (taskItem.files[i].name === fileName) {
+                recordIdToFileIndex.set(recordId, {
+                    taskId: taskItem.id,
+                    index: i,
+                })
+                return taskItem.files[i]
+            }
+        }
+
+        return null
+    }
+
+    /**
+     * 更新 ReceiveTaskItem 的整体进度信息
+     */
+    function updateTaskItemProgress(
+        taskItem: ReceiveTaskItem,
+        currentSpeed: number
+    ): void {
+        const totalTransferred = taskItem.files.reduce(
+            (sum, file) => sum + file.transferredBytes,
+            0
+        )
+        taskItem.totalTransferredBytes = totalTransferred
+        taskItem.totalSize = taskItem.files.reduce(
+            (sum, file) => sum + file.size,
+            0
+        )
+        taskItem.progress =
+            taskItem.totalSize > 0
+                ? Math.round((totalTransferred / taskItem.totalSize) * 100)
+                : 0
+        taskItem.speed = currentSpeed
+        taskItem.transferStatus = 'transferring'
+    }
+
+    /**
+     * 同意统一接收任务
+     */
+    async function acceptReceiveTask(taskId: string): Promise<void> {
+        const taskItem = receiveTaskItems.value.get(taskId)
+        if (taskItem?.source === 'webUpload' && taskItem.originalRequestId) {
+            await acceptWebUploadRequest(taskItem.originalRequestId)
+            return
+        }
+        // P2P 任务目前自动接受，无需额外操作
+    }
+
+    /**
+     * 拒绝统一接收任务
+     */
+    async function rejectReceiveTask(taskId: string): Promise<void> {
+        const taskItem = receiveTaskItems.value.get(taskId)
+        if (taskItem?.source === 'webUpload' && taskItem.originalRequestId) {
+            await rejectWebUploadRequest(taskItem.originalRequestId)
+            return
+        }
+        // P2P 任务：取消传输
+        if (taskItem?.originalTaskId) {
+            await cancel(taskItem.originalTaskId)
+        }
+    }
+
+    /**
+     * 清理已完成的统一接收任务
+     */
+    function cleanupReceiveTaskItems(): void {
+        const idsToRemove: string[] = []
+        for (const [id, task] of receiveTaskItems.value.entries()) {
+            if (
+                task.transferStatus === 'completed' ||
+                task.transferStatus === 'cancelled' ||
+                task.approvalStatus === 'rejected' ||
+                task.approvalStatus === 'expired'
+            ) {
+                idsToRemove.push(id)
+            }
+        }
+        idsToRemove.forEach((id) => receiveTaskItems.value.delete(id))
+    }
+
     /**
      * 销毁 store，清理事件监听器
      */
@@ -542,6 +1034,7 @@ export const useTransferStore = defineStore('transfer', () => {
         unlistenFns.forEach((unlisten) => unlisten())
         unlistenFns.length = 0
         tasks.value.clear()
+        receiveTaskItems.value.clear()
         initialized.value = false
         // 重置页面状态
         transferMode.value = 'local'
@@ -834,6 +1327,23 @@ export const useTransferStore = defineStore('transfer', () => {
         transferMode,
         selectedPeerId,
         receiveMode,
+        // Web 上传
+        webUploadEnabled,
+        webUploadInfo,
+        webUploadRequests,
+        webUploadRequestList,
+        pendingWebUploadRequests,
+        startWebUpload,
+        stopWebUpload,
+        acceptWebUploadRequest,
+        rejectWebUploadRequest,
+        // 统一接收任务
+        receiveTaskItems,
+        unifiedReceiveTasks,
+        pendingReceiveTasks,
+        acceptReceiveTask,
+        rejectReceiveTask,
+        cleanupReceiveTaskItems,
         // 历史记录状态
         historyItems,
         historyLoaded,

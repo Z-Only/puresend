@@ -206,15 +206,15 @@ export type ShareTransferStatus =
 
 /** 分享传输进度信息（保留用于兼容） */
 export interface ShareTransferProgress {
-    /** 当前下载的文件名 */
+    /** 当前上传的文件名 */
     fileName: string
-    /** 已下载字节数 */
+    /** 已上传字节数 */
     downloadedBytes: number
     /** 总字节数 */
     totalBytes: number
     /** 进度百分比（0-100） */
     progress: number
-    /** 下载速度（字节/秒） */
+    /** 上传速度（字节/秒） */
     speed: number
     /** 已完成文件数 */
     completedFiles: number
@@ -228,21 +228,26 @@ export interface ShareTransferProgress {
     completedAt?: number
 }
 
-/** 下载记录 */
-export interface DownloadRecord {
-    /** 下载记录唯一 ID */
+/**
+ * 上传记录
+ *
+ * 从分享者（应用）视角来看，接收者通过链接获取文件时，
+ * 应用作为文件提供方，实际上是在上传文件给接收者。
+ */
+export interface UploadRecord {
+    /** 上传记录唯一 ID */
     id: string
     /** 文件名 */
     fileName: string
-    /** 已下载字节数 */
-    downloadedBytes: number
+    /** 已上传字节数 */
+    uploadedBytes: number
     /** 总字节数 */
     totalBytes: number
     /** 进度百分比（0-100） */
     progress: number
-    /** 下载速度（字节/秒） */
+    /** 上传速度（字节/秒） */
     speed: number
-    /** 下载状态 */
+    /** 上传状态 */
     status: ShareTransferStatus
     /** 开始时间（毫秒） */
     startedAt: number
@@ -250,22 +255,175 @@ export interface DownloadRecord {
     completedAt?: number
 }
 
-/** 下载进度事件载荷 */
-export interface DownloadProgress {
-    /** 下载记录 ID */
-    downloadId: string
+// ============ 统一接收任务类型 ============
+
+/** 接收任务来源 */
+export type ReceiveTaskSource = 'p2p' | 'webUpload'
+
+/** 接收任务审批状态 */
+export type ReceiveTaskApprovalStatus =
+    | 'pending'
+    | 'accepted'
+    | 'rejected'
+    | 'expired'
+
+/** 接收任务文件条目 */
+export interface ReceiveTaskFileItem {
     /** 文件名 */
-    fileName: string
+    name: string
+    /** 文件大小（字节） */
+    size: number
+    /** 已传输字节数 */
+    transferredBytes: number
     /** 进度百分比（0-100） */
     progress: number
-    /** 已下载字节数 */
-    downloadedBytes: number
+    /** 传输速度（字节/秒） */
+    speed: number
+    /** 文件状态 */
+    status: TaskStatus
+    /** 开始传输时间戳（毫秒） */
+    startedAt?: number
+}
+
+/** 统一接收任务项 */
+export interface ReceiveTaskItem {
+    /** 任务唯一 ID */
+    id: string
+    /** 任务来源 */
+    source: ReceiveTaskSource
+    /** 发送方标识（P2P 为设备名，Web 上传为 IP 地址） */
+    senderLabel: string
+    /** 发送方 IP 地址 */
+    senderIp: string
+    /** 文件列表 */
+    files: ReceiveTaskFileItem[]
+    /** 文件总数 */
+    fileCount: number
+    /** 文件总大小（字节） */
+    totalSize: number
+    /** 已传输总字节数 */
+    totalTransferredBytes: number
+    /** 审批状态 */
+    approvalStatus: ReceiveTaskApprovalStatus
+    /** 整体传输状态 */
+    transferStatus: TaskStatus
+    /** 整体进度百分比（0-100） */
+    progress: number
+    /** 整体传输速度（字节/秒） */
+    speed: number
+    /** 创建时间戳（毫秒） */
+    createdAt: number
+    /** 完成时间戳（毫秒） */
+    completedAt?: number
+    /** 错误信息 */
+    error?: string
+    /** 原始 P2P 任务 ID（用于关联 TransferTask） */
+    originalTaskId?: string
+    /** 原始 Web 上传请求 ID（用于关联 WebUploadRequest） */
+    originalRequestId?: string
+}
+
+// ============ Web 上传相关类型 ============
+
+/** Web 上传请求状态 */
+export type WebUploadRequestStatus =
+    | 'pending'
+    | 'accepted'
+    | 'rejected'
+    | 'expired'
+
+/** Web 上传文件记录（对应后端 UploadRecord） */
+export interface WebUploadRecord {
+    /** 记录唯一 ID */
+    id: string
+    /** 文件名 */
+    fileName: string
+    /** 已上传字节数 */
+    uploadedBytes: number
     /** 总字节数 */
     totalBytes: number
-    /** 下载速度（字节/秒） */
+    /** 进度百分比（0-100） */
+    progress: number
+    /** 上传速度（字节/秒） */
     speed: number
-    /** 访问者 IP */
+    /** 状态：transferring / completed / failed */
+    status: string
+    /** 开始时间戳（毫秒） */
+    startedAt: number
+    /** 完成时间戳（毫秒） */
+    completedAt?: number
+}
+
+/** Web 上传请求（按 IP 审批的接收任务） */
+export interface WebUploadRequest {
+    /** 请求唯一 ID */
+    id: string
+    /** 上传方 IP 地址 */
     clientIp: string
+    /** 请求状态 */
+    status: WebUploadRequestStatus
+    /** 请求时间戳（毫秒） */
+    createdAt: number
+    /** 上传方 User-Agent */
+    userAgent?: string
+    /** 该 IP 下的所有上传文件记录 */
+    uploadRecords: WebUploadRecord[]
+}
+
+/** Web 上传文件开始事件 */
+export interface WebUploadFileStartEvent {
+    /** 请求 ID */
+    requestId: string
+    /** 文件记录 ID */
+    recordId: string
+    /** 文件名 */
+    fileName: string
+    /** 文件总字节数 */
+    totalBytes: number
+    /** 上传方 IP */
+    clientIp: string
+}
+
+/** Web 上传文件进度事件 */
+export interface WebUploadFileProgressEvent {
+    /** 请求 ID */
+    requestId: string
+    /** 文件记录 ID */
+    recordId: string
+    /** 文件名 */
+    fileName: string
+    /** 已上传字节数 */
+    uploadedBytes: number
+    /** 总字节数 */
+    totalBytes: number
+    /** 进度百分比（0-100） */
+    progress: number
+    /** 上传速度（字节/秒） */
+    speed: number
+}
+
+/** Web 上传文件完成事件 */
+export interface WebUploadFileCompleteEvent {
+    /** 请求 ID */
+    requestId: string
+    /** 文件记录 ID */
+    recordId: string
+    /** 文件名 */
+    fileName: string
+    /** 文件总字节数 */
+    totalBytes: number
+    /** 状态：completed / failed */
+    status: string
+}
+
+/** Web 上传服务器信息 */
+export interface WebUploadInfo {
+    /** 是否已启动 */
+    enabled: boolean
+    /** 服务器端口 */
+    port: number
+    /** 上传链接 */
+    url: string
 }
 
 /** 访问请求 */
@@ -286,8 +444,8 @@ export interface AccessRequest {
     lockedUntil?: number
     /** 用户代理（浏览器/平台信息，如 "Chrome(Android)"） */
     userAgent?: string
-    /** 下载记录列表 */
-    downloadRecords: DownloadRecord[]
+    /** 上传记录列表 */
+    uploadRecords: UploadRecord[]
 }
 
 /** 分享设置 */
@@ -312,21 +470,25 @@ export interface PinVerifyResult {
     lockedUntil?: number
 }
 
-/** 下载进度 */
-export interface DownloadProgress {
-    /** 下载 ID */
-    downloadId: string
+/**
+ * 上传进度
+ *
+ * 从分享者视角，文件被接收者获取时的传输进度。
+ */
+export interface UploadProgress {
+    /** 上传 ID */
+    uploadId: string
     /** 文件名 */
     fileName: string
     /** 进度百分比（0-100） */
     progress: number
-    /** 已下载字节数 */
-    downloadedBytes: number
+    /** 已上传字节数 */
+    uploadedBytes: number
     /** 总字节数 */
     totalBytes: number
-    /** 下载速度（字节/秒） */
+    /** 上传速度（字节/秒） */
     speed: number
-    /** 访问者 IP */
+    /** 接收者 IP */
     clientIp: string
 }
 

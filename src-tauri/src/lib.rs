@@ -7,10 +7,12 @@ mod error;
 mod models;
 mod share;
 mod transfer;
+mod web_upload;
 
 use discovery::DiscoveryState;
 use transfer::TransferState;
 use share::ShareManagerState;
+use web_upload::WebUploadManagerState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -23,6 +25,7 @@ pub fn run() {
         .manage(TransferState::default())
         .manage(DiscoveryState::default())
         .manage(ShareManagerState::default())
+        .manage(WebUploadManagerState::default())
         .invoke_handler(tauri::generate_handler![
             // Device commands
             crate::discovery::get_device_name,
@@ -64,7 +67,15 @@ pub fn run() {
             crate::share::get_access_requests,
             crate::share::accept_access_request,
             crate::share::reject_access_request,
+            crate::share::remove_access_request,
+            crate::share::clear_access_requests,
             crate::share::update_share_settings,
+            // Web upload commands
+            crate::web_upload::start_web_upload,
+            crate::web_upload::stop_web_upload,
+            crate::web_upload::get_web_upload_requests,
+            crate::web_upload::accept_web_upload,
+            crate::web_upload::reject_web_upload,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

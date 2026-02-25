@@ -8,7 +8,8 @@
                     variant="text"
                     :prepend-icon="mdiArrowLeft"
                     @click="handleBack"
-                    class="mb-4"
+                    class="mb-4 back-btn"
+                    style="font-size: 16px"
                 >
                     {{ t('share.backToSend') }}
                 </v-btn>
@@ -86,21 +87,37 @@
 
                 <!-- 访问请求和下载进度 -->
                 <v-card class="mb-4">
-                    <v-card-title>
-                        {{ t('share.requests.title') }}
-                        <v-chip
-                            v-if="shareStore.pendingRequests.length > 0"
-                            color="error"
+                    <v-card-title
+                        class="d-flex align-center justify-space-between"
+                    >
+                        <div>
+                            {{ t('share.requests.title') }}
+                            <v-chip
+                                v-if="shareStore.pendingRequests.length > 0"
+                                color="error"
+                                size="small"
+                                class="ml-2"
+                            >
+                                {{ shareStore.pendingRequests.length }}
+                            </v-chip>
+                        </div>
+                        <v-btn
+                            v-if="shareStore.accessRequests.size > 0"
+                            :prepend-icon="mdiDeleteSweep"
+                            variant="text"
                             size="small"
-                            class="ml-2"
+                            color="error"
+                            @click="showClearAllDialog = true"
                         >
-                            {{ shareStore.pendingRequests.length }}
-                        </v-chip>
+                            {{ t('share.requests.clearAll') }}
+                        </v-btn>
                     </v-card-title>
                     <v-card-text>
                         <v-list v-if="shareStore.accessRequests.size > 0">
                             <template
-                                v-for="request in shareStore.accessRequests.values()"
+                                v-for="(request, index) in Array.from(
+                                    shareStore.accessRequests.values()
+                                )"
                                 :key="request.id"
                             >
                                 <v-list-item>
@@ -115,6 +132,30 @@
                                     </v-list-item-title>
                                     <v-list-item-subtitle>
                                         {{ formatTime(request.requestedAt) }}
+                                        <template
+                                            v-if="
+                                                request.uploadRecords &&
+                                                request.uploadRecords.length > 1
+                                            "
+                                        >
+                                            ·
+                                            {{
+                                                t('share.uploads.fileCount', {
+                                                    count: request.uploadRecords
+                                                        .length,
+                                                })
+                                            }}
+                                            ·
+                                            {{
+                                                formatFileSize(
+                                                    request.uploadRecords.reduce(
+                                                        (sum, r) =>
+                                                            sum + r.totalBytes,
+                                                        0
+                                                    )
+                                                )
+                                            }}
+                                        </template>
                                     </v-list-item-subtitle>
                                     <template v-slot:append>
                                         <!-- 待处理状态：显示同意/拒绝按钮 -->
@@ -176,206 +217,240 @@
                                                 }}
                                             </v-chip>
                                         </template>
+                                        <!-- 移除按钮 -->
+                                        <v-btn
+                                            :icon="mdiDelete"
+                                            size="small"
+                                            variant="text"
+                                            color="grey"
+                                            @click="
+                                                showRemoveDialog(request.id)
+                                            "
+                                        />
                                     </template>
                                 </v-list-item>
 
-                                <!-- 下载记录列表 -->
+                                <!-- 上传记录列表 -->
                                 <div
                                     v-if="
-                                        request.downloadRecords &&
-                                        request.downloadRecords.length > 0
+                                        request.uploadRecords &&
+                                        request.uploadRecords.length > 0
                                     "
-                                    class="download-records-container ml-4 mr-4 mb-2"
+                                    class="upload-records-container ml-4 mr-4 mb-2"
                                 >
                                     <!-- 折叠状态：显示前 3 条 -->
-                                    <div
-                                        v-for="record in getVisibleRecords(
-                                            request
-                                        )"
-                                        :key="record.id"
-                                        class="download-record-item"
-                                    >
+                                    <template v-if="!isExpanded(request.id)">
                                         <div
-                                            class="d-flex align-center justify-space-between"
+                                            v-for="(
+                                                record, index
+                                            ) in request.uploadRecords.slice(
+                                                0,
+                                                3
+                                            )"
+                                            :key="record.id"
+                                            :class="[
+                                                'upload-record-item',
+                                                {
+                                                    'has-divider':
+                                                        index <
+                                                        request.uploadRecords.slice(
+                                                            0,
+                                                            3
+                                                        ).length -
+                                                            1,
+                                                },
+                                            ]"
                                         >
                                             <div
-                                                class="d-flex align-center flex-grow-1 text-truncate"
-                                                style="max-width: 65%"
-                                            >
-                                                <span
-                                                    class="text-body-2 text-truncate"
-                                                >
-                                                    {{ record.fileName }}
-                                                </span>
-                                                <span
-                                                    class="text-caption text-grey ml-2"
-                                                    style="white-space: nowrap"
-                                                >
-                                                    {{
-                                                        formatTime(
-                                                            record.startedAt
-                                                        )
-                                                    }}
-                                                </span>
-                                            </div>
-                                            <div
-                                                class="d-flex align-center ga-2"
-                                            >
-                                                <span
-                                                    v-if="
-                                                        record.status ===
-                                                        'transferring'
-                                                    "
-                                                    class="text-body-2 text-grey"
-                                                >
-                                                    {{
-                                                        formatSpeed(
-                                                            record.speed
-                                                        )
-                                                    }}
-                                                </span>
-                                                <span class="text-body-2">
-                                                    {{
-                                                        record.progress.toFixed(
-                                                            1
-                                                        )
-                                                    }}%
-                                                </span>
-                                                <v-chip
-                                                    :color="
-                                                        getDownloadStatusColor(
-                                                            record.status
-                                                        )
-                                                    "
-                                                    size="x-small"
-                                                    label
-                                                >
-                                                    {{
-                                                        getDownloadStatusText(
-                                                            record.status
-                                                        )
-                                                    }}
-                                                </v-chip>
-                                            </div>
-                                        </div>
-                                        <v-progress-linear
-                                            v-if="
-                                                record.status === 'transferring'
-                                            "
-                                            :model-value="record.progress"
-                                            color="primary"
-                                            height="3"
-                                            class="mt-1"
-                                        />
-                                    </div>
-
-                                    <!-- 展开状态：显示全部记录（可滚动） -->
-                                    <v-expand-transition>
-                                        <div
-                                            v-if="
-                                                isExpanded(request.id) &&
-                                                request.downloadRecords.length >
-                                                    3
-                                            "
-                                            class="expanded-records"
-                                        >
-                                            <div
-                                                v-for="record in getHiddenRecords(
-                                                    request
-                                                )"
-                                                :key="record.id"
-                                                class="download-record-item"
+                                                class="d-flex align-center justify-space-between"
                                             >
                                                 <div
-                                                    class="d-flex align-center justify-space-between"
+                                                    class="d-flex align-center flex-grow-1 text-truncate"
+                                                    style="max-width: 65%"
                                                 >
-                                                    <div
-                                                        class="d-flex align-center flex-grow-1 text-truncate"
-                                                        style="max-width: 65%"
+                                                    <span
+                                                        class="text-body-2 text-truncate"
                                                     >
-                                                        <span
-                                                            class="text-body-2 text-truncate"
-                                                        >
-                                                            {{
-                                                                record.fileName
-                                                            }}
-                                                        </span>
-                                                        <span
-                                                            class="text-caption text-grey ml-2"
-                                                            style="
-                                                                white-space: nowrap;
-                                                            "
-                                                        >
-                                                            {{
-                                                                formatTime(
-                                                                    record.startedAt
-                                                                )
-                                                            }}
-                                                        </span>
-                                                    </div>
-                                                    <div
-                                                        class="d-flex align-center ga-2"
+                                                        {{ record.fileName }}
+                                                    </span>
+                                                    <span
+                                                        class="text-caption text-grey ml-2"
+                                                        style="
+                                                            white-space: nowrap;
+                                                        "
                                                     >
-                                                        <span
-                                                            v-if="
-                                                                record.status ===
-                                                                'transferring'
-                                                            "
-                                                            class="text-body-2 text-grey"
-                                                        >
-                                                            {{
-                                                                formatSpeed(
-                                                                    record.speed
-                                                                )
-                                                            }}
-                                                        </span>
-                                                        <span
-                                                            class="text-body-2"
-                                                        >
-                                                            {{
-                                                                record.progress.toFixed(
-                                                                    1
-                                                                )
-                                                            }}%
-                                                        </span>
-                                                        <v-chip
-                                                            :color="
-                                                                getDownloadStatusColor(
-                                                                    record.status
-                                                                )
-                                                            "
-                                                            size="x-small"
-                                                            label
-                                                        >
-                                                            {{
-                                                                getDownloadStatusText(
-                                                                    record.status
-                                                                )
-                                                            }}
-                                                        </v-chip>
-                                                    </div>
+                                                        {{
+                                                            formatFileSize(
+                                                                record.totalBytes
+                                                            )
+                                                        }}
+                                                    </span>
                                                 </div>
-                                                <v-progress-linear
-                                                    v-if="
-                                                        record.status ===
-                                                        'transferring'
-                                                    "
-                                                    :model-value="
-                                                        record.progress
-                                                    "
-                                                    color="primary"
-                                                    height="3"
-                                                    class="mt-1"
-                                                />
+                                                <div
+                                                    class="d-flex align-center ga-2"
+                                                >
+                                                    <span
+                                                        v-if="
+                                                            record.status ===
+                                                            'transferring'
+                                                        "
+                                                        class="text-body-2 text-grey"
+                                                    >
+                                                        {{
+                                                            formatSpeed(
+                                                                record.speed
+                                                            )
+                                                        }}
+                                                    </span>
+                                                    <span class="text-body-2">
+                                                        {{
+                                                            record.progress.toFixed(
+                                                                1
+                                                            )
+                                                        }}%
+                                                    </span>
+                                                    <v-chip
+                                                        :color="
+                                                            getUploadStatusColor(
+                                                                record.status
+                                                            )
+                                                        "
+                                                        size="x-small"
+                                                        label
+                                                    >
+                                                        {{
+                                                            getUploadStatusText(
+                                                                record.status
+                                                            )
+                                                        }}
+                                                    </v-chip>
+                                                </div>
                                             </div>
+                                            <v-progress-linear
+                                                v-if="record.status !== 'idle'"
+                                                :model-value="record.progress"
+                                                :color="
+                                                    record.status ===
+                                                    'completed'
+                                                        ? 'success'
+                                                        : record.status ===
+                                                            'failed'
+                                                          ? 'error'
+                                                          : 'primary'
+                                                "
+                                                height="3"
+                                                class="mt-1"
+                                            />
                                         </div>
-                                    </v-expand-transition>
+                                    </template>
+
+                                    <!-- 展开状态：显示全部记录（可滚动） -->
+                                    <div
+                                        v-show="isExpanded(request.id)"
+                                        class="expanded-records"
+                                    >
+                                        <div
+                                            v-for="(
+                                                record, index
+                                            ) in request.uploadRecords"
+                                            :key="record.id"
+                                            :class="[
+                                                'upload-record-item',
+                                                {
+                                                    'has-divider':
+                                                        index <
+                                                        request.uploadRecords
+                                                            .length -
+                                                            1,
+                                                },
+                                            ]"
+                                        >
+                                            <div
+                                                class="d-flex align-center justify-space-between"
+                                            >
+                                                <div
+                                                    class="d-flex align-center flex-grow-1 text-truncate"
+                                                    style="max-width: 65%"
+                                                >
+                                                    <span
+                                                        class="text-body-2 text-truncate"
+                                                    >
+                                                        {{ record.fileName }}
+                                                    </span>
+                                                    <span
+                                                        class="text-caption text-grey ml-2"
+                                                        style="
+                                                            white-space: nowrap;
+                                                        "
+                                                    >
+                                                        {{
+                                                            formatFileSize(
+                                                                record.totalBytes
+                                                            )
+                                                        }}
+                                                    </span>
+                                                </div>
+                                                <div
+                                                    class="d-flex align-center ga-2"
+                                                >
+                                                    <span
+                                                        v-if="
+                                                            record.status ===
+                                                            'transferring'
+                                                        "
+                                                        class="text-body-2 text-grey"
+                                                    >
+                                                        {{
+                                                            formatSpeed(
+                                                                record.speed
+                                                            )
+                                                        }}
+                                                    </span>
+                                                    <span class="text-body-2">
+                                                        {{
+                                                            record.progress.toFixed(
+                                                                1
+                                                            )
+                                                        }}%
+                                                    </span>
+                                                    <v-chip
+                                                        :color="
+                                                            getUploadStatusColor(
+                                                                record.status
+                                                            )
+                                                        "
+                                                        size="x-small"
+                                                        label
+                                                    >
+                                                        {{
+                                                            getUploadStatusText(
+                                                                record.status
+                                                            )
+                                                        }}
+                                                    </v-chip>
+                                                </div>
+                                            </div>
+                                            <v-progress-linear
+                                                v-if="record.status !== 'idle'"
+                                                :model-value="record.progress"
+                                                :color="
+                                                    record.status ===
+                                                    'completed'
+                                                        ? 'success'
+                                                        : record.status ===
+                                                            'failed'
+                                                          ? 'error'
+                                                          : 'primary'
+                                                "
+                                                height="3"
+                                                class="mt-1"
+                                            />
+                                        </div>
+                                    </div>
 
                                     <!-- 折叠/展开控件（超过 3 条时显示） -->
                                     <div
-                                        v-if="
-                                            request.downloadRecords.length > 3
-                                        "
+                                        v-if="request.uploadRecords.length > 3"
                                         class="text-center mt-1"
                                     >
                                         <v-btn
@@ -389,11 +464,11 @@
                                             >
                                                 {{
                                                     t(
-                                                        'share.downloads.moreRecords',
+                                                        'share.uploads.moreRecords',
                                                         {
                                                             count:
                                                                 request
-                                                                    .downloadRecords
+                                                                    .uploadRecords
                                                                     .length - 3,
                                                         }
                                                     )
@@ -401,16 +476,23 @@
                                             </template>
                                             <template v-else>
                                                 {{
-                                                    t(
-                                                        'share.downloads.collapse'
-                                                    )
+                                                    t('share.uploads.collapse')
                                                 }}
                                             </template>
                                         </v-btn>
                                     </div>
                                 </div>
 
-                                <v-divider />
+                                <!-- 只在不是最后一条请求时显示分隔线 -->
+                                <v-divider
+                                    v-if="
+                                        index <
+                                        Array.from(
+                                            shareStore.accessRequests.values()
+                                        ).length -
+                                            1
+                                    "
+                                />
                             </template>
                         </v-list>
                         <div v-else class="text-body-2 text-grey">
@@ -438,6 +520,56 @@
             @confirm="handleConfirmPin"
         />
 
+        <!-- 移除单个请求确认对话框 -->
+        <v-dialog v-model="removeDialog" max-width="400">
+            <v-card>
+                <v-card-title>{{
+                    t('share.removeConfirm.title')
+                }}</v-card-title>
+                <v-card-text>
+                    {{ t('share.removeConfirm.message') }}
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn variant="text" @click="removeDialog = false">
+                        {{ t('common.cancel') }}
+                    </v-btn>
+                    <v-btn color="error" variant="flat" @click="confirmRemove">
+                        {{ t('common.remove') }}
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <!-- 移除全部请求确认对话框 -->
+        <v-dialog v-model="showClearAllDialog" max-width="400">
+            <v-card>
+                <v-card-title>{{
+                    t('share.clearAllConfirm.title')
+                }}</v-card-title>
+                <v-card-text>
+                    {{
+                        t('share.clearAllConfirm.message', {
+                            count: shareStore.accessRequests.size,
+                        })
+                    }}
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn variant="text" @click="showClearAllDialog = false">
+                        {{ t('common.cancel') }}
+                    </v-btn>
+                    <v-btn
+                        color="error"
+                        variant="flat"
+                        @click="confirmClearAll"
+                    >
+                        {{ t('share.requests.clearAll') }}
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
         <!-- 错误提示 -->
         <v-snackbar v-model="showError" color="error" :timeout="5000">
             {{ errorMessage }}
@@ -456,13 +588,23 @@ import {
     PinConfigDialog,
 } from '../components/transfer'
 import { updateShareSettingsService } from '../services/shareService'
-import type {
-    ShareSettings,
-    AccessRequest,
-    ShareTransferStatus,
-} from '../types'
+import type { ShareSettings, ShareTransferStatus } from '../types'
 import { formatSpeed } from '../types/transfer'
-import { mdiArrowLeft, mdiCheck, mdiClose } from '@mdi/js'
+
+function formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 B'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+import {
+    mdiArrowLeft,
+    mdiCheck,
+    mdiClose,
+    mdiDelete,
+    mdiDeleteSweep,
+} from '@mdi/js'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -473,6 +615,9 @@ const showError = ref(false)
 const errorMessage = ref('')
 const showShareSettings = ref(false)
 const showPinConfig = ref(false)
+const removeDialog = ref(false)
+const showClearAllDialog = ref(false)
+const requestIdToRemove = ref<string>('')
 const shareSettings = ref<ShareSettings>({
     pinEnabled: false,
     pin: '',
@@ -503,23 +648,8 @@ function toggleExpand(requestId: string): void {
     expandedRequests.value = newSet
 }
 
-// 获取可见的下载记录（折叠状态下最多 3 条）
-function getVisibleRecords(request: AccessRequest) {
-    if (!request.downloadRecords) return []
-    if (request.downloadRecords.length <= 3 || isExpanded(request.id)) {
-        return request.downloadRecords
-    }
-    return request.downloadRecords.slice(0, 3)
-}
-
-// 获取隐藏的下载记录（展开时显示第 4 条及之后的记录）
-function getHiddenRecords(request: AccessRequest) {
-    if (!request.downloadRecords) return []
-    return request.downloadRecords.slice(3)
-}
-
-// 获取下载状态颜色
-function getDownloadStatusColor(status: ShareTransferStatus): string {
+// 获取上传状态颜色
+function getUploadStatusColor(status: ShareTransferStatus): string {
     const colorMap: Record<ShareTransferStatus, string> = {
         idle: 'grey',
         transferring: 'primary',
@@ -530,8 +660,8 @@ function getDownloadStatusColor(status: ShareTransferStatus): string {
     return colorMap[status] || 'grey'
 }
 
-// 获取下载状态文本
-function getDownloadStatusText(status: ShareTransferStatus): string {
+// 获取上传状态文本
+function getUploadStatusText(status: ShareTransferStatus): string {
     const keyMap: Record<ShareTransferStatus, string> = {
         idle: 'share.transfer.idle',
         transferring: 'share.transfer.transferring',
@@ -624,6 +754,35 @@ async function handleRejectRequest(requestId: string) {
     }
 }
 
+// 显示移除单个请求对话框
+function showRemoveDialog(requestId: string) {
+    requestIdToRemove.value = requestId
+    removeDialog.value = true
+}
+
+// 确认移除单个请求
+async function confirmRemove() {
+    try {
+        await shareStore.removeRequest(requestIdToRemove.value)
+        removeDialog.value = false
+        requestIdToRemove.value = ''
+    } catch (error) {
+        showError.value = true
+        errorMessage.value = t('share.removeError', { error })
+    }
+}
+
+// 确认移除全部请求
+async function confirmClearAll() {
+    try {
+        await shareStore.clearRequests()
+        showClearAllDialog.value = false
+    } catch (error) {
+        showError.value = true
+        errorMessage.value = t('share.clearAllError', { error })
+    }
+}
+
 // 监听事件
 onMounted(async () => {
     // 自动开始分享（使用 store 中的方法，事件监听已在 store 中设置）
@@ -659,19 +818,18 @@ onUnmounted(() => {
     margin: 0 auto;
 }
 
-.download-records-container {
+.upload-records-container {
     background: rgba(var(--v-theme-surface-variant), 0.05);
     border-radius: 4px;
     padding: 8px;
 }
 
-.download-record-item {
+.upload-record-item {
     padding: 4px 8px;
-    border-bottom: 1px solid rgba(var(--v-border-color), 0.08);
 }
 
-.download-record-item:last-child {
-    border-bottom: none;
+.upload-record-item.has-divider {
+    border-bottom: 1px solid rgba(var(--v-border-color), 0.08);
 }
 
 .expanded-records {

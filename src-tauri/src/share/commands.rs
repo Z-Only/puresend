@@ -178,6 +178,49 @@ pub async fn reject_access_request(
     Ok(())
 }
 
+/// 移除单个访问请求
+#[tauri::command]
+pub async fn remove_access_request(
+    app: AppHandle,
+    state: State<'_, ShareManagerState>,
+    request_id: String,
+) -> Result<(), String> {
+    let mut share_state = state.share_state.lock().await;
+
+    if share_state.remove_request(&request_id).is_some() {
+        // 发送事件通知
+        let _ = app.emit("access-request-removed", request_id);
+    } else {
+        return Err("请求不存在".to_string());
+    }
+
+    Ok(())
+}
+
+/// 移除所有访问请求
+#[tauri::command]
+pub async fn clear_access_requests(
+    app: AppHandle,
+    state: State<'_, ShareManagerState>,
+) -> Result<(), String> {
+    let mut share_state = state.share_state.lock().await;
+
+    let removed_ids: Vec<String> = share_state
+        .access_requests
+        .keys()
+        .cloned()
+        .collect();
+
+    share_state.access_requests.clear();
+
+    // 发送事件通知
+    for request_id in removed_ids {
+        let _ = app.emit("access-request-removed", request_id);
+    }
+
+    Ok(())
+}
+
 /// 更新分享设置
 #[tauri::command]
 pub async fn update_share_settings(
