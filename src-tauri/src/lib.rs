@@ -69,6 +69,7 @@ pub fn run() {
             crate::share::reject_access_request,
             crate::share::remove_access_request,
             crate::share::clear_access_requests,
+            crate::share::update_share_files,
             crate::share::update_share_settings,
             // Web upload commands
             crate::web_upload::start_web_upload,

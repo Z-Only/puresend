@@ -12,6 +12,7 @@ import type {
     ContentType,
     UploadRecord,
     UploadProgress,
+    SendTaskFileItem,
 } from '../types'
 import { DEFAULT_MAX_HISTORY_COUNT } from '../types/transfer'
 import type { SelectedFileItem } from '../types/content'
@@ -19,6 +20,7 @@ import type { UnlistenFn } from '@tauri-apps/api/event'
 import {
     startShareService,
     stopShareService,
+    updateShareFilesService,
     acceptAccessRequest,
     rejectAccessRequest,
     removeAccessRequest,
@@ -103,36 +105,81 @@ export const useShareStore = defineStore('share', () => {
     // ============ 方法 ============
 
     /**
+     * 将访问请求同步到 transferStore.sendTaskItems
+     */
+    async function syncAccessRequestToSendTask(
+        request: AccessRequest,
+        approvalStatus: 'pending' | 'accepted' | 'rejected'
+    ) {
+        const { useTransferStore } = await import('./transfer')
+        const transferStore = useTransferStore()
+        const taskId = `web-${request.id}`
+
+        const existingTask = transferStore.sendTaskItems.get(taskId)
+        if (existingTask) {
+            // 更新已有任务的审批状态
+            transferStore.sendTaskItems.set(taskId, {
+                ...existingTask,
+                approvalStatus,
+            })
+        } else {
+            // 创建新的发送任务
+            transferStore.sendTaskItems.set(taskId, {
+                id: taskId,
+                source: 'webDownload',
+                receiverLabel: request.userAgent || '',
+                receiverIp: request.ip,
+                files: [],
+                fileCount: 0,
+                totalSize: 0,
+                totalTransferredBytes: 0,
+                approvalStatus,
+                transferStatus: 'pending',
+                progress: 0,
+                speed: 0,
+                createdAt: request.requestedAt,
+                originalRequestId: request.id,
+            })
+        }
+    }
+
+    /**
      * 处理访问请求事件
      */
-    function handleAccessRequest(request: AccessRequest) {
+    async function handleAccessRequest(request: AccessRequest) {
         accessRequests.value.set(request.id, { ...request })
+        await syncAccessRequestToSendTask(
+            request,
+            request.status as 'pending' | 'accepted' | 'rejected'
+        )
     }
 
     /**
      * 处理访问请求被接受事件
      */
-    function handleAccessRequestAccepted(request: AccessRequest) {
+    async function handleAccessRequestAccepted(request: AccessRequest) {
         const existingRequest = accessRequests.value.get(request.id)
         if (existingRequest) {
             accessRequests.value.set(request.id, { ...request })
         }
+        await syncAccessRequestToSendTask(request, 'accepted')
     }
 
     /**
      * 处理访问请求被拒绝事件
      */
-    function handleAccessRequestRejected(request: AccessRequest) {
+    async function handleAccessRequestRejected(request: AccessRequest) {
         const existingRequest = accessRequests.value.get(request.id)
         if (existingRequest) {
             accessRequests.value.set(request.id, { ...request })
         }
+        await syncAccessRequestToSendTask(request, 'rejected')
     }
 
     /**
      * 处理上传进度事件
      */
-    function handleUploadProgress(progress: UploadProgress) {
+    async function handleUploadProgress(progress: UploadProgress) {
         for (const [requestId, request] of accessRequests.value.entries()) {
             const recordIndex = request.uploadRecords.findIndex(
                 (r) => r.id === progress.uploadId
@@ -151,15 +198,94 @@ export const useShareStore = defineStore('share', () => {
                     ...request,
                     uploadRecords: updatedRecords,
                 })
+
+                // 同步到 sendTaskItems
+                await syncUploadRecordToSendTask(
+                    request.id,
+                    progress.uploadId,
+                    {
+                        transferredBytes: progress.uploadedBytes,
+                        progress: progress.progress,
+                        speed: progress.speed,
+                        status: 'transferring',
+                    }
+                )
                 break
             }
         }
     }
 
     /**
+     * 同步上传记录到 sendTaskItems 的 files 数组
+     */
+    async function syncUploadRecordToSendTask(
+        requestId: string,
+        uploadId: string,
+        update: {
+            transferredBytes?: number
+            progress?: number
+            speed?: number
+            status?: string
+            startedAt?: number
+        }
+    ) {
+        const { useTransferStore } = await import('./transfer')
+        const transferStore = useTransferStore()
+        const taskId = `web-${requestId}`
+        const task = transferStore.sendTaskItems.get(taskId)
+        if (!task) return
+
+        const fileIndex = task.files.findIndex((f) => f.uploadId === uploadId)
+        if (fileIndex === -1) return
+
+        const updatedFiles = [...task.files]
+        updatedFiles[fileIndex] = {
+            ...updatedFiles[fileIndex],
+            ...(update.transferredBytes !== undefined && {
+                transferredBytes: update.transferredBytes,
+            }),
+            ...(update.progress !== undefined && {
+                progress: update.progress,
+            }),
+            ...(update.speed !== undefined && { speed: update.speed }),
+            ...(update.status !== undefined && {
+                status: update.status as any,
+            }),
+            ...(update.startedAt !== undefined && {
+                startedAt: update.startedAt,
+            }),
+        }
+
+        // 计算整体进度
+        const totalSize = updatedFiles.reduce((sum, f) => sum + f.size, 0)
+        const totalTransferred = updatedFiles.reduce(
+            (sum, f) => sum + f.transferredBytes,
+            0
+        )
+        const overallProgress =
+            totalSize > 0 ? Math.round((totalTransferred / totalSize) * 100) : 0
+        const overallSpeed = updatedFiles.reduce(
+            (sum, f) => sum + (f.status === 'transferring' ? f.speed : 0),
+            0
+        )
+        const allCompleted = updatedFiles.every((f) => f.status === 'completed')
+
+        transferStore.sendTaskItems.set(taskId, {
+            ...task,
+            files: updatedFiles,
+            fileCount: updatedFiles.length,
+            totalSize,
+            totalTransferredBytes: totalTransferred,
+            progress: overallProgress,
+            speed: overallSpeed,
+            transferStatus: allCompleted ? 'completed' : 'transferring',
+        })
+    }
+
+    /**
      * 处理上传开始事件
      */
-    function handleUploadStart(payload: UploadStartPayload) {
+    async function handleUploadStart(payload: UploadStartPayload) {
         console.log('上传开始:', payload)
         const request = Array.from(accessRequests.value.values()).find(
             (r) => r.ip === payload.client_ip
@@ -179,6 +305,31 @@ export const useShareStore = defineStore('share', () => {
                 ...request,
                 uploadRecords: [newRecord, ...request.uploadRecords],
             })
+
+            // 同步到 sendTaskItems 的 files 数组
+            const { useTransferStore } = await import('./transfer')
+            const transferStore = useTransferStore()
+            const taskId = `web-${request.id}`
+            const task = transferStore.sendTaskItems.get(taskId)
+            if (task) {
+                const newFileItem: SendTaskFileItem = {
+                    name: payload.file_name,
+                    size: payload.file_size,
+                    transferredBytes: 0,
+                    progress: 0,
+                    speed: 0,
+                    status: 'transferring',
+                    startedAt: Date.now(),
+                    uploadId: payload.upload_id,
+                }
+                transferStore.sendTaskItems.set(taskId, {
+                    ...task,
+                    files: [newFileItem, ...task.files],
+                    fileCount: task.files.length + 1,
+                    totalSize: task.totalSize + payload.file_size,
+                    transferStatus: 'transferring',
+                })
+            }
         }
     }
 
@@ -188,11 +339,14 @@ export const useShareStore = defineStore('share', () => {
     async function handleUploadComplete(payload: UploadCompletePayload) {
         console.log('上传完成:', payload)
 
+        let matchedRequestId: string | null = null
+
         for (const [requestId, request] of accessRequests.value.entries()) {
             const recordIndex = request.uploadRecords.findIndex(
                 (r) => r.id === payload.upload_id
             )
             if (recordIndex !== -1) {
+                matchedRequestId = requestId
                 const updatedRecords = [...request.uploadRecords]
                 updatedRecords[recordIndex] = {
                     ...updatedRecords[recordIndex],
@@ -208,6 +362,20 @@ export const useShareStore = defineStore('share', () => {
                 })
                 break
             }
+        }
+
+        // 同步到 sendTaskItems
+        if (matchedRequestId) {
+            await syncUploadRecordToSendTask(
+                matchedRequestId,
+                payload.upload_id,
+                {
+                    transferredBytes: payload.file_size,
+                    progress: 100,
+                    speed: 0,
+                    status: 'completed',
+                }
+            )
         }
 
         // 检查是否需要记录历史
@@ -470,6 +638,27 @@ export const useShareStore = defineStore('share', () => {
     }
 
     /**
+     * 更新分享文件列表（动态同步已选文件到后端 HTTP 服务器）
+     * @param files 新的文件元数据列表
+     */
+    async function updateShareFiles(files: FileMetadata[]): Promise<void> {
+        if (!isSharing.value) return
+
+        try {
+            await updateShareFilesService(files)
+            // 同步更新本地 shareInfo 中的文件列表
+            if (shareInfo.value) {
+                shareInfo.value = {
+                    ...shareInfo.value,
+                    files,
+                }
+            }
+        } catch (e) {
+            console.error('更新分享文件列表失败:', e)
+        }
+    }
+
+    /**
      * 清空已选文件
      */
     function clearSelectedFiles(): void {
@@ -517,6 +706,7 @@ export const useShareStore = defineStore('share', () => {
         // 方法
         startShare,
         stopShare,
+        updateShareFiles,
         acceptRequest,
         rejectRequest,
         removeRequest,

@@ -86,6 +86,16 @@ export async function clearAccessRequests(): Promise<void> {
 }
 
 /**
+ * 更新分享文件列表
+ * @param files 新的文件列表
+ */
+export async function updateShareFilesService(
+    files: FileMetadata[]
+): Promise<void> {
+    return invoke('update_share_files', { files })
+}
+
+/**
  * 更新分享设置
  * @param settings 分享设置
  */

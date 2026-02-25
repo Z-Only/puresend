@@ -59,21 +59,18 @@
                 <ModeSwitcher
                     v-model="transferMode"
                     :online-peer-count="discoveryStore.onlineCount"
-                    class="mt-4"
+                    class="mt-4 mb-4"
                 />
 
-                <!-- 发送模式选择器（仅本地网络模式下显示） -->
-                <SendModeSelector
+                <!-- 发送设置卡片 -->
+                <SendSettingsCard
                     v-if="transferMode === 'local'"
-                    v-model="sendMode"
-                    :has-selected-files="selectedFiles.count.value > 0"
                     class="mt-4"
-                    @change="handleSendModeChange"
                 />
 
-                <!-- 设备列表（P2P 模式 + 本地网络模式） -->
+                <!-- 设备列表（本地网络模式） -->
                 <PeerList
-                    v-if="sendMode === 'p2p' && transferMode === 'local'"
+                    v-if="transferMode === 'local'"
                     :peers="discoveryStore.peerList"
                     :selected-peer-id="selectedPeerId"
                     :loading="discoveryStore.scanning"
@@ -82,64 +79,502 @@
                     @refresh="handlePeerRefresh"
                     @add-manual="handleAddManual"
                 />
-
-                <!-- 分享链接面板（链接分享模式 + 本地网络模式） -->
-                <LinkSharePanel
-                    v-else-if="sendMode === 'link' && transferMode === 'local'"
-                    :files="[...selectedFiles.files.value]"
-                    class="mt-4"
-                    @start-share="handleStartShare"
-                    @stop-share="handleStopShare"
-                    @settings="handleShareSettings"
-                />
             </v-col>
 
-            <!-- 右侧：发送任务进度 -->
+            <!-- 右侧：发送任务列表 -->
             <v-col cols="12" md="6">
                 <v-card class="mb-4">
                     <v-card-title
                         class="d-flex align-center justify-space-between"
                     >
-                        <span>{{ t('send.tasks') }}</span>
+                        <div class="d-flex align-center">
+                            <span>{{ t('send.tasks') }}</span>
+                            <v-chip
+                                v-if="transferStore.pendingSendTasks.length > 0"
+                                color="error"
+                                size="small"
+                                class="ml-2"
+                            >
+                                {{ transferStore.pendingSendTasks.length }}
+                            </v-chip>
+                        </div>
                         <v-btn
-                            v-if="transferStore.sendTasks.length > 0"
-                            color="primary"
+                            v-if="transferStore.unifiedSendTasks.length > 0"
+                            :prepend-icon="mdiDeleteSweep"
                             variant="text"
                             size="small"
-                            @click="handleCleanup"
+                            color="error"
+                            @click="showClearAllDialog = true"
                         >
-                            {{ t('send.cleanup') }}
+                            {{ t('send.task.clearAll') }}
                         </v-btn>
                     </v-card-title>
+                    <v-card-text>
+                        <!-- 空状态 -->
+                        <div
+                            v-if="transferStore.unifiedSendTasks.length === 0"
+                            class="d-flex flex-column align-center justify-center py-8"
+                        >
+                            <v-icon
+                                :icon="mdiInboxArrowUp"
+                                size="64"
+                                color="grey"
+                                class="mb-4"
+                            />
+                            <div class="text-h6 text-grey">
+                                {{ t('send.noTasks') }}
+                            </div>
+                            <div class="text-body-2 text-grey">
+                                {{ t('send.selectFileToStart') }}
+                            </div>
+                        </div>
+
+                        <!-- 统一发送任务列表 -->
+                        <v-list
+                            v-if="transferStore.unifiedSendTasks.length > 0"
+                        >
+                            <template
+                                v-for="(task, index) in visibleSendTasks"
+                                :key="task.id"
+                            >
+                                <v-list-item>
+                                    <v-list-item-title>
+                                        {{ task.receiverIp }}
+                                        <span
+                                            v-if="task.receiverLabel"
+                                            class="text-grey ml-2"
+                                        >
+                                            {{ task.receiverLabel }}
+                                        </span>
+                                    </v-list-item-title>
+                                    <v-list-item-subtitle>
+                                        {{ formatTime(task.createdAt) }}
+                                        <template v-if="task.fileCount > 0">
+                                            ·
+                                            {{
+                                                t('send.task.fileCount', {
+                                                    count: task.fileCount,
+                                                })
+                                            }}
+                                            ·
+                                            {{ formatFileSize(task.totalSize) }}
+                                        </template>
+                                        <template
+                                            v-if="
+                                                task.transferStatus ===
+                                                    'transferring' &&
+                                                task.progress > 0
+                                            "
+                                        >
+                                            · {{ task.progress }}% ·
+                                            {{ formatSpeed(task.speed) }}
+                                        </template>
+                                    </v-list-item-subtitle>
+                                    <template v-slot:append>
+                                        <!-- Web 下载任务：显示同意/拒绝按钮 -->
+                                        <template
+                                            v-if="
+                                                task.source === 'webDownload' &&
+                                                task.approvalStatus ===
+                                                    'pending'
+                                            "
+                                        >
+                                            <v-btn
+                                                :icon="mdiCheck"
+                                                size="small"
+                                                variant="text"
+                                                color="success"
+                                                @click="
+                                                    handleAcceptTask(task.id)
+                                                "
+                                            />
+                                            <v-btn
+                                                :icon="mdiClose"
+                                                size="small"
+                                                variant="text"
+                                                color="error"
+                                                @click="
+                                                    handleRejectTask(task.id)
+                                                "
+                                            />
+                                        </template>
+                                        <!-- P2P 任务 pending 状态 -->
+                                        <template
+                                            v-else-if="
+                                                task.source === 'p2p' &&
+                                                task.approvalStatus ===
+                                                    'pending'
+                                            "
+                                        >
+                                            <v-chip
+                                                color="info"
+                                                size="small"
+                                                label
+                                            >
+                                                {{
+                                                    t(
+                                                        'send.task.approval.waitingResponse'
+                                                    )
+                                                }}
+                                            </v-chip>
+                                        </template>
+                                        <!-- 已接受状态 -->
+                                        <template
+                                            v-else-if="
+                                                task.approvalStatus ===
+                                                'accepted'
+                                            "
+                                        >
+                                            <v-chip
+                                                color="success"
+                                                size="small"
+                                                label
+                                            >
+                                                {{
+                                                    t(
+                                                        'send.task.approval.accepted'
+                                                    )
+                                                }}
+                                            </v-chip>
+                                        </template>
+                                        <!-- 已拒绝状态 -->
+                                        <template
+                                            v-else-if="
+                                                task.approvalStatus ===
+                                                'rejected'
+                                            "
+                                        >
+                                            <v-chip
+                                                color="error"
+                                                size="small"
+                                                label
+                                            >
+                                                {{
+                                                    t(
+                                                        'send.task.approval.rejected'
+                                                    )
+                                                }}
+                                            </v-chip>
+                                        </template>
+                                        <!-- 移除按钮 -->
+                                        <v-btn
+                                            :icon="mdiDelete"
+                                            size="small"
+                                            variant="text"
+                                            color="grey"
+                                            @click="
+                                                showRemoveTaskDialog(task.id)
+                                            "
+                                        />
+                                    </template>
+                                </v-list-item>
+
+                                <!-- 文件发送详情列表 -->
+                                <div
+                                    v-if="
+                                        task.approvalStatus === 'accepted' &&
+                                        task.files.length > 0
+                                    "
+                                    class="upload-records-container ml-4 mr-4 mb-2"
+                                >
+                                    <!-- 折叠状态：显示前 3 条 -->
+                                    <template v-if="!isTaskExpanded(task.id)">
+                                        <div
+                                            v-for="(
+                                                file, fileIndex
+                                            ) in task.files.slice(0, 3)"
+                                            :key="file.name"
+                                            :class="[
+                                                'upload-record-item',
+                                                {
+                                                    'has-divider':
+                                                        fileIndex <
+                                                        task.files.slice(0, 3)
+                                                            .length -
+                                                            1,
+                                                },
+                                            ]"
+                                        >
+                                            <div
+                                                class="d-flex align-center justify-space-between"
+                                            >
+                                                <div
+                                                    class="d-flex align-center flex-grow-1 text-truncate"
+                                                    style="max-width: 65%"
+                                                >
+                                                    <span
+                                                        class="text-body-2 text-truncate"
+                                                    >
+                                                        {{ file.name }}
+                                                    </span>
+                                                    <span
+                                                        v-if="file.startedAt"
+                                                        class="text-caption text-grey ml-2"
+                                                        style="
+                                                            white-space: nowrap;
+                                                        "
+                                                    >
+                                                        {{
+                                                            formatTime(
+                                                                file.startedAt
+                                                            )
+                                                        }}
+                                                    </span>
+                                                    <span
+                                                        class="text-caption text-grey ml-2"
+                                                        style="
+                                                            white-space: nowrap;
+                                                        "
+                                                    >
+                                                        {{
+                                                            formatFileSize(
+                                                                file.size
+                                                            )
+                                                        }}
+                                                    </span>
+                                                </div>
+                                                <div
+                                                    class="d-flex align-center ga-2"
+                                                >
+                                                    <span
+                                                        v-if="
+                                                            file.status ===
+                                                            'transferring'
+                                                        "
+                                                        class="text-body-2 text-grey"
+                                                    >
+                                                        {{
+                                                            formatSpeed(
+                                                                file.speed
+                                                            )
+                                                        }}
+                                                    </span>
+                                                    <span class="text-body-2">
+                                                        {{
+                                                            file.progress.toFixed(
+                                                                1
+                                                            )
+                                                        }}%
+                                                    </span>
+                                                    <v-chip
+                                                        :color="
+                                                            getFileStatusColor(
+                                                                file.status
+                                                            )
+                                                        "
+                                                        size="x-small"
+                                                        label
+                                                    >
+                                                        {{
+                                                            getFileStatusText(
+                                                                file.status
+                                                            )
+                                                        }}
+                                                    </v-chip>
+                                                </div>
+                                            </div>
+                                            <v-progress-linear
+                                                v-if="file.status !== 'pending'"
+                                                :model-value="file.progress"
+                                                :color="
+                                                    file.status === 'completed'
+                                                        ? 'success'
+                                                        : file.status ===
+                                                            'failed'
+                                                          ? 'error'
+                                                          : 'primary'
+                                                "
+                                                height="3"
+                                                class="mt-1"
+                                            />
+                                        </div>
+                                    </template>
+
+                                    <!-- 展开状态：显示最多10条文件（可滚动） -->
+                                    <div
+                                        v-show="isTaskExpanded(task.id)"
+                                        class="expanded-records"
+                                    >
+                                        <div
+                                            v-for="(
+                                                file, fileIndex
+                                            ) in task.files.slice(0, 10)"
+                                            :key="file.name"
+                                            :class="[
+                                                'upload-record-item',
+                                                {
+                                                    'has-divider':
+                                                        fileIndex <
+                                                        task.files.slice(0, 10)
+                                                            .length -
+                                                            1,
+                                                },
+                                            ]"
+                                        >
+                                            <div
+                                                class="d-flex align-center justify-space-between"
+                                            >
+                                                <div
+                                                    class="d-flex align-center flex-grow-1 text-truncate"
+                                                    style="max-width: 65%"
+                                                >
+                                                    <span
+                                                        class="text-body-2 text-truncate"
+                                                    >
+                                                        {{ file.name }}
+                                                    </span>
+                                                    <span
+                                                        v-if="file.startedAt"
+                                                        class="text-caption text-grey ml-2"
+                                                        style="
+                                                            white-space: nowrap;
+                                                        "
+                                                    >
+                                                        {{
+                                                            formatTime(
+                                                                file.startedAt
+                                                            )
+                                                        }}
+                                                    </span>
+                                                    <span
+                                                        class="text-caption text-grey ml-2"
+                                                        style="
+                                                            white-space: nowrap;
+                                                        "
+                                                    >
+                                                        {{
+                                                            formatFileSize(
+                                                                file.size
+                                                            )
+                                                        }}
+                                                    </span>
+                                                </div>
+                                                <div
+                                                    class="d-flex align-center ga-2"
+                                                >
+                                                    <span
+                                                        v-if="
+                                                            file.status ===
+                                                            'transferring'
+                                                        "
+                                                        class="text-body-2 text-grey"
+                                                    >
+                                                        {{
+                                                            formatSpeed(
+                                                                file.speed
+                                                            )
+                                                        }}
+                                                    </span>
+                                                    <span class="text-body-2">
+                                                        {{
+                                                            file.progress.toFixed(
+                                                                1
+                                                            )
+                                                        }}%
+                                                    </span>
+                                                    <v-chip
+                                                        :color="
+                                                            getFileStatusColor(
+                                                                file.status
+                                                            )
+                                                        "
+                                                        size="x-small"
+                                                        label
+                                                    >
+                                                        {{
+                                                            getFileStatusText(
+                                                                file.status
+                                                            )
+                                                        }}
+                                                    </v-chip>
+                                                </div>
+                                            </div>
+                                            <v-progress-linear
+                                                v-if="file.status !== 'pending'"
+                                                :model-value="file.progress"
+                                                :color="
+                                                    file.status === 'completed'
+                                                        ? 'success'
+                                                        : file.status ===
+                                                            'failed'
+                                                          ? 'error'
+                                                          : 'primary'
+                                                "
+                                                height="3"
+                                                class="mt-1"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <!-- 折叠/展开控件（超过 3 条时显示） -->
+                                    <div
+                                        v-if="task.files.length > 3"
+                                        class="text-center mt-1"
+                                    >
+                                        <v-btn
+                                            variant="text"
+                                            size="small"
+                                            density="compact"
+                                            @click="toggleFileList(task.id)"
+                                        >
+                                            <template
+                                                v-if="!isTaskExpanded(task.id)"
+                                            >
+                                                {{
+                                                    t('send.task.moreFiles', {
+                                                        count:
+                                                            task.files.length -
+                                                            3,
+                                                    })
+                                                }}
+                                            </template>
+                                            <template v-else>
+                                                {{
+                                                    t('send.task.collapseFiles')
+                                                }}
+                                            </template>
+                                        </v-btn>
+                                    </div>
+                                </div>
+
+                                <!-- 错误信息 -->
+                                <v-alert
+                                    v-if="task.error"
+                                    type="error"
+                                    variant="tonal"
+                                    class="mx-4 mb-2"
+                                    density="compact"
+                                >
+                                    {{ task.error }}
+                                </v-alert>
+
+                                <!-- 只在不是最后一条任务时显示分隔线 -->
+                                <v-divider
+                                    v-if="index < visibleSendTasks.length - 1"
+                                />
+                            </template>
+                        </v-list>
+
+                        <!-- 展开/收起任务列表按钮 -->
+                        <div
+                            v-if="transferStore.unifiedSendTasks.length > 3"
+                            class="text-center mt-2"
+                        >
+                            <v-btn
+                                variant="text"
+                                size="small"
+                                @click="taskListExpanded = !taskListExpanded"
+                            >
+                                {{
+                                    taskListExpanded
+                                        ? t('send.task.collapse')
+                                        : t('send.task.expand')
+                                }}
+                                ({{ transferStore.unifiedSendTasks.length }})
+                            </v-btn>
+                        </div>
+                    </v-card-text>
                 </v-card>
-
-                <!-- 空状态 -->
-                <div
-                    v-if="transferStore.sendTasks.length === 0"
-                    class="d-flex flex-column align-center justify-center py-8"
-                >
-                    <v-icon
-                        :icon="mdiInboxArrowUp"
-                        size="64"
-                        color="grey"
-                        class="mb-4"
-                    />
-                    <div class="text-h6 text-grey">{{ t('send.noTasks') }}</div>
-                    <div class="text-body-2 text-grey">
-                        {{ t('send.selectFileToStart') }}
-                    </div>
-                </div>
-
-                <!-- 任务列表 -->
-                <ProgressDisplay
-                    v-for="task in transferStore.sendTasks"
-                    :key="task.id"
-                    :task="task"
-                    class="mb-4"
-                    @cancel="handleCancel"
-                    @retry="handleRetry"
-                    @remove="handleRemoveTask"
-                />
             </v-col>
         </v-row>
 
@@ -148,7 +583,7 @@
             v-if="
                 selectedFiles.count.value > 0 &&
                 selectedPeerId &&
-                sendMode === 'p2p'
+                transferMode === 'local'
             "
             color="primary"
             :icon="mdiSend"
@@ -172,20 +607,65 @@
             {{ errorMessage }}
         </v-snackbar>
 
-        <!-- 分享设置对话框 -->
-        <ShareSettingsDialog
-            :visible="showShareSettings"
-            :settings="shareSettings"
-            @update:visible="showShareSettings = $event"
-            @update:settings="handleApplyShareSettings"
-        />
+        <!-- 移除单个任务确认对话框 -->
+        <v-dialog v-model="removeDialog" max-width="400">
+            <v-card>
+                <v-card-title>{{
+                    t('send.task.removeConfirm.title')
+                }}</v-card-title>
+                <v-card-text>
+                    {{ t('send.task.removeConfirm.message') }}
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn variant="text" @click="removeDialog = false">
+                        {{ t('common.cancel') }}
+                    </v-btn>
+                    <v-btn
+                        color="error"
+                        variant="flat"
+                        @click="confirmRemoveTask"
+                    >
+                        {{ t('common.remove') }}
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <!-- 移除全部任务确认对话框 -->
+        <v-dialog v-model="showClearAllDialog" max-width="400">
+            <v-card>
+                <v-card-title>{{
+                    t('send.task.clearAllConfirm.title')
+                }}</v-card-title>
+                <v-card-text>
+                    {{
+                        t('send.task.clearAllConfirm.message', {
+                            count: transferStore.unifiedSendTasks.length,
+                        })
+                    }}
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn variant="text" @click="showClearAllDialog = false">
+                        {{ t('common.cancel') }}
+                    </v-btn>
+                    <v-btn
+                        color="error"
+                        variant="flat"
+                        @click="confirmClearAllTasks"
+                    >
+                        {{ t('send.task.clearAll') }}
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
     </v-container>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, reactive, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
     FileSelector,
@@ -195,13 +675,10 @@ import {
     MediaPicker,
     FolderPicker,
     AppPicker,
-    ProgressDisplay,
     ModeSwitcher,
     PeerList,
     SelectedFileList,
-    SendModeSelector,
-    LinkSharePanel,
-    ShareSettingsDialog,
+    SendSettingsCard,
 } from '../components/transfer'
 import { useTransferStore, useDiscoveryStore, useShareStore } from '../stores'
 import { useSelectedFiles } from '../composables'
@@ -210,21 +687,25 @@ import type {
     ContentItem,
     ThumbnailInfo,
     FileSourceType,
-    TransferTask,
-    ShareSettings,
-    FileMetadata,
 } from '../types'
 import { FILE_COUNT_LIMIT } from '../types/content'
-import { mdiInboxArrowUp, mdiSend } from '@mdi/js'
+import { formatSpeed as formatSpeedUtil } from '../types'
+import {
+    mdiInboxArrowUp,
+    mdiSend,
+    mdiCheck,
+    mdiClose,
+    mdiDelete,
+    mdiDeleteSweep,
+} from '@mdi/js'
 
-const router = useRouter()
 const { t } = useI18n()
 const transferStore = useTransferStore()
 const discoveryStore = useDiscoveryStore()
 const shareStore = useShareStore()
 
 // 从 store 获取响应式状态（Tab 切换时保留）
-const { transferMode, selectedPeerId, sendMode } = storeToRefs(transferStore)
+const { transferMode, selectedPeerId } = storeToRefs(transferStore)
 const { contentType } = storeToRefs(shareStore)
 
 // 使用已选文件管理 composable（现在直接使用 shareStore.selectedFiles）
@@ -246,32 +727,10 @@ onMounted(async () => {
 const sending = ref(false)
 const showError = ref(false)
 const errorMessage = ref('')
-const showShareSettings = ref(false)
-const shareSettings = ref<ShareSettings>({
-    pinEnabled: false,
-    pin: '',
-    autoAccept: false,
-})
+const removeDialog = ref(false)
+const showClearAllDialog = ref(false)
+const taskIdToRemove = ref<string>('')
 
-// 处理发送模式切换
-async function handleSendModeChange(mode: 'p2p' | 'link') {
-    if (mode === 'link' && selectedFiles.count.value > 0) {
-        try {
-            // 有选中文件时，将文件列表保存到 shareStore
-            shareStore.setSelectedFiles([...selectedFiles.files.value])
-            // 跳转到链接分享界面，由 ShareLinkView 自动开始分享
-            router.push({ name: 'ShareLink' })
-        } catch (error) {
-            console.error('切换到链接分享模式失败:', error)
-            // 跳转失败时，恢复为 P2P 模式
-            sendMode.value = 'p2p'
-            showError.value = true
-            errorMessage.value = t('share.switchModeError')
-        }
-    }
-}
-
-// 添加结果提示
 const showAddResult = ref(false)
 const addResultMessage = ref('')
 const addResultColor = computed(() => {
@@ -284,12 +743,10 @@ const addResultColor = computed(() => {
     return 'success'
 })
 
-// 内容类型切换时保存到 store
 function handleContentTypeChange(type: ContentType) {
     contentType.value = type
 }
 
-// 处理文件选择
 function handleFileSelect(file: {
     path: string
     name: string
@@ -306,7 +763,6 @@ function handleFileSelect(file: {
     showAddResultMessage(result)
 }
 
-// 处理文件夹选择（展开为文件列表）
 async function handleFolderSelect(
     item: ContentItem & {
         files?: Array<{
@@ -317,7 +773,6 @@ async function handleFolderSelect(
         }>
     }
 ) {
-    // 如果有文件列表，直接添加
     if (item.files && item.files.length > 0) {
         const result = selectedFiles.addFiles(
             item.files.map((f) => ({
@@ -330,7 +785,6 @@ async function handleFolderSelect(
         )
         showAddResultMessage(result)
     } else {
-        // 单个文件夹项
         const result = selectedFiles.addFile({
             path: item.path,
             name: item.name,
@@ -342,11 +796,9 @@ async function handleFolderSelect(
     }
 }
 
-// 处理剪贴板选择（生成临时文本文件）
 function handleClipboardSelect(
     item: ContentItem & { content?: string; tempPath?: string }
 ) {
-    // 如果有临时文件路径，使用它
     const path = item.tempPath || item.path
     const result = selectedFiles.addFile({
         path,
@@ -360,7 +812,6 @@ function handleClipboardSelect(
     showAddResultMessage(result)
 }
 
-// 处理文本输入选择
 function handleTextSelect(
     item: ContentItem & { content?: string; tempPath?: string }
 ) {
@@ -377,7 +828,6 @@ function handleTextSelect(
     showAddResultMessage(result)
 }
 
-// 处理媒体文件选择
 function handleMediaSelect(item: ContentItem) {
     const result = selectedFiles.addFile({
         path: item.path,
@@ -389,7 +839,6 @@ function handleMediaSelect(item: ContentItem) {
     showAddResultMessage(result)
 }
 
-// 处理应用选择
 function handleAppSelect(item: ContentItem) {
     const result = selectedFiles.addFile({
         path: item.path,
@@ -402,7 +851,6 @@ function handleAppSelect(item: ContentItem) {
     showAddResultMessage(result)
 }
 
-// 显示添加结果消息
 function showAddResultMessage(
     result:
         | 'added'
@@ -443,28 +891,23 @@ function showAddResultMessage(
     showAddResult.value = true
 }
 
-// 移除单个文件
 function handleFileRemove(path: string) {
     selectedFiles.removeFile(path)
 }
 
-// 清空所有文件
 function handleFileClear() {
     selectedFiles.clearFiles()
 }
 
-// 缩略图加载完成
 function handleThumbnailLoaded(path: string, thumbnail: ThumbnailInfo) {
     selectedFiles.updateThumbnail(path, thumbnail)
 }
 
-// 缩略图加载失败
 function handleThumbnailError(_path: string, _error: string): void {
     void _path
     void _error
 }
 
-// 选择设备时保存到 store
 function handlePeerSelect(peerId: string) {
     selectedPeerId.value = peerId
 }
@@ -493,20 +936,14 @@ async function handleSend() {
     sending.value = true
 
     try {
-        // 发送所有选中的文件
         const filesToSend = [...selectedFiles.files.value]
         for (const file of filesToSend) {
-            // 准备文件传输（计算哈希等）
             const metadata = await transferStore.prepareTransfer(file.path)
             if (!metadata) {
                 throw new Error(t('send.prepareFailed'))
             }
-
-            // 发送文件
             await transferStore.send(metadata, peer.id, peer.ip, peer.port)
         }
-
-        // 清除选择
         selectedFiles.clearFiles()
         selectedPeerId.value = ''
     } catch (error) {
@@ -517,61 +954,120 @@ async function handleSend() {
     }
 }
 
-// 处理开始分享
-async function handleStartShare(files: FileMetadata[]) {
-    try {
-        await shareStore.startShare(files)
-    } catch (error) {
-        showError.value = true
-        errorMessage.value = t('share.startError', { error })
+// Task list management
+const taskListExpanded = ref(false)
+const expandedTasks = reactive(new Set<string>())
+
+const visibleSendTasks = computed(() => {
+    const list = transferStore.unifiedSendTasks
+    if (taskListExpanded.value || list.length <= 3) {
+        return list
+    }
+    return list.slice(0, 3)
+})
+
+function isTaskExpanded(taskId: string): boolean {
+    return expandedTasks.has(taskId)
+}
+
+function toggleFileList(taskId: string) {
+    if (expandedTasks.has(taskId)) {
+        expandedTasks.delete(taskId)
+    } else {
+        expandedTasks.add(taskId)
     }
 }
 
-// 处理停止分享
-async function handleStopShare() {
-    try {
-        await shareStore.stopShare()
-    } catch (error) {
-        showError.value = true
-        errorMessage.value = t('share.stopError', { error })
+function showRemoveTaskDialog(taskId: string) {
+    taskIdToRemove.value = taskId
+    removeDialog.value = true
+}
+
+async function confirmRemoveTask() {
+    const taskId = taskIdToRemove.value
+    // 移除 Web 下载任务
+    if (taskId.startsWith('web-')) {
+        transferStore.sendTaskItems.delete(taskId)
     }
+    // 移除 P2P 任务
+    if (taskId.startsWith('p2p-')) {
+        const originalId = taskId.replace('p2p-', '')
+        transferStore.tasks.delete(originalId)
+    }
+    removeDialog.value = false
+    taskIdToRemove.value = ''
 }
 
-// 处理分享设置
-function handleShareSettings() {
-    showShareSettings.value = true
-}
-
-// 处理应用分享设置
-function handleApplyShareSettings(settings: ShareSettings) {
-    shareSettings.value = settings
-    shareStore.updateSettings(settings)
-}
-
-async function handleCancel(taskId: string) {
-    await transferStore.cancel(taskId)
-}
-
-async function handleRetry(task: TransferTask) {
-    if (task.peer && task.file.path) {
-        const metadata = await transferStore.prepareTransfer(task.file.path)
-        if (metadata) {
-            await transferStore.send(
-                metadata,
-                task.peer.id,
-                task.peer.ip,
-                task.peer.port
-            )
+async function confirmClearAllTasks() {
+    // 清理所有 Web 下载任务
+    transferStore.sendTaskItems.clear()
+    // 清理所有发送方向的 P2P 任务
+    for (const [id, task] of transferStore.tasks.entries()) {
+        if (task.direction === 'send') {
+            transferStore.tasks.delete(id)
         }
     }
+    showClearAllDialog.value = false
 }
 
-async function handleRemoveTask(taskId: string) {
-    await transferStore.removeTask(taskId)
+async function handleAcceptTask(taskId: string) {
+    try {
+        // taskId 格式为 "web-{requestId}"，需要提取原始请求 ID
+        const requestId = taskId.startsWith('web-') ? taskId.slice(4) : taskId
+        await shareStore.acceptRequest(requestId)
+    } catch (error) {
+        showError.value = true
+        errorMessage.value = t('send.task.acceptError', { error })
+    }
 }
 
-async function handleCleanup() {
-    await transferStore.cleanup()
+async function handleRejectTask(taskId: string) {
+    try {
+        // taskId 格式为 "web-{requestId}"，需要提取原始请求 ID
+        const requestId = taskId.startsWith('web-') ? taskId.slice(4) : taskId
+        await shareStore.rejectRequest(requestId)
+    } catch (error) {
+        showError.value = true
+        errorMessage.value = t('send.task.rejectError', { error })
+    }
+}
+
+function formatTime(timestamp: number): string {
+    return new Date(timestamp).toLocaleTimeString()
+}
+
+function formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 B'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
+}
+
+function formatSpeed(bytesPerSecond: number): string {
+    return formatSpeedUtil(bytesPerSecond)
+}
+
+function getFileStatusColor(status: string): string {
+    const colorMap: Record<string, string> = {
+        pending: 'grey',
+        transferring: 'primary',
+        completed: 'success',
+        failed: 'error',
+        cancelled: 'warning',
+    }
+    return colorMap[status] || 'grey'
+}
+
+function getFileStatusText(status: string): string {
+    const keyMap: Record<string, string> = {
+        pending: 'send.task.fileStatus.pending',
+        transferring: 'send.task.fileStatus.transferring',
+        completed: 'send.task.fileStatus.completed',
+        failed: 'send.task.fileStatus.failed',
+        cancelled: 'send.task.fileStatus.cancelled',
+    }
+    return t(keyMap[status] || 'send.task.fileStatus.pending')
 }
 </script>
 
@@ -579,5 +1075,24 @@ async function handleCleanup() {
 .send-view {
     max-width: 1400px;
     margin: 0 auto;
+}
+
+.upload-records-container {
+    background: rgba(var(--v-theme-surface-variant), 0.05);
+    border-radius: 4px;
+    padding: 8px;
+}
+
+.upload-record-item {
+    padding: 4px 8px;
+}
+
+.upload-record-item.has-divider {
+    border-bottom: 1px solid rgba(var(--v-border-color), 0.08);
+}
+
+.expanded-records {
+    max-height: 300px;
+    overflow-y: auto;
 }
 </style>

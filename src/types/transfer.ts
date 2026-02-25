@@ -7,9 +7,6 @@ import type { FileMetadata } from './file'
 /** 传输模式 */
 export type TransferMode = 'local' | 'cloud'
 
-/** 发送模式（仅本地网络模式下可用） */
-export type SendMode = 'p2p' | 'link'
-
 /** 任务状态 */
 export type TaskStatus =
     | 'pending'
@@ -253,6 +250,72 @@ export interface UploadRecord {
     startedAt: number
     /** 完成时间（毫秒） */
     completedAt?: number
+}
+
+// ============ 统一发送任务类型 ============
+
+/** 发送任务来源 */
+export type SendTaskSource = 'p2p' | 'webDownload'
+
+/** 发送任务审批状态 */
+export type SendTaskApprovalStatus = 'pending' | 'accepted' | 'rejected'
+
+/** 发送任务文件条目 */
+export interface SendTaskFileItem {
+    /** 文件名 */
+    name: string
+    /** 文件大小（字节） */
+    size: number
+    /** 已传输字节数 */
+    transferredBytes: number
+    /** 进度百分比（0-100） */
+    progress: number
+    /** 传输速度（字节/秒） */
+    speed: number
+    /** 文件状态 */
+    status: TaskStatus
+    /** 开始传输时间戳（毫秒） */
+    startedAt?: number
+    /** 上传 ID（仅 Web 下载任务使用，用于关联上传记录） */
+    uploadId?: string
+}
+
+/** 统一发送任务项 */
+export interface SendTaskItem {
+    /** 任务唯一 ID */
+    id: string
+    /** 任务来源 */
+    source: SendTaskSource
+    /** 接收方标识（P2P 为设备名，Web 下载为 IP 地址） */
+    receiverLabel: string
+    /** 接收方 IP 地址 */
+    receiverIp: string
+    /** 文件列表 */
+    files: SendTaskFileItem[]
+    /** 文件总数 */
+    fileCount: number
+    /** 文件总大小（字节） */
+    totalSize: number
+    /** 已传输总字节数 */
+    totalTransferredBytes: number
+    /** 审批状态 */
+    approvalStatus: SendTaskApprovalStatus
+    /** 整体传输状态 */
+    transferStatus: TaskStatus
+    /** 整体进度百分比（0-100） */
+    progress: number
+    /** 整体传输速度（字节/秒） */
+    speed: number
+    /** 创建时间戳（毫秒） */
+    createdAt: number
+    /** 完成时间戳（毫秒） */
+    completedAt?: number
+    /** 错误信息 */
+    error?: string
+    /** 原始 P2P 任务 ID（用于关联 TransferTask） */
+    originalTaskId?: string
+    /** 原始访问请求 ID（用于关联 AccessRequest） */
+    originalRequestId?: string
 }
 
 // ============ 统一接收任务类型 ============

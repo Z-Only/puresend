@@ -253,54 +253,22 @@ async fn index_handler(
         return Html(WAITING_RESPONSE_HTML).into_response();
     }
     
-    // 有访问权限，显示文件列表页面
-    let share_info = share_state.share_info.as_ref().unwrap();
-    
-    // 构建哈希 ID 到文件名的映射，用于 HTML 显示
-    let hash_to_name = {
-        let hash_to_filename = state.hash_to_filename.lock().await;
-        hash_to_filename.clone()
-    };
-    
-    let files_html = hash_to_name
-        .iter()
-        .map(|(hash_id, file_name)| {
-            // 从 share_info 中查找文件大小
-            let file_size = share_info
-                .files
-                .iter()
-                .find(|f| {
-                    // 通过文件名匹配
-                    f.name == *file_name
-                })
-                .map(|f| f.size)
-                .unwrap_or(0);
-            
-            format!(
-                r#"<li><a href="/download/{}" download="{}">{}</a> ({})</li>"#,
-                hash_id,
-                file_name,
-                file_name,
-                format_size(file_size)
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
-    let html = format!(
-        r#"<html>
+    // 有访问权限，显示文件列表页面（通过 JS 轮询 /files API 动态加载）
+    let html = r#"<html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="/favicon.ico">
     <title>PureSend - 文件分享</title>
     <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }}
-        h1 {{ color: #333; }}
-        ul {{ list-style: none; padding: 0; }}
-        li {{ padding: 10px; border-bottom: 1px solid #eee; }}
-        a {{ color: #1976d2; text-decoration: none; }}
-        a:hover {{ text-decoration: underline; }}
-        .warning {{ background: #fff3cd; padding: 10px; border-radius: 4px; margin-bottom: 20px; }}
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        h1 { color: #333; }
+        ul { list-style: none; padding: 0; }
+        li { padding: 10px; border-bottom: 1px solid #eee; }
+        a { color: #1976d2; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .warning { background: #fff3cd; padding: 10px; border-radius: 4px; margin-bottom: 20px; }
+        .empty { color: #999; text-align: center; padding: 40px 0; }
     </style>
 </head>
 <body>
@@ -309,13 +277,40 @@ async fn index_handler(
         ⚠️ 此链接仅限可信网络内使用，请勿分享到公共平台
     </div>
     <h2>可用文件</h2>
-    <ul>
-        {}
+    <ul id="file-list">
+        <li class="empty">加载中...</li>
     </ul>
+    <script>
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 B';
+            var units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            var i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + units[i];
+        }
+        var lastJson = '';
+        function refreshFiles() {
+            fetch('/files')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var json = JSON.stringify(data.files);
+                    if (json === lastJson) return;
+                    lastJson = json;
+                    var ul = document.getElementById('file-list');
+                    if (!data.files || data.files.length === 0) {
+                        ul.innerHTML = '<li class="empty">暂无可用文件</li>';
+                        return;
+                    }
+                    ul.innerHTML = data.files.map(function(f) {
+                        return '<li><a href="/download/' + f.id + '" download="' + f.name + '">' + f.name + '</a> (' + formatSize(f.size) + ')</li>';
+                    }).join('');
+                })
+                .catch(function() {});
+        }
+        refreshFiles();
+        setInterval(refreshFiles, 1000);
+    </script>
 </body>
-</html>"#,
-        files_html
-    );
+</html>"#.to_string();
 
     Html(html).into_response()
 }
@@ -378,15 +373,30 @@ async fn list_files_handler(
         );
     }
 
+    // 从 hash_to_filename 和 share_info 构建文件列表，使用 hash_id 作为下载标识
     let share_info = share_state.share_info.as_ref().unwrap();
-    let files: Vec<FileInfo> = share_info
-        .files
+    let hash_to_filename = state.hash_to_filename.lock().await;
+    let files: Vec<FileInfo> = hash_to_filename
         .iter()
-        .map(|f| FileInfo {
-            id: f.id.clone(),
-            name: f.name.clone(),
-            size: f.size,
-            mime_type: f.mime_type.clone(),
+        .map(|(hash_id, file_name)| {
+            let file_size = share_info
+                .files
+                .iter()
+                .find(|f| f.name == *file_name)
+                .map(|f| f.size)
+                .unwrap_or(0);
+            let mime_type = share_info
+                .files
+                .iter()
+                .find(|f| f.name == *file_name)
+                .map(|f| f.mime_type.clone())
+                .unwrap_or_else(|| "application/octet-stream".to_string());
+            FileInfo {
+                id: hash_id.clone(),
+                name: file_name.clone(),
+                size: file_size,
+                mime_type,
+            }
         })
         .collect();
 
@@ -1020,6 +1030,7 @@ struct FileInfo {
 }
 
 /// 格式化文件大小
+#[allow(dead_code)]
 fn format_size(size: u64) -> String {
     const UNITS: [&str; 5] = ["B", "KB", "MB", "GB", "TB"];
     let mut size = size as f64;

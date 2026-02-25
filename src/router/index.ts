@@ -25,12 +25,6 @@ const routes = [
         component: () => import('@/views/SettingsView.vue'),
         meta: { titleKey: 'nav.settings' },
     },
-    {
-        path: '/share-link',
-        name: 'ShareLink',
-        component: () => import('@/views/ShareLinkView.vue'),
-        meta: { titleKey: 'nav.shareLink' },
-    },
 ]
 
 const router = createRouter({

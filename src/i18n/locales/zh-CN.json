@@ -14,7 +14,11 @@
     "disabled": "已禁用",
     "apply": "应用",
     "add": "添加",
-    "edit": "编辑"
+    "edit": "编辑",
+    "justNow": "刚刚",
+    "minutesAgo": "{count} 分钟前",
+    "hoursAgo": "{count} 小时前",
+    "daysAgo": "{count} 天前"
   },
   "settings": {
     "title": "设置",
@@ -244,7 +248,47 @@
     "tasks": "发送任务",
     "noTasks": "暂无发送任务",
     "selectFileToStart": "选择文件开始发送",
-    "cleanup": "清理已完成"
+    "cleanup": "清理已完成",
+    "settings": {
+      "title": "发送设置",
+      "webDownload": "Web 下载",
+      "webDownloadHint": "开启后启动 HTTP 服务器，其他设备可通过浏览器下载已选文件",
+      "webDownloadLink": "下载链接",
+      "webDownloadQrcode": "扫码下载",
+      "webDownloadStartFailed": "启动 Web 下载服务失败：{error}",
+      "webDownloadStopFailed": "停止 Web 下载服务失败：{error}"
+    },
+    "task": {
+      "fileCount": "{count} 个文件",
+      "approval": {
+        "pending": "等待确认",
+        "accepted": "已接受",
+        "rejected": "已拒绝",
+        "waitingResponse": "等待对方响应"
+      },
+      "moreFiles": "还有 {count} 个文件",
+      "collapseFiles": "收起文件列表",
+      "expand": "展开全部",
+      "collapse": "收起",
+      "clearAll": "移除全部",
+      "removeConfirm": {
+        "title": "移除任务",
+        "message": "确定要移除该发送任务吗？"
+      },
+      "clearAllConfirm": {
+        "title": "移除全部任务",
+        "message": "确定要移除所有 {count} 条发送任务吗？"
+      },
+      "acceptError": "接受请求失败：{error}",
+      "rejectError": "拒绝请求失败：{error}",
+      "fileStatus": {
+        "pending": "等待中",
+        "transferring": "传输中",
+        "completed": "已完成",
+        "failed": "失败",
+        "cancelled": "已取消"
+      }
+    }
   },
   "receiveMode": {
     "label": "传输模式",

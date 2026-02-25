@@ -19,7 +19,6 @@ declare module 'vue' {
     FileTypeIcon: typeof import('./src/components/transfer/FileTypeIcon.vue')['default']
     FolderPicker: typeof import('./src/components/transfer/FolderPicker.vue')['default']
     LanguageSelector: typeof import('./src/components/settings/LanguageSelector.vue')['default']
-    LinkSharePanel: typeof import('./src/components/transfer/LinkSharePanel.vue')['default']
     MediaPicker: typeof import('./src/components/transfer/MediaPicker.vue')['default']
     ModeSwitcher: typeof import('./src/components/transfer/ModeSwitcher.vue')['default']
     PeerList: typeof import('./src/components/transfer/PeerList.vue')['default']
@@ -30,9 +29,8 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SelectedFileList: typeof import('./src/components/transfer/SelectedFileList.vue')['default']
-    SendModeSelector: typeof import('./src/components/transfer/SendModeSelector.vue')['default']
+    SendSettingsCard: typeof import('./src/components/transfer/SendSettingsCard.vue')['default']
     SettingsGroup: typeof import('./src/components/settings/SettingsGroup.vue')['default']
-    ShareSettingsDialog: typeof import('./src/components/transfer/ShareSettingsDialog.vue')['default']
     TextInput: typeof import('./src/components/transfer/TextInput.vue')['default']
     ThemeSelector: typeof import('./src/components/settings/ThemeSelector.vue')['default']
   }

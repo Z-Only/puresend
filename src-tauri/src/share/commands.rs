@@ -58,9 +58,7 @@ pub async fn start_share(
         }
     }
 
-    if file_paths.is_empty() {
-        return Err("没有有效的文件可分享".to_string());
-    }
+    // 允许空文件列表启动分享服务（Web 下载模式下可以先启动服务，后续再添加文件）
 
     // 创建并启动服务器
     let mut server = ShareServer::new(state.share_state.clone(), app, 0); // 自动分配端口
@@ -216,6 +214,69 @@ pub async fn clear_access_requests(
     // 发送事件通知
     for request_id in removed_ids {
         let _ = app.emit("access-request-removed", request_id);
+    }
+
+    Ok(())
+}
+
+/// 更新分享文件列表（动态同步已选文件到 HTTP 服务器）
+#[tauri::command]
+pub async fn update_share_files(
+    state: State<'_, ShareManagerState>,
+    files: Vec<FileMetadata>,
+) -> Result<(), String> {
+    // 验证文件存在性并收集路径
+    let mut new_file_paths: Vec<(FileMetadata, std::path::PathBuf)> = Vec::new();
+    let mut valid_files: Vec<FileMetadata> = Vec::new();
+
+    for file in files {
+        if let Some(path_str) = &file.path {
+            let path = std::path::PathBuf::from(path_str);
+            if !path.exists() {
+                return Err(format!("文件不存在：{}", path_str));
+            }
+            new_file_paths.push((file.clone(), path));
+            valid_files.push(file);
+        } else {
+            return Err(format!("文件路径未设置：{}", file.name));
+        }
+    }
+
+    // 更新服务器的文件映射
+    {
+        let server_guard = state.server.lock().await;
+        if let Some(server) = server_guard.as_ref() {
+            let mut file_paths = server.state.file_paths.lock().await;
+            let mut hash_to_filename = server.state.hash_to_filename.lock().await;
+
+            // 清空旧映射
+            file_paths.clear();
+            hash_to_filename.clear();
+
+            // 重建映射
+            for (metadata, path) in new_file_paths {
+                use sha2::{Digest, Sha256};
+                let hash = Sha256::digest(path.to_string_lossy().as_bytes());
+                let hash_id = hex::encode(hash);
+
+                let file_name = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or(&metadata.name)
+                    .to_string();
+
+                file_paths.insert(hash_id.clone(), path);
+                hash_to_filename.insert(hash_id, file_name);
+            }
+        }
+    }
+
+    // 更新 share_state 中的文件列表
+    {
+        let mut share_state = state.share_state.lock().await;
+        if let Some(ref mut share_info) = share_state.share_info {
+            share_info.files = valid_files;
+        }
     }
 
     Ok(())

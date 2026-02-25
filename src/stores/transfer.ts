@@ -8,7 +8,6 @@ import type {
     FileMetadata,
     TransferTask,
     TransferProgress,
-    SendMode,
     TransferMode,
     TransferHistoryItem,
     HistoryFilter,
@@ -21,6 +20,8 @@ import type {
     WebUploadFileCompleteEvent,
     ReceiveTaskItem,
     ReceiveTaskFileItem,
+    SendTaskItem,
+    SendTaskFileItem,
 } from '../types'
 import {
     HISTORY_STORAGE_VERSION,
@@ -86,9 +87,6 @@ export const useTransferStore = defineStore('transfer', () => {
     /** 错误信息 */
     const error = ref<string>('')
 
-    /** 发送模式（仅本地网络模式下可用） */
-    const sendMode = ref<SendMode>('p2p')
-
     /** 传输模式（P2P 模式下的传输方式） */
     const transferMode = ref<TransferMode>('local')
 
@@ -111,6 +109,12 @@ export const useTransferStore = defineStore('transfer', () => {
 
     /** 统一接收任务列表（包含 P2P 和 Web 上传） */
     const receiveTaskItems = ref<Map<string, ReceiveTaskItem>>(new Map())
+
+    /** Web 下载是否已启用 */
+    const webDownloadEnabled = ref(false)
+
+    /** 统一发送任务列表（Web 下载部分） */
+    const sendTaskItems = ref<Map<string, SendTaskItem>>(new Map())
 
     /** 事件监听器清理函数 */
     const unlistenFns: UnlistenFn[] = []
@@ -232,6 +236,74 @@ export const useTransferStore = defineStore('transfer', () => {
     /** 待审批的统一接收任务 */
     const pendingReceiveTasks = computed(() =>
         unifiedReceiveTasks.value.filter(
+            (task) => task.approvalStatus === 'pending'
+        )
+    )
+
+    /** 统一发送任务列表（合并 P2P 发送任务和 Web 下载任务，按创建时间倒序） */
+    const unifiedSendTasks = computed<SendTaskItem[]>(() => {
+        // 将 P2P 发送任务转换为 SendTaskItem
+        const p2pItems: SendTaskItem[] = sendTasks.value.map(
+            (task): SendTaskItem => {
+                // 根据 status 确定 approvalStatus
+                let approvalStatus: 'pending' | 'accepted' | 'rejected'
+                if (
+                    task.status === 'transferring' ||
+                    task.status === 'completed'
+                ) {
+                    approvalStatus = 'accepted'
+                } else if (
+                    task.status === 'failed' ||
+                    task.status === 'cancelled'
+                ) {
+                    approvalStatus = 'rejected'
+                } else {
+                    approvalStatus = 'pending'
+                }
+
+                return {
+                    id: `p2p-${task.id}`,
+                    source: 'p2p',
+                    receiverLabel: task.peer?.name || task.peer?.ip || '',
+                    receiverIp: task.peer?.ip || '',
+                    files: [
+                        {
+                            name: task.file.name,
+                            size: task.file.size,
+                            transferredBytes: task.transferredBytes,
+                            progress: task.progress,
+                            speed: task.speed,
+                            status: task.status,
+                            startedAt: task.createdAt,
+                        } as SendTaskFileItem,
+                    ],
+                    fileCount: 1,
+                    totalSize: task.file.size,
+                    totalTransferredBytes: task.transferredBytes,
+                    approvalStatus,
+                    transferStatus: task.status,
+                    progress: task.progress,
+                    speed: task.speed,
+                    createdAt: task.createdAt,
+                    completedAt: task.completedAt,
+                    error: task.error,
+                    originalTaskId: task.id,
+                }
+            }
+        )
+
+        // 从 sendTaskItems 获取 Web 下载任务
+        const webItems = Array.from(sendTaskItems.value.values())
+
+        // 合并并按创建时间倒序排列
+        return [...p2pItems, ...webItems].sort(
+            (a, b) => b.createdAt - a.createdAt
+        )
+    })
+
+    /** 待审批的统一发送任务 */
+    const pendingSendTasks = computed(() =>
+        unifiedSendTasks.value.filter(
             (task) => task.approvalStatus === 'pending'
         )
     )
@@ -593,14 +665,6 @@ export const useTransferStore = defineStore('transfer', () => {
             error.value = `移除任务失败：${e}`
             console.error('移除任务失败:', e)
         }
-    }
-
-    /**
-     * 设置发送模式
-     * @param mode 发送模式
-     */
-    function setSendMode(mode: SendMode): void {
-        sendMode.value = mode
     }
 
     /**
@@ -1035,6 +1099,8 @@ export const useTransferStore = defineStore('transfer', () => {
         unlistenFns.length = 0
         tasks.value.clear()
         receiveTaskItems.value.clear()
+        sendTaskItems.value.clear()
+        webDownloadEnabled.value = false
         initialized.value = false
         // 重置页面状态
         transferMode.value = 'local'
@@ -1323,7 +1389,6 @@ export const useTransferStore = defineStore('transfer', () => {
         selectedTaskId,
         loading,
         error,
-        sendMode,
         transferMode,
         selectedPeerId,
         receiveMode,
@@ -1337,6 +1402,9 @@ export const useTransferStore = defineStore('transfer', () => {
         stopWebUpload,
         acceptWebUploadRequest,
         rejectWebUploadRequest,
+        // Web 下载
+        webDownloadEnabled,
+        sendTaskItems,
         // 统一接收任务
         receiveTaskItems,
         unifiedReceiveTasks,
@@ -1344,6 +1412,9 @@ export const useTransferStore = defineStore('transfer', () => {
         acceptReceiveTask,
         rejectReceiveTask,
         cleanupReceiveTaskItems,
+        // 统一发送任务
+        unifiedSendTasks,
+        pendingSendTasks,
         // 历史记录状态
         historyItems,
         historyLoaded,
@@ -1374,7 +1445,6 @@ export const useTransferStore = defineStore('transfer', () => {
         cancel,
         cleanup,
         removeTask,
-        setSendMode,
         setTransferMode,
         setSelectedPeerId,
         setReceiveMode,

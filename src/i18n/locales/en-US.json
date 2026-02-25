@@ -14,7 +14,11 @@
     "disabled": "Disabled",
     "apply": "Apply",
     "add": "Add",
-    "edit": "Edit"
+    "edit": "Edit",
+    "justNow": "Just now",
+    "minutesAgo": "{count} min ago",
+    "hoursAgo": "{count} hr ago",
+    "daysAgo": "{count} days ago"
   },
   "settings": {
     "title": "Settings",
@@ -244,7 +248,47 @@
     "tasks": "Send Tasks",
     "noTasks": "No send tasks",
     "selectFileToStart": "Select files to start sending",
-    "cleanup": "Cleanup Completed"
+    "cleanup": "Cleanup Completed",
+    "settings": {
+      "title": "Send Settings",
+      "webDownload": "Web Download",
+      "webDownloadHint": "Start HTTP server to allow other devices to download files via browser",
+      "webDownloadLink": "Download Link",
+      "webDownloadQrcode": "Scan to Download",
+      "webDownloadStartFailed": "Failed to start Web Download: {error}",
+      "webDownloadStopFailed": "Failed to stop Web Download: {error}"
+    },
+    "task": {
+      "fileCount": "{count} file(s)",
+      "approval": {
+        "pending": "Pending",
+        "accepted": "Accepted",
+        "rejected": "Rejected",
+        "waitingResponse": "Waiting for response"
+      },
+      "moreFiles": "{count} more file(s)",
+      "collapseFiles": "Collapse file list",
+      "expand": "Expand All",
+      "collapse": "Collapse",
+      "clearAll": "Clear All",
+      "removeConfirm": {
+        "title": "Remove Task",
+        "message": "Are you sure you want to remove this send task?"
+      },
+      "clearAllConfirm": {
+        "title": "Clear All Tasks",
+        "message": "Are you sure you want to remove all {count} send tasks?"
+      },
+      "acceptError": "Failed to accept request: {error}",
+      "rejectError": "Failed to reject request: {error}",
+      "fileStatus": {
+        "pending": "Pending",
+        "transferring": "Transferring",
+        "completed": "Completed",
+        "failed": "Failed",
+        "cancelled": "Cancelled"
+      }
+    }
   },
   "receiveMode": {
     "label": "Transfer Mode",
