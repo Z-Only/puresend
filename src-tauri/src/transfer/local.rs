@@ -406,9 +406,8 @@ impl LocalTransport {
     ) -> TransferResult<()> {
         // 确保接收目录存在
         if !receive_directory.exists() {
-            std::fs::create_dir_all(receive_directory).map_err(|e| {
-                TransferError::Internal(format!("无法创建接收目录: {}", e))
-            })?;
+            std::fs::create_dir_all(receive_directory)
+                .map_err(|e| TransferError::Internal(format!("无法创建接收目录: {}", e)))?;
         }
 
         // 根据 file_overwrite 设置决定保存路径

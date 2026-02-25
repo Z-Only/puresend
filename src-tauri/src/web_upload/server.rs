@@ -2,6 +2,7 @@
 //!
 //! 提供文件上传的 HTTP 服务，采用按 IP 审批模式
 
+use axum::extract::DefaultBodyLimit;
 use axum::{
     body::Body,
     extract::{connect_info::ConnectInfo, Multipart, State as AxumState},
@@ -14,10 +15,9 @@ use serde::Serialize;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+use tauri::{AppHandle, Emitter};
 use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
-use axum::extract::DefaultBodyLimit;
-use tauri::{AppHandle, Emitter};
 
 use super::models::{UploadRecord, UploadRequest, UploadRequestStatus, WebUploadState};
 
@@ -90,12 +90,15 @@ impl WebUploadServer {
         self.shutdown_tx = Some(shutdown_tx);
 
         tokio::spawn(async move {
-            axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
-                .with_graceful_shutdown(async {
-                    let _ = shutdown_rx.await;
-                })
-                .await
-                .ok();
+            axum::serve(
+                listener,
+                app.into_make_service_with_connect_info::<SocketAddr>(),
+            )
+            .with_graceful_shutdown(async {
+                let _ = shutdown_rx.await;
+            })
+            .await
+            .ok();
         });
 
         Ok(actual_port)
@@ -324,11 +327,10 @@ async fn upload_handler(
     let mut uploaded_count: u32 = 0;
 
     while let Ok(Some(field)) = multipart.next_field().await {
-        let file_name = field
-            .file_name()
-            .unwrap_or("unknown")
-            .to_string();
-        let content_length = field.headers().get(header::CONTENT_LENGTH)
+        let file_name = field.file_name().unwrap_or("unknown").to_string();
+        let content_length = field
+            .headers()
+            .get(header::CONTENT_LENGTH)
             .and_then(|v| v.to_str().ok())
             .and_then(|s| s.parse::<u64>().ok())
             .unwrap_or(0);
@@ -411,7 +413,9 @@ async fn upload_handler(
                                 .values_mut()
                                 .find(|r| r.client_ip == client_ip)
                             {
-                                if let Some(rec) = req.upload_records.iter_mut().find(|r| r.id == record_id) {
+                                if let Some(rec) =
+                                    req.upload_records.iter_mut().find(|r| r.id == record_id)
+                                {
                                     rec.status = "failed".to_string();
                                     rec.completed_at = Some(
                                         std::time::SystemTime::now()
@@ -468,7 +472,9 @@ async fn upload_handler(
                             .values_mut()
                             .find(|r| r.client_ip == client_ip)
                         {
-                            if let Some(rec) = req.upload_records.iter_mut().find(|r| r.id == record_id) {
+                            if let Some(rec) =
+                                req.upload_records.iter_mut().find(|r| r.id == record_id)
+                            {
                                 rec.status = "failed".to_string();
                                 rec.completed_at = Some(
                                     std::time::SystemTime::now()
@@ -608,18 +614,47 @@ async fn fallback_handler() -> impl IntoResponse {
 
 /// 生成上传页面 HTML（已授权 IP 直接上传，无需审批流程）
 fn generate_upload_page(is_english: bool) -> String {
-    let title = if is_english { "PureSend - Upload Files" } else { "PureSend - 文件上传" };
-    let select_files = if is_english { "Select Files" } else { "选择文件" };
-    let drag_hint = if is_english { "or drag and drop files here" } else { "或将文件拖拽到此处" };
+    let title = if is_english {
+        "PureSend - Upload Files"
+    } else {
+        "PureSend - 文件上传"
+    };
+    let select_files = if is_english {
+        "Select Files"
+    } else {
+        "选择文件"
+    };
+    let drag_hint = if is_english {
+        "or drag and drop files here"
+    } else {
+        "或将文件拖拽到此处"
+    };
     let upload_btn = if is_english { "Upload" } else { "上传" };
-    let transferring = if is_english { "Uploading files..." } else { "正在上传文件..." };
-    let success = if is_english { "Files uploaded successfully!" } else { "文件上传成功！" };
-    let failed = if is_english { "Upload failed" } else { "上传失败" };
+    let transferring = if is_english {
+        "Uploading files..."
+    } else {
+        "正在上传文件..."
+    };
+    let success = if is_english {
+        "Files uploaded successfully!"
+    } else {
+        "文件上传成功！"
+    };
+    let failed = if is_english {
+        "Upload failed"
+    } else {
+        "上传失败"
+    };
     let file_label = if is_english { "file(s)" } else { "个文件" };
-    let total_size_label = if is_english { "Total size" } else { "总大小" };
+    let total_size_label = if is_english {
+        "Total size"
+    } else {
+        "总大小"
+    };
     let remove_label = if is_english { "Remove" } else { "移除" };
 
-    format!(r##"<!DOCTYPE html>
+    format!(
+        r##"<!DOCTYPE html>
 <html lang="{lang}">
 <head>
     <meta charset="UTF-8">
@@ -795,16 +830,29 @@ fn generate_upload_page(is_english: bool) -> String {
 
 /// 生成等待响应页面 HTML
 fn generate_waiting_page(is_english: bool) -> String {
-    let title = if is_english { "PureSend - Waiting" } else { "PureSend - 等待中" };
-    let waiting_text = if is_english { "Waiting for approval..." } else { "等待接收方确认..." };
+    let title = if is_english {
+        "PureSend - Waiting"
+    } else {
+        "PureSend - 等待中"
+    };
+    let waiting_text = if is_english {
+        "Waiting for approval..."
+    } else {
+        "等待接收方确认..."
+    };
     let waiting_desc = if is_english {
         "Your upload request has been sent. Please wait for the receiver to approve."
     } else {
         "您的上传请求已发送，请等待接收方确认。"
     };
-    let rejected_text = if is_english { "Access denied" } else { "访问被拒绝" };
+    let rejected_text = if is_english {
+        "Access denied"
+    } else {
+        "访问被拒绝"
+    };
 
-    format!(r##"<!DOCTYPE html>
+    format!(
+        r##"<!DOCTYPE html>
 <html lang="{lang}">
 <head>
     <meta charset="UTF-8">
@@ -875,15 +923,24 @@ fn generate_waiting_page(is_english: bool) -> String {
 
 /// 生成访问被拒绝页面 HTML
 fn generate_rejected_page(is_english: bool) -> String {
-    let title = if is_english { "PureSend - Access Denied" } else { "PureSend - 访问被拒绝" };
-    let rejected_text = if is_english { "Access Denied" } else { "访问被拒绝" };
+    let title = if is_english {
+        "PureSend - Access Denied"
+    } else {
+        "PureSend - 访问被拒绝"
+    };
+    let rejected_text = if is_english {
+        "Access Denied"
+    } else {
+        "访问被拒绝"
+    };
     let rejected_desc = if is_english {
         "Your upload request has been rejected by the receiver."
     } else {
         "您的上传请求已被接收方拒绝。"
     };
 
-    format!(r##"<!DOCTYPE html>
+    format!(
+        r##"<!DOCTYPE html>
 <html lang="{lang}">
 <head>
     <meta charset="UTF-8">

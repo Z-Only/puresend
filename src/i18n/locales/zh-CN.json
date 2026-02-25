@@ -32,6 +32,12 @@
       }
     },
     "appearance": "外观",
+    "tabLayout": {
+      "label": "Tab 栏布局",
+      "horizontal": "水平",
+      "verticalLeft": "垂直（左侧）",
+      "verticalRight": "垂直（右侧）"
+    },
     "theme": {
       "label": "主题",
       "light": "浅色",
@@ -71,6 +77,14 @@
       },
       "currentCount": "当前记录数：{count} 条",
       "cleanupNow": "立即清理"
+    },
+    "about": {
+      "title": "关于",
+      "version": "版本",
+      "homepage": "项目主页",
+      "github": "GitHub 项目",
+      "collapse": "收起",
+      "expand": "展开"
     }
   },
   "transfer": {
@@ -560,5 +574,38 @@
     "charCount": "{count} 个字符",
     "addToSend": "添加到发送列表",
     "content": "文本内容"
+  },
+  "menu": {
+    "puresend": {
+      "about": "关于 PureSend",
+      "quit": "退出"
+    },
+    "file": {
+      "title": "文件",
+      "sendFile": "发送文件"
+    },
+    "edit": {
+      "title": "编辑",
+      "undo": "撤销",
+      "redo": "重做",
+      "cut": "剪切",
+      "copy": "复制",
+      "paste": "粘贴",
+      "selectAll": "全选"
+    },
+    "view": {
+      "title": "视图",
+      "toggleFullscreen": "切换全屏"
+    },
+    "window": {
+      "title": "窗口",
+      "minimize": "最小化",
+      "zoom": "缩放"
+    },
+    "help": {
+      "title": "帮助",
+      "github": "GitHub 仓库",
+      "docs": "在线文档"
+    }
   }
 }

@@ -5,7 +5,7 @@ defineProps<{
 </script>
 
 <template>
-    <v-card class="mb-4" variant="outlined">
+    <v-card class="mb-4">
         <v-card-title class="text-h6 pb-0">
             {{ title }}
         </v-card-title>

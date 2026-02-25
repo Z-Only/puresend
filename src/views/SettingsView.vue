@@ -3,13 +3,13 @@ import { useI18n } from 'vue-i18n'
 import SettingsGroup from '@/components/settings/SettingsGroup.vue'
 import ThemeSelector from '@/components/settings/ThemeSelector.vue'
 import LanguageSelector from '@/components/settings/LanguageSelector.vue'
+import { usePlatform } from '@/composables'
 import { useSettingsStore } from '@/stores/settings'
-import { useTransferStore } from '@/stores/transfer'
 import { computed, ref } from 'vue'
 
 const { t } = useI18n()
+const { isMobile } = usePlatform()
 const settingsStore = useSettingsStore()
-const transferStore = useTransferStore()
 
 // 设备名称编辑
 const editingDeviceName = ref('')
@@ -107,16 +107,20 @@ const strategyOptions = computed(() => [
     },
 ])
 
-// 立即清理
-async function handleCleanupNow() {
-    const strategy = cleanupStrategy.value
-    if (strategy === 'disabled') return
+// Tab 栏布局
+const tabLayoutOptions = computed(() => [
+    { title: t('settings.tabLayout.horizontal'), value: 'horizontal' },
+    { title: t('settings.tabLayout.verticalLeft'), value: 'vertical-left' },
+    { title: t('settings.tabLayout.verticalRight'), value: 'vertical-right' },
+])
 
-    await transferStore.applyAutoCleanup(strategy, {
-        retentionDays: retentionDays.value,
-        maxCount: maxCount.value,
-    })
-}
+const tabLayout = computed({
+    get: () => settingsStore.tabLayout,
+    set: (value) => settingsStore.setTabLayout(value),
+})
+
+// 应用版本
+const appVersion = __APP_VERSION__
 </script>
 
 <template>
@@ -154,6 +158,14 @@ async function handleCleanupNow() {
                                 >
                                     {{ t('common.edit', '编辑') }}
                                 </v-btn>
+                                <v-btn
+                                    variant="text"
+                                    color="secondary"
+                                    size="small"
+                                    @click="resetDeviceName"
+                                >
+                                    {{ t('settings.device.deviceName.reset') }}
+                                </v-btn>
                             </template>
                             <template v-else>
                                 <v-text-field
@@ -189,23 +201,6 @@ async function handleCleanupNow() {
                         </div>
                     </div>
                 </div>
-
-                <v-divider />
-
-                <!-- 恢复默认设备名 -->
-                <div class="d-flex align-center justify-space-between">
-                    <span class="text-body-2 text-grey">
-                        {{ t('settings.device.deviceName.reset') }}
-                    </span>
-                    <v-btn
-                        variant="text"
-                        color="primary"
-                        size="small"
-                        @click="resetDeviceName"
-                    >
-                        {{ t('settings.device.deviceName.reset') }}
-                    </v-btn>
-                </div>
             </div>
         </SettingsGroup>
 
@@ -214,6 +209,24 @@ async function handleCleanupNow() {
                 <ThemeSelector />
                 <v-divider />
                 <LanguageSelector />
+                <template v-if="!isMobile">
+                    <v-divider />
+                    <div class="d-flex align-center justify-space-between">
+                        <div>
+                            <div class="text-subtitle-1">
+                                {{ t('settings.tabLayout.label') }}
+                            </div>
+                        </div>
+                        <v-select
+                            v-model="tabLayout"
+                            :items="tabLayoutOptions"
+                            density="compact"
+                            variant="outlined"
+                            hide-details
+                            style="max-width: 200px"
+                        />
+                    </div>
+                </template>
             </div>
         </SettingsGroup>
 
@@ -341,26 +354,37 @@ async function handleCleanupNow() {
                         </div>
                     </v-expand-transition>
                 </div>
+            </div>
+        </SettingsGroup>
 
-                <v-divider />
-
-                <!-- 当前记录数和立即清理 -->
-                <div class="d-flex align-center justify-space-between">
-                    <span class="text-body-2 text-grey">
-                        {{
-                            t('settings.history.currentCount', {
-                                count: transferStore.historyCount,
-                            })
-                        }}
-                    </span>
+        <!-- 关于 -->
+        <SettingsGroup :title="t('settings.about.title')" class="mt-6">
+            <div class="d-flex flex-column align-center py-4">
+                <v-avatar size="64" class="mb-3">
+                    <v-img src="/icons/icon.png" alt="PureSend" />
+                </v-avatar>
+                <div class="text-h6 font-weight-bold">PureSend</div>
+                <div class="text-body-2 text-grey mt-1">
+                    {{ t('settings.about.version') }} {{ appVersion }}
+                </div>
+                <div class="d-flex flex-column ga-1 mt-2">
                     <v-btn
-                        v-if="cleanupStrategy !== 'disabled'"
                         variant="text"
                         color="primary"
                         size="small"
-                        @click="handleCleanupNow"
+                        href="https://puresend.vercel.app"
+                        target="_blank"
                     >
-                        {{ t('settings.history.cleanupNow') }}
+                        {{ t('settings.about.homepage') }}
+                    </v-btn>
+                    <v-btn
+                        variant="text"
+                        color="primary"
+                        size="small"
+                        href="https://github.com/z-only/puresend"
+                        target="_blank"
+                    >
+                        {{ t('settings.about.github') }}
                     </v-btn>
                 </div>
             </div>

@@ -1,8 +1,8 @@
 //! 传输核心模块
 
 mod chunker;
-mod commands;
 mod cloud;
+mod commands;
 mod integrity;
 mod local;
 mod transport;

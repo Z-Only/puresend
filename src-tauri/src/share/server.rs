@@ -12,20 +12,20 @@ use axum::{
 };
 use bytes::Bytes;
 use futures::Stream;
-use sha2::{Digest, Sha256};
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use tokio::fs::File;
-use tokio_util::io::ReaderStream;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::sync::Arc;
-use tokio::sync::Mutex;
-use tower_http::cors::{Any, CorsLayer};
+use std::task::{Context, Poll};
 use tauri::{AppHandle, Emitter};
+use tokio::fs::File;
+use tokio::sync::Mutex;
+use tokio_util::io::ReaderStream;
+use tower_http::cors::{Any, CorsLayer};
 
-use super::models::{UploadRecord, ShareState};
+use super::models::{ShareState, UploadRecord};
 use crate::models::FileMetadata;
 
 /// Favicon 图标数据（嵌入二进制）
@@ -81,13 +81,13 @@ impl ShareServer {
                 // 使用文件路径的 SHA256 哈希值作为下载 ID，隐藏真实路径
                 let hash = Sha256::digest(path.to_string_lossy().as_bytes());
                 let hash_id = hex::encode(hash);
-                
+
                 let file_name = path
                     .file_name()
                     .and_then(|n| n.to_str())
                     .unwrap_or(&metadata.name)
                     .to_string();
-                
+
                 file_paths.insert(hash_id.clone(), path);
                 hash_to_filename.insert(hash_id, file_name);
             }
@@ -126,12 +126,15 @@ impl ShareServer {
 
         // 启动服务器，使用 into_make_service_with_connect_info 来支持 ConnectInfo
         tokio::spawn(async move {
-            axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
-                .with_graceful_shutdown(async {
-                    let _ = shutdown_rx.await;
-                })
-                .await
-                .ok();
+            axum::serve(
+                listener,
+                app.into_make_service_with_connect_info::<SocketAddr>(),
+            )
+            .with_graceful_shutdown(async {
+                let _ = shutdown_rx.await;
+            })
+            .await
+            .ok();
         });
 
         Ok(actual_port)
@@ -187,16 +190,21 @@ async fn index_handler(
     // 检查是否需要 PIN 验证
     {
         let mut share_state = state.share_state.lock().await;
-        
-        let has_pin = share_state.settings.pin.is_some() && !share_state.settings.pin.as_ref().map_or(true, String::is_empty);
+
+        let has_pin = share_state.settings.pin.is_some()
+            && !share_state
+                .settings
+                .pin
+                .as_ref()
+                .map_or(true, String::is_empty);
         let is_verified = share_state.is_ip_verified(&client_ip);
         let has_access = share_state.is_ip_allowed(&client_ip);
-        
+
         // 如果启用了 PIN 且访问者未验证
         if has_pin && !is_verified && !has_access {
             // 检查是否被锁定
             let pin_attempt = share_state.pin_attempts.get(&client_ip).cloned();
-            
+
             if let Some(attempt) = &pin_attempt {
                 if attempt.is_still_locked() {
                     // 显示锁定页面
@@ -206,39 +214,54 @@ async fn index_handler(
                     return Html(locked_html).into_response();
                 }
             }
-            
+
             // 显示 PIN 输入页面
             return Html(PIN_INPUT_HTML).into_response();
         }
-        
+
         // 如果没有 PIN 且开启了自动接受，且没有请求记录，自动创建已接受的请求
-        let has_request = share_state.access_requests.values().any(|r| r.ip == client_ip);
+        let has_request = share_state
+            .access_requests
+            .values()
+            .any(|r| r.ip == client_ip);
         if !has_pin && share_state.settings.auto_accept && !has_request {
-            let mut new_request = super::models::AccessRequest::new(client_ip.clone(), Some(user_agent.to_string()));
+            let mut new_request =
+                super::models::AccessRequest::new(client_ip.clone(), Some(user_agent.to_string()));
             new_request.status = super::models::AccessRequestStatus::Accepted;
-            share_state.access_requests.insert(new_request.id.clone(), new_request.clone());
-            
+            share_state
+                .access_requests
+                .insert(new_request.id.clone(), new_request.clone());
+
             // 添加到已验证 IP 列表
             if !share_state.verified_ips.contains(&client_ip) {
                 share_state.verified_ips.push(client_ip.clone());
             }
-            
+
             // 发送事件通知前端
             let _ = state.app_handle.emit("access-request", new_request);
             // 同时发送已接受事件
-            let _ = state.app_handle.emit("access-request-accepted", 
-                share_state.access_requests.values().find(|r| r.ip == client_ip).cloned());
+            let _ = state.app_handle.emit(
+                "access-request-accepted",
+                share_state
+                    .access_requests
+                    .values()
+                    .find(|r| r.ip == client_ip)
+                    .cloned(),
+            );
         }
-        
+
         // 如果没有 PIN 且没有开启自动接受，且没有请求记录，创建待处理的请求
         if !has_pin && !share_state.settings.auto_accept && !has_request {
-            let new_request = super::models::AccessRequest::new(client_ip.clone(), Some(user_agent.to_string()));
-            share_state.access_requests.insert(new_request.id.clone(), new_request.clone());
-            
+            let new_request =
+                super::models::AccessRequest::new(client_ip.clone(), Some(user_agent.to_string()));
+            share_state
+                .access_requests
+                .insert(new_request.id.clone(), new_request.clone());
+
             // 发送事件通知前端有新的访问请求
             let _ = state.app_handle.emit("access-request", new_request);
         }
-        
+
         // 如果没有访问权限，显示等待响应页面
         if !has_access && !share_state.settings.auto_accept {
             return Html(WAITING_RESPONSE_HTML).into_response();
@@ -248,11 +271,11 @@ async fn index_handler(
     // 重新获取状态检查访问权限
     let share_state = state.share_state.lock().await;
     let has_access = share_state.is_ip_allowed(&client_ip);
-    
+
     if !has_access {
         return Html(WAITING_RESPONSE_HTML).into_response();
     }
-    
+
     // 有访问权限，显示文件列表页面（通过 JS 轮询 /files API 动态加载）
     let html = r#"<html>
 <head>
@@ -323,52 +346,66 @@ async fn list_files_handler(
     let share_state = state.share_state.lock().await;
 
     if share_state.share_info.is_none() {
-        return (StatusCode::NOT_FOUND, Json(FilesResponse { 
-            files: vec![],
-            waiting_response: None
-        }));
+        return (
+            StatusCode::NOT_FOUND,
+            Json(FilesResponse {
+                files: vec![],
+                waiting_response: None,
+            }),
+        );
     }
 
     let client_ip = client_addr.ip().to_string();
 
     // 检查访问权限
     if share_state.is_ip_rejected(&client_ip) {
-        return (StatusCode::FORBIDDEN, Json(FilesResponse { 
-            files: vec![],
-            waiting_response: None
-        }));
-    }
-
-    // 检查是否需要 PIN（只要设置了 PIN 码且未验证就需要）
-    let has_pin = share_state.settings.pin.is_some() && !share_state.settings.pin.as_ref().map_or(true, String::is_empty);
-    let is_verified = share_state.is_ip_verified(&client_ip);
-    
-    // 检查是否已有访问请求（无论状态如何）
-    let has_request = share_state.access_requests.values().any(|r| r.ip == client_ip);
-    
-    // 如果需要 PIN 且没有请求记录，才返回未授权
-    let needs_pin = has_pin && !is_verified && !has_request;
-    
-    if needs_pin {
         return (
-            StatusCode::UNAUTHORIZED,
-            Json(FilesResponse { 
+            StatusCode::FORBIDDEN,
+            Json(FilesResponse {
                 files: vec![],
-                waiting_response: None
+                waiting_response: None,
             }),
         );
     }
-    
+
+    // 检查是否需要 PIN（只要设置了 PIN 码且未验证就需要）
+    let has_pin = share_state.settings.pin.is_some()
+        && !share_state
+            .settings
+            .pin
+            .as_ref()
+            .map_or(true, String::is_empty);
+    let is_verified = share_state.is_ip_verified(&client_ip);
+
+    // 检查是否已有访问请求（无论状态如何）
+    let has_request = share_state
+        .access_requests
+        .values()
+        .any(|r| r.ip == client_ip);
+
+    // 如果需要 PIN 且没有请求记录，才返回未授权
+    let needs_pin = has_pin && !is_verified && !has_request;
+
+    if needs_pin {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(FilesResponse {
+                files: vec![],
+                waiting_response: None,
+            }),
+        );
+    }
+
     // 检查是否有访问权限（请求已被接受）
     let has_access = share_state.is_ip_allowed(&client_ip);
-    
+
     // 如果没有访问权限，返回等待响应状态
     if !has_access {
         return (
             StatusCode::ACCEPTED,
-            Json(FilesResponse { 
+            Json(FilesResponse {
                 files: vec![],
-                waiting_response: Some(true)
+                waiting_response: Some(true),
             }),
         );
     }
@@ -400,10 +437,13 @@ async fn list_files_handler(
         })
         .collect();
 
-    (StatusCode::OK, Json(FilesResponse { 
-        files,
-        waiting_response: None
-    }))
+    (
+        StatusCode::OK,
+        Json(FilesResponse {
+            files,
+            waiting_response: None,
+        }),
+    )
 }
 
 /// PIN 验证请求
@@ -425,7 +465,6 @@ async fn verify_pin_handler(
         .and_then(|v| v.to_str().ok())
         .map(|s| parse_user_agent(s).to_string());
     let mut share_state = state.share_state.lock().await;
-
 
     // 检查是否被锁定
     if let Some(attempt) = share_state.pin_attempts.get(&client_ip) {
@@ -462,28 +501,32 @@ async fn verify_pin_handler(
     if payload.pin == *correct_pin {
         // 验证成功，清理 PIN 尝试状态
         share_state.pin_attempts.remove(&client_ip);
-        
+
         // 添加到已验证 IP 列表（无论是否自动接受，PIN 验证成功都标记为已验证）
         if !share_state.verified_ips.contains(&client_ip) {
             share_state.verified_ips.push(client_ip.clone());
         }
-        
+
         // 创建访问请求
         let mut new_request = super::models::AccessRequest::new(client_ip.clone(), user_agent);
-        
+
         // 根据 auto_accept 设置决定状态
         if share_state.settings.auto_accept {
             new_request.status = super::models::AccessRequestStatus::Accepted;
         }
-        
-        share_state.access_requests.insert(new_request.id.clone(), new_request.clone());
-        
+
+        share_state
+            .access_requests
+            .insert(new_request.id.clone(), new_request.clone());
+
         // 发送事件通知前端
         let _ = state.app_handle.emit("access-request", new_request.clone());
         if new_request.status == super::models::AccessRequestStatus::Accepted {
-            let _ = state.app_handle.emit("access-request-accepted", new_request);
+            let _ = state
+                .app_handle
+                .emit("access-request-accepted", new_request);
         }
-        
+
         (
             StatusCode::OK,
             Json(super::models::PinVerifyResult {
@@ -499,11 +542,11 @@ async fn verify_pin_handler(
             .pin_attempts
             .entry(client_ip.clone())
             .or_insert_with(|| super::models::PinAttemptState::new(client_ip.clone()));
-        
+
         attempt.record_failure();
-        
+
         let remaining = 3u32.saturating_sub(attempt.attempts);
-        
+
         (
             StatusCode::UNAUTHORIZED,
             Json(super::models::PinVerifyResult {
@@ -525,8 +568,9 @@ fn generate_locked_html(remaining_secs: u64) -> String {
     } else {
         format!("{} 秒", seconds)
     };
-    
-    format!(r#"<!DOCTYPE html>
+
+    format!(
+        r#"<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
@@ -563,7 +607,9 @@ fn generate_locked_html(remaining_secs: u64) -> String {
         updateTimer();
     </script>
 </body>
-</html>"#, time_str, remaining_secs)
+</html>"#,
+        time_str, remaining_secs
+    )
 }
 
 /// 请求状态响应
@@ -589,7 +635,10 @@ async fn request_status_handler(
     let mut share_state = state.share_state.lock().await;
 
     // 查找该 IP 的请求
-    let request = share_state.access_requests.values().find(|r| r.ip == client_ip);
+    let request = share_state
+        .access_requests
+        .values()
+        .find(|r| r.ip == client_ip);
 
     let response = match request {
         Some(req) => {
@@ -604,28 +653,40 @@ async fn request_status_handler(
                 status: Some(status_str.to_string()),
                 waiting_response: req.status == super::models::AccessRequestStatus::Pending,
             }
-        },
+        }
         None => {
             // 检查是否是自动接受模式
             let auto_accept = share_state.settings.auto_accept;
-            let has_pin = share_state.settings.pin.is_some() && !share_state.settings.pin.as_ref().map_or(true, String::is_empty);
+            let has_pin = share_state.settings.pin.is_some()
+                && !share_state
+                    .settings
+                    .pin
+                    .as_ref()
+                    .map_or(true, String::is_empty);
             let is_verified = share_state.is_ip_verified(&client_ip);
-            
+
             // 如果是自动接受模式且没有 PIN，自动创建已接受的请求
             if auto_accept && !has_pin && !is_verified {
-                let mut new_request = super::models::AccessRequest::new(client_ip.clone(), Some(user_agent.to_string()));
+                let mut new_request = super::models::AccessRequest::new(
+                    client_ip.clone(),
+                    Some(user_agent.to_string()),
+                );
                 new_request.status = super::models::AccessRequestStatus::Accepted;
-                share_state.access_requests.insert(new_request.id.clone(), new_request.clone());
-                
+                share_state
+                    .access_requests
+                    .insert(new_request.id.clone(), new_request.clone());
+
                 // 添加到已验证 IP 列表
                 if !share_state.verified_ips.contains(&client_ip) {
                     share_state.verified_ips.push(client_ip.clone());
                 }
-                
+
                 // 发送事件通知前端
                 let _ = state.app_handle.emit("access-request", new_request.clone());
-                let _ = state.app_handle.emit("access-request-accepted", new_request);
-                
+                let _ = state
+                    .app_handle
+                    .emit("access-request-accepted", new_request);
+
                 RequestStatusResponse {
                     has_request: true,
                     status: Some("accepted".to_string()),
@@ -646,7 +707,7 @@ async fn request_status_handler(
                     waiting_response: false,
                 }
             }
-        },
+        }
     };
 
     (StatusCode::OK, Json(response))
@@ -655,10 +716,13 @@ async fn request_status_handler(
 /// 回退处理器 - 用于调试未匹配的路由
 async fn fallback_handler(uri: axum::http::Uri) -> impl IntoResponse {
     eprintln!("未匹配的路由: {}", uri);
-    (StatusCode::NOT_FOUND, Html(format!(
-        "<html><body><h1>404 - 路由未找到</h1><p>请求的路径: {}</p></body></html>",
-        uri
-    )))
+    (
+        StatusCode::NOT_FOUND,
+        Html(format!(
+            "<html><body><h1>404 - 路由未找到</h1><p>请求的路径: {}</p></body></html>",
+            uri
+        )),
+    )
 }
 
 /// 文件上传处理器（向接收者提供文件）
@@ -670,7 +734,10 @@ async fn upload_handler(
     let client_ip = client_addr.ip().to_string();
 
     // 调试：记录上传请求
-    eprintln!("上传请求开始 - client_ip: {}, file_id: {}", client_ip, file_id);
+    eprintln!(
+        "上传请求开始 - client_ip: {}, file_id: {}",
+        client_ip, file_id
+    );
 
     // 检查访问权限
     {
@@ -687,22 +754,29 @@ async fn upload_handler(
         }
 
         // 检查是否需要 PIN（只要设置了 PIN 码且未验证就需要）
-        let has_pin = share_state.settings.pin.is_some() && !share_state.settings.pin.as_ref().map_or(true, String::is_empty);
+        let has_pin = share_state.settings.pin.is_some()
+            && !share_state
+                .settings
+                .pin
+                .as_ref()
+                .map_or(true, String::is_empty);
         let is_verified = share_state.is_ip_verified(&client_ip);
         let needs_pin = has_pin && !is_verified;
-        
+
         // 如果需要 PIN，优先显示提示
         if needs_pin {
             eprintln!("上传失败 - 需要 PIN 验证: {}", client_ip);
             return Html("<html><body><h1>需要验证 PIN</h1></body></html>").into_response();
         }
-        
+
         // 检查是否有访问权限
         let has_access = share_state.is_ip_allowed(&client_ip);
-        
-        eprintln!("上传权限检查 - client_ip: {}, has_access: {}, auto_accept: {}", 
-            client_ip, has_access, share_state.settings.auto_accept);
-        
+
+        eprintln!(
+            "上传权限检查 - client_ip: {}, has_access: {}, auto_accept: {}",
+            client_ip, has_access, share_state.settings.auto_accept
+        );
+
         // 如果没有访问权限，显示等待响应
         if !has_access {
             eprintln!("上传失败 - 没有访问权限: {}", client_ip);
@@ -733,31 +807,39 @@ async fn upload_handler(
                 .unwrap_or("download")
                 .to_string();
 
-            let file_size = std::fs::metadata(&path)
-                .map(|m| m.len())
-                .unwrap_or(0);
+            let file_size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
 
             let mime_type = FileMetadata::infer_mime_type(&file_name);
-            
-            eprintln!("开始传输文件 - file_name: {}, mime_type: {}", file_name, mime_type);
+
+            eprintln!(
+                "开始传输文件 - file_name: {}, mime_type: {}",
+                file_name, mime_type
+            );
 
             // 创建上传记录并追加到访问请求的上传记录列表
             let upload_record = UploadRecord::new(file_name.clone(), file_size);
             let upload_id = upload_record.id.clone();
             {
                 let mut share_state = state.share_state.lock().await;
-                if let Some(request) = share_state.access_requests.values_mut().find(|r| r.ip == client_ip) {
+                if let Some(request) = share_state
+                    .access_requests
+                    .values_mut()
+                    .find(|r| r.ip == client_ip)
+                {
                     request.upload_records.insert(0, upload_record);
                 }
             }
 
             // 发送上传开始事件到前端
-            let _ = state.app_handle.emit("upload-start", UploadStartPayload {
-                upload_id: upload_id.clone(),
-                file_name: file_name.clone(),
-                file_size: file_size as i64,
-                client_ip: client_ip.clone(),
-            });
+            let _ = state.app_handle.emit(
+                "upload-start",
+                UploadStartPayload {
+                    upload_id: upload_id.clone(),
+                    file_name: file_name.clone(),
+                    file_size: file_size as i64,
+                    client_ip: client_ip.clone(),
+                },
+            );
 
             // 使用流式传输文件，通过 ProgressTrackingStream 跟踪进度
             match File::open(&path).await {
@@ -780,7 +862,10 @@ async fn upload_handler(
                     if let Ok(mime_header) = mime_type.parse() {
                         headers.insert(header::CONTENT_TYPE, mime_header);
                     } else {
-                        headers.insert(header::CONTENT_TYPE, "application/octet-stream".parse().unwrap());
+                        headers.insert(
+                            header::CONTENT_TYPE,
+                            "application/octet-stream".parse().unwrap(),
+                        );
                     }
                     let encoded_filename = urlencoding::encode(&file_name);
                     headers.insert(
@@ -789,7 +874,7 @@ async fn upload_handler(
                             .parse()
                             .unwrap(),
                     );
-                    
+
                     eprintln!("文件传输响应已发送 - file_name: {}", file_name);
                     return response;
                 }
@@ -798,7 +883,11 @@ async fn upload_handler(
                     {
                         let mut share_state = state.share_state.lock().await;
                         for request in share_state.access_requests.values_mut() {
-                            if let Some(record) = request.upload_records.iter_mut().find(|r| r.id == upload_id) {
+                            if let Some(record) = request
+                                .upload_records
+                                .iter_mut()
+                                .find(|r| r.id == upload_id)
+                            {
                                 record.status = super::models::TransferStatus::Failed;
                                 break;
                             }
@@ -927,12 +1016,15 @@ impl ProgressTrackingStream {
         };
         let _ = self.app_handle.emit("upload-progress", payload);
 
-        let _ = self.app_handle.emit("upload-complete", UploadCompletePayload {
-            upload_id: self.upload_id.clone(),
-            file_name: self.file_name.clone(),
-            file_size: self.total_bytes as i64,
-            client_ip: self.client_ip.clone(),
-        });
+        let _ = self.app_handle.emit(
+            "upload-complete",
+            UploadCompletePayload {
+                upload_id: self.upload_id.clone(),
+                file_name: self.file_name.clone(),
+                file_size: self.total_bytes as i64,
+                client_ip: self.client_ip.clone(),
+            },
+        );
     }
 }
 
@@ -967,7 +1059,11 @@ impl Stream for ProgressTrackingStream {
                     tokio::spawn(async move {
                         let mut state = share_state.lock().await;
                         for request in state.access_requests.values_mut() {
-                            if let Some(record) = request.upload_records.iter_mut().find(|r| r.id == upload_id) {
+                            if let Some(record) = request
+                                .upload_records
+                                .iter_mut()
+                                .find(|r| r.id == upload_id)
+                            {
                                 record.uploaded_bytes = transferred;
                                 record.progress = prog;
                                 record.speed = spd;
@@ -995,7 +1091,11 @@ impl Stream for ProgressTrackingStream {
                         .unwrap()
                         .as_millis() as u64;
                     for request in state.access_requests.values_mut() {
-                        if let Some(record) = request.upload_records.iter_mut().find(|r| r.id == upload_id) {
+                        if let Some(record) = request
+                            .upload_records
+                            .iter_mut()
+                            .find(|r| r.id == upload_id)
+                        {
                             record.uploaded_bytes = record.total_bytes;
                             record.progress = 100.0;
                             record.status = super::models::TransferStatus::Completed;
@@ -1052,11 +1152,12 @@ fn format_size(size: u64) -> String {
 /// 例如: "Chrome(Android)", "Safari(iOS)", "Firefox(Windows)"
 fn parse_user_agent(ua: &str) -> &'static str {
     let ua_lower = ua.to_lowercase();
-    
+
     // 检测平台
     let platform = if ua_lower.contains("android") {
         "Android"
-    } else if ua_lower.contains("iphone") || ua_lower.contains("ipad") || ua_lower.contains("ipod") {
+    } else if ua_lower.contains("iphone") || ua_lower.contains("ipad") || ua_lower.contains("ipod")
+    {
         "iOS"
     } else if ua_lower.contains("mac") || ua_lower.contains("macos") {
         "macOS"
@@ -1067,7 +1168,7 @@ fn parse_user_agent(ua: &str) -> &'static str {
     } else {
         "Unknown"
     };
-    
+
     // 检测浏览器
     let browser = if ua_lower.contains("edg/") || ua_lower.contains("edge") {
         "Edge"
@@ -1084,7 +1185,7 @@ fn parse_user_agent(ua: &str) -> &'static str {
     } else {
         "Unknown"
     };
-    
+
     // 返回静态字符串，格式: "Browser(Platform)"
     match (browser, platform) {
         ("Chrome", "Android") => "Chrome(Android)",

@@ -51,9 +51,7 @@ pub async fn get_device_name() -> String {
             let hostname = String::from_utf8_lossy(&output.stdout).trim().to_string();
             if !hostname.is_empty() && hostname != "localhost" {
                 // 尝试获取硬件型号
-                if let Ok(hw_output) = std::process::Command::new("hostnamectl")
-                    .output()
-                {
+                if let Ok(hw_output) = std::process::Command::new("hostnamectl").output() {
                     let hw_stdout = String::from_utf8_lossy(&hw_output.stdout);
                     for line in hw_stdout.lines() {
                         if line.contains("Hardware Model:") || line.contains("Machine:") {

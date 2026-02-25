@@ -32,6 +32,12 @@
       }
     },
     "appearance": "Appearance",
+    "tabLayout": {
+      "label": "Tab Layout",
+      "horizontal": "Horizontal",
+      "verticalLeft": "Vertical (Left)",
+      "verticalRight": "Vertical (Right)"
+    },
     "theme": {
       "label": "Theme",
       "light": "Light",
@@ -71,6 +77,14 @@
       },
       "currentCount": "Current records: {count}",
       "cleanupNow": "Cleanup Now"
+    },
+    "about": {
+      "title": "About",
+      "version": "Version",
+      "homepage": "Homepage",
+      "github": "GitHub Project",
+      "collapse": "Collapse",
+      "expand": "Expand"
     }
   },
   "transfer": {
@@ -560,5 +574,38 @@
     "charCount": "{count} characters",
     "addToSend": "Add to Send List",
     "content": "Text Content"
+  },
+  "menu": {
+    "puresend": {
+      "about": "About PureSend",
+      "quit": "Quit"
+    },
+    "file": {
+      "title": "File",
+      "sendFile": "Send File"
+    },
+    "edit": {
+      "title": "Edit",
+      "undo": "Undo",
+      "redo": "Redo",
+      "cut": "Cut",
+      "copy": "Copy",
+      "paste": "Paste",
+      "selectAll": "Select All"
+    },
+    "view": {
+      "title": "View",
+      "toggleFullscreen": "Toggle Fullscreen"
+    },
+    "window": {
+      "title": "Window",
+      "minimize": "Minimize",
+      "zoom": "Zoom"
+    },
+    "help": {
+      "title": "Help",
+      "github": "GitHub Repository",
+      "docs": "Online Documentation"
+    }
   }
 }

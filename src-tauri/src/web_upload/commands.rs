@@ -91,9 +91,7 @@ pub async fn start_web_upload(
 
 /// 停止 Web 上传服务器
 #[tauri::command]
-pub async fn stop_web_upload(
-    state: State<'_, WebUploadManagerState>,
-) -> Result<(), String> {
+pub async fn stop_web_upload(state: State<'_, WebUploadManagerState>) -> Result<(), String> {
     // 停止服务器
     {
         let mut server_guard = state.server.lock().await;

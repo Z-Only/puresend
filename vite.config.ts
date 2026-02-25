@@ -29,6 +29,11 @@ export default defineConfig(async () => ({
             '@': resolve(__dirname, 'src'),
         },
     },
+    define: {
+        __APP_VERSION__: JSON.stringify(
+            process.env.npm_package_version || '0.1.0'
+        ),
+    },
 
     // 构建优化配置
     build: {

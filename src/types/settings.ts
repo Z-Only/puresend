@@ -8,8 +8,11 @@ export type ThemeMode = 'light' | 'dark' | 'system'
 /** 语言模式 */
 export type LanguageMode = 'zh-CN' | 'en-US' | 'system'
 
+/** Tab 栏布局模式 */
+export type TabLayout = 'horizontal' | 'vertical-left' | 'vertical-right'
+
 /** 设置存储版本，用于迁移兼容 */
-export const SETTINGS_VERSION = 3
+export const SETTINGS_VERSION = 4
 
 /** 清理策略 */
 export type CleanupStrategy = 'byTime' | 'byCount' | 'disabled'
@@ -54,6 +57,8 @@ export interface AppSettings {
     language: LanguageMode
     /** 历史记录设置 */
     history: HistorySettings
+    /** Tab 栏布局模式 */
+    tabLayout: TabLayout
 }
 
 /** 扩展的设置状态，包含版本信息 */
@@ -88,6 +93,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     theme: 'system',
     language: 'system',
     history: DEFAULT_HISTORY_SETTINGS,
+    tabLayout: 'horizontal',
 }
 
 /** 接收设置 */
@@ -108,5 +114,7 @@ export const DEFAULT_RECEIVE_SETTINGS: ReceiveSettings = {
     fileOverwrite: false,
     requestExpireTime: 300,
     maxPendingRequests: 50,
-} /** 本地存储键名 */
+}
+
+/** 本地存储键名 */
 export const SETTINGS_STORAGE_KEY = 'puresend-settings'

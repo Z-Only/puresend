@@ -6,6 +6,7 @@ import { ref, computed } from 'vue'
 import {
     type ThemeMode,
     type LanguageMode,
+    type TabLayout,
     type SettingsState,
     type HistoryPrivacySettings,
     type AutoCleanupSettings,
@@ -34,6 +35,7 @@ export const useSettingsStore = defineStore('settings', () => {
     const language = ref<LanguageMode>(DEFAULT_SETTINGS.language)
     const history = ref(DEFAULT_HISTORY_SETTINGS)
     const receiveSettings = ref<ReceiveSettings>(DEFAULT_RECEIVE_SETTINGS)
+    const tabLayout = ref<TabLayout>(DEFAULT_SETTINGS.tabLayout)
     const version = ref(SETTINGS_VERSION)
 
     // ============ 计算属性 ============
@@ -170,30 +172,18 @@ export const useSettingsStore = defineStore('settings', () => {
 
         // 接收设置迁移
         const oldReceiveSettings = (oldSettings as any).receiveSettings || {}
-
-        // 迁移 autoSave → autoReceive
-        if (
-            'autoSave' in oldReceiveSettings &&
-            !('autoReceive' in oldReceiveSettings)
-        ) {
-            console.log('[Settings] 迁移 autoSave → autoReceive')
-            migrated.receiveSettings = {
-                ...oldReceiveSettings,
-                autoReceive: oldReceiveSettings.autoSave,
-                fileOverwrite: oldReceiveSettings.fileOverwrite ?? false,
-            }
-            delete (migrated.receiveSettings as any).autoSave
-        } else {
-            // 确保新字段存在
-            migrated.receiveSettings = {
-                autoReceive: oldReceiveSettings.autoReceive ?? false,
-                fileOverwrite: oldReceiveSettings.fileOverwrite ?? false,
-                requestExpireTime: oldReceiveSettings.requestExpireTime ?? 300,
-                maxPendingRequests: oldReceiveSettings.maxPendingRequests ?? 50,
-            }
+        migrated.receiveSettings = {
+            autoReceive: oldReceiveSettings.autoReceive ?? false,
+            fileOverwrite: oldReceiveSettings.fileOverwrite ?? false,
+            requestExpireTime: oldReceiveSettings.requestExpireTime ?? 300,
+            maxPendingRequests: oldReceiveSettings.maxPendingRequests ?? 50,
         }
 
-        console.log('[Settings] 迁移完成:', migrated.receiveSettings)
+        // Tab 布局迁移
+        if (!('tabLayout' in oldSettings)) {
+            ;(migrated as any).tabLayout = 'horizontal'
+        }
+
         return migrated
     }
 
@@ -208,6 +198,7 @@ export const useSettingsStore = defineStore('settings', () => {
                 language: language.value,
                 history: history.value,
                 receiveSettings: receiveSettings.value,
+                tabLayout: tabLayout.value,
                 version: version.value,
             }
 
@@ -251,6 +242,8 @@ export const useSettingsStore = defineStore('settings', () => {
                 receiveSettings.value =
                     (settings as any).receiveSettings ||
                     DEFAULT_RECEIVE_SETTINGS
+                // 兼容旧版设置（没有 tabLayout 字段）
+                tabLayout.value = (settings as any).tabLayout || 'horizontal'
 
                 // 如果没有设备名称，尝试获取本机设备名
                 if (!deviceName.value) {
@@ -384,6 +377,14 @@ export const useSettingsStore = defineStore('settings', () => {
     }
 
     /**
+     * 设置 Tab 布局
+     */
+    async function setTabLayout(layout: TabLayout): Promise<boolean> {
+        tabLayout.value = layout
+        return saveSettings()
+    }
+
+    /**
      * 监听系统主题变化
      */
     function watchSystemTheme(
@@ -420,6 +421,7 @@ export const useSettingsStore = defineStore('settings', () => {
         language,
         history,
         receiveSettings,
+        tabLayout,
         version,
 
         // 计算属性
@@ -437,6 +439,7 @@ export const useSettingsStore = defineStore('settings', () => {
         setAutoCleanup,
         setAutoReceive,
         setFileOverwrite,
+        setTabLayout,
         saveSettings,
         loadSettings,
         watchSystemTheme,

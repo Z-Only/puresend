@@ -1,159 +1,165 @@
 <template>
-    <v-card class="send-settings-card">
-        <v-card-title class="text-subtitle-1">
-            {{ t('send.settings.title') }}
-        </v-card-title>
-        <v-card-text>
-            <!-- Web 下载开关 -->
-            <div class="setting-item">
-                <div class="d-flex align-center justify-space-between">
-                    <div>
-                        <div class="setting-label text-body-1">
-                            {{ t('send.settings.webDownload') }}
-                        </div>
-                        <div class="text-body-2 text-medium-emphasis">
-                            {{ t('send.settings.webDownloadHint') }}
-                        </div>
-                    </div>
-                    <v-switch
-                        v-model="webDownloadEnabled"
-                        color="primary"
-                        hide-details
-                        :loading="webDownloadLoading"
-                        @update:model-value="handleWebDownloadChange"
-                    />
-                </div>
-
-                <!-- Web 下载链接和二维码（开启后显示） -->
-                <div
-                    v-if="shareStore.isSharing && shareStore.shareInfo"
-                    class="mt-4"
-                >
-                    <div class="d-flex align-center mb-2">
-                        <div class="text-body-2 text-medium-emphasis mr-2">
-                            {{ t('send.settings.webDownloadLink') }}:
-                        </div>
-                        <code class="text-body-2">{{
-                            shareStore.shareLink
-                        }}</code>
-                        <v-btn
-                            :icon="mdiContentCopy"
-                            size="x-small"
-                            variant="text"
-                            class="ml-1"
-                            @click="handleCopyLink"
-                        />
-                        <v-tooltip
-                            location="top"
-                            open-on-hover
-                            :content-class="
-                                isDarkTheme
-                                    ? 'qr-tooltip-dark'
-                                    : 'qr-tooltip-light'
-                            "
-                        >
-                            <template #activator="{ props: tooltipProps }">
-                                <v-btn
-                                    v-bind="tooltipProps"
-                                    :icon="mdiQrcode"
-                                    size="x-small"
-                                    variant="text"
-                                    class="ml-1"
-                                />
-                            </template>
-                            <div class="qr-tooltip-content">
-                                <img
-                                    v-if="qrCodeDataUrl"
-                                    :src="qrCodeDataUrl"
-                                    :alt="t('send.settings.webDownloadQrcode')"
-                                    class="qr-code-tooltip-image"
-                                />
-                                <div v-else class="qr-code-loading">
-                                    {{ t('share.qrcode.generating') }}
-                                </div>
-                            </div>
-                        </v-tooltip>
-                    </div>
-                </div>
-
-                <!-- 子设置项（Web 下载开启后显示） -->
-                <div v-if="shareStore.isSharing" class="mt-4 ml-4">
-                    <!-- 自动接受请求 -->
-                    <div class="d-flex align-center justify-space-between mb-2">
+    <div>
+        <v-card class="send-settings-card">
+            <v-card-title class="text-subtitle-1">
+                {{ t('send.settings.title') }}
+            </v-card-title>
+            <v-card-text>
+                <!-- Web 下载开关 -->
+                <div class="setting-item">
+                    <div class="d-flex align-center justify-space-between">
                         <div>
-                            <div class="text-body-2">
-                                {{ t('share.settings.autoAccept') }}
+                            <div class="setting-label text-body-1">
+                                {{ t('send.settings.webDownload') }}
                             </div>
-                            <div class="text-caption text-medium-emphasis">
-                                {{ t('share.settings.autoAcceptHint') }}
+                            <div class="text-body-2 text-medium-emphasis">
+                                {{ t('send.settings.webDownloadHint') }}
                             </div>
                         </div>
                         <v-switch
-                            v-model="shareStore.settings.autoAccept"
+                            v-model="webDownloadEnabled"
                             color="primary"
                             hide-details
-                            density="compact"
-                            @update:model-value="handleAutoAcceptChange"
+                            :loading="webDownloadLoading"
+                            @update:model-value="handleWebDownloadChange"
                         />
                     </div>
-                    <!-- PIN 保护 -->
-                    <div class="d-flex align-center justify-space-between">
-                        <div>
-                            <div class="text-body-2">
-                                {{ t('share.settings.pinEnabled') }}
+
+                    <!-- Web 下载链接和二维码（开启后显示） -->
+                    <div
+                        v-if="shareStore.isSharing && shareStore.shareInfo"
+                        class="mt-4"
+                    >
+                        <div class="d-flex align-center mb-2">
+                            <div class="text-body-2 text-medium-emphasis mr-2">
+                                {{ t('send.settings.webDownloadLink') }}:
                             </div>
-                            <div class="text-caption text-medium-emphasis">
-                                <span
-                                    v-if="
-                                        shareStore.settings.pinEnabled &&
-                                        shareStore.settings.pin
-                                    "
-                                >
-                                    {{ t('share.settings.currentPin') }}:
-                                    <strong>{{
-                                        shareStore.settings.pin
-                                    }}</strong>
-                                </span>
-                                <span v-else>
-                                    {{
-                                        shareStore.settings.pinEnabled
-                                            ? t('share.settings.pinSet')
-                                            : t('share.settings.pinNotSet')
-                                    }}
-                                </span>
-                            </div>
+                            <code class="text-body-2">{{
+                                shareStore.shareLink
+                            }}</code>
+                            <v-btn
+                                :icon="mdiContentCopy"
+                                size="x-small"
+                                variant="text"
+                                class="ml-1"
+                                @click="handleCopyLink"
+                            />
+                            <v-tooltip
+                                location="top"
+                                open-on-hover
+                                :content-class="
+                                    isDarkTheme
+                                        ? 'qr-tooltip-dark'
+                                        : 'qr-tooltip-light'
+                                "
+                            >
+                                <template #activator="{ props: tooltipProps }">
+                                    <v-btn
+                                        v-bind="tooltipProps"
+                                        :icon="mdiQrcode"
+                                        size="x-small"
+                                        variant="text"
+                                        class="ml-1"
+                                    />
+                                </template>
+                                <div class="qr-tooltip-content">
+                                    <img
+                                        v-if="qrCodeDataUrl"
+                                        :src="qrCodeDataUrl"
+                                        :alt="
+                                            t('send.settings.webDownloadQrcode')
+                                        "
+                                        class="qr-code-tooltip-image"
+                                    />
+                                    <div v-else class="qr-code-loading">
+                                        {{ t('share.qrcode.generating') }}
+                                    </div>
+                                </div>
+                            </v-tooltip>
                         </div>
-                        <v-btn
-                            size="small"
-                            variant="text"
-                            @click="showPinConfig = true"
+                    </div>
+
+                    <!-- 子设置项（Web 下载开启后显示） -->
+                    <div v-if="shareStore.isSharing" class="mt-4 ml-4">
+                        <!-- 自动接受请求 -->
+                        <div
+                            class="d-flex align-center justify-space-between mb-2"
                         >
-                            {{ t('share.settings.configure') }}
-                        </v-btn>
+                            <div>
+                                <div class="text-body-2">
+                                    {{ t('share.settings.autoAccept') }}
+                                </div>
+                                <div class="text-caption text-medium-emphasis">
+                                    {{ t('share.settings.autoAcceptHint') }}
+                                </div>
+                            </div>
+                            <v-switch
+                                v-model="shareStore.settings.autoAccept"
+                                color="primary"
+                                hide-details
+                                density="compact"
+                                @update:model-value="handleAutoAcceptChange"
+                            />
+                        </div>
+                        <!-- PIN 保护 -->
+                        <div class="d-flex align-center justify-space-between">
+                            <div>
+                                <div class="text-body-2">
+                                    {{ t('share.settings.pinEnabled') }}
+                                </div>
+                                <div class="text-caption text-medium-emphasis">
+                                    <span
+                                        v-if="
+                                            shareStore.settings.pinEnabled &&
+                                            shareStore.settings.pin
+                                        "
+                                    >
+                                        {{ t('share.settings.currentPin') }}:
+                                        <strong>{{
+                                            shareStore.settings.pin
+                                        }}</strong>
+                                    </span>
+                                    <span v-else>
+                                        {{
+                                            shareStore.settings.pinEnabled
+                                                ? t('share.settings.pinSet')
+                                                : t('share.settings.pinNotSet')
+                                        }}
+                                    </span>
+                                </div>
+                            </div>
+                            <v-btn
+                                size="small"
+                                variant="text"
+                                @click="showPinConfig = true"
+                            >
+                                {{ t('share.settings.configure') }}
+                            </v-btn>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </v-card-text>
-    </v-card>
+            </v-card-text>
+        </v-card>
 
-    <!-- PIN 配置对话框 -->
-    <PinConfigDialog
-        :visible="showPinConfig"
-        :current-pin="shareStore.settings.pin"
-        :pin-enabled="shareStore.settings.pinEnabled"
-        @update:visible="showPinConfig = $event"
-        @confirm="handleConfirmPin"
-    />
+        <!-- PIN 配置对话框 -->
+        <PinConfigDialog
+            :visible="showPinConfig"
+            :current-pin="shareStore.settings.pin"
+            :pin-enabled="shareStore.settings.pinEnabled"
+            @update:visible="showPinConfig = $event"
+            @confirm="handleConfirmPin"
+        />
 
-    <!-- 复制成功提示 -->
-    <v-snackbar
-        v-model="showCopied"
-        :timeout="2000"
-        color="success"
-        location="top"
-    >
-        {{ t('share.link.copied') }}
-    </v-snackbar>
+        <!-- 复制成功提示 -->
+        <v-snackbar
+            v-model="showCopied"
+            :timeout="2000"
+            color="success"
+            location="top"
+        >
+            {{ t('share.link.copied') }}
+        </v-snackbar>
+    </div>
 </template>
 
 <script setup lang="ts">

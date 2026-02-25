@@ -45,6 +45,8 @@ qrcode = "0.14"
 urlencoding = "2.1"
 async-trait = "0.1.89"
 hostname = "0.4.2"
+open = "5"
+tauri-plugin-os = "2"
 
 [dev-dependencies]
 tempfile = "3"

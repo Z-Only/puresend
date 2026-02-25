@@ -203,11 +203,7 @@ pub async fn clear_access_requests(
 ) -> Result<(), String> {
     let mut share_state = state.share_state.lock().await;
 
-    let removed_ids: Vec<String> = share_state
-        .access_requests
-        .keys()
-        .cloned()
-        .collect();
+    let removed_ids: Vec<String> = share_state.access_requests.keys().cloned().collect();
 
     share_state.access_requests.clear();
 
