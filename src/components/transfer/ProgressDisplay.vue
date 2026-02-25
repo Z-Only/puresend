@@ -169,7 +169,7 @@ const statusColor = computed(() => {
 })
 
 const statusIcon = computed(() => {
-    const icons: Record<string, any> = {
+    const icons: Record<string, string> = {
         pending: mdiClockOutline,
         transferring: mdiSync,
         completed: mdiCheckCircle,

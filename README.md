@@ -4,6 +4,8 @@
 [![GitHub release](https://img.shields.io/github/v/release/z-only/puresend?include_prereleases)](https://github.com/z-only/puresend/releases)
 [![GitHub stars](https://img.shields.io/github/stars/z-only/puresend?style=social)](https://github.com/z-only/puresend/stargazers)
 
+**语言**: [中文](README.md) | [English](README_EN.md)
+
 **跨平台文件传输应用**，基于 Tauri 2 + Vue 3 + TypeScript 构建。支持 macOS、Windows、Linux 和 Android 平台，实现设备间快速、安全的文件传输。
 
 📚 **文档站点**: https://z-only.github.io/puresend/
@@ -124,4 +126,4 @@ git push origin v1.0.0
 
 - **前端**: Vue 3 + TypeScript + Vuetify 3 + Pinia
 - **后端**: Tauri 2 (Rust)
-- **构建工具**: Vite 6
+- **构建工具**: Vite 7

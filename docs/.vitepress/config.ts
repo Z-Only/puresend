@@ -7,50 +7,106 @@ export default defineConfig({
 
   head: [['link', { rel: 'icon', href: '/puresend/favicon.ico' }]],
 
-  themeConfig: {
-    logo: '/logo.svg',
+  locales: {
+    root: {
+      label: '简体中文',
+      lang: 'zh-CN',
+      themeConfig: {
+        logo: '/logo.svg',
 
-    nav: [
-      { text: '首页', link: '/' },
-      { text: '快速开始', link: '/getting-started' },
-      {
-        text: '功能',
-        items: [{ text: '文件传输', link: '/features/file-transfer' }]
-      },
-      {
-        text: '开发',
-        items: [{ text: '环境搭建', link: '/development/setup' }]
-      }
-    ],
+        nav: [
+          { text: '首页', link: '/' },
+          { text: '快速开始', link: '/getting-started' },
+          {
+            text: '功能',
+            items: [{ text: '文件传输', link: '/features/file-transfer' }]
+          },
+          {
+            text: '开发',
+            items: [{ text: '环境搭建', link: '/development/setup' }]
+          }
+        ],
 
-    sidebar: {
-      '/': [
-        {
-          text: '开始',
-          items: [
-            { text: '首页', link: '/' },
-            { text: '快速开始', link: '/getting-started' }
+        sidebar: {
+          '/': [
+            {
+              text: '开始',
+              items: [
+                { text: '首页', link: '/' },
+                { text: '快速开始', link: '/getting-started' }
+              ]
+            },
+            {
+              text: '功能',
+              collapsed: false,
+              items: [{ text: '文件传输', link: '/features/file-transfer' }]
+            },
+            {
+              text: '开发指南',
+              collapsed: false,
+              items: [{ text: '环境搭建', link: '/development/setup' }]
+            }
           ]
         },
-        {
-          text: '功能',
-          collapsed: false,
-          items: [{ text: '文件传输', link: '/features/file-transfer' }]
-        },
-        {
-          text: '开发指南',
-          collapsed: false,
-          items: [{ text: '环境搭建', link: '/development/setup' }]
+
+        footer: {
+          message: '基于 MIT 许可发布',
+          copyright: 'Copyright © 2024-present PureSend'
         }
-      ]
+      }
     },
 
+    en: {
+      label: 'English',
+      lang: 'en-US',
+      themeConfig: {
+        logo: '/logo.svg',
+
+        nav: [
+          { text: 'Home', link: '/en/' },
+          { text: 'Getting Started', link: '/en/getting-started' },
+          {
+            text: 'Features',
+            items: [{ text: 'File Transfer', link: '/en/features/file-transfer' }]
+          },
+          {
+            text: 'Development',
+            items: [{ text: 'Setup', link: '/en/development/setup' }]
+          }
+        ],
+
+        sidebar: {
+          '/en/': [
+            {
+              text: 'Getting Started',
+              items: [
+                { text: 'Home', link: '/en/' },
+                { text: 'Getting Started', link: '/en/getting-started' }
+              ]
+            },
+            {
+              text: 'Features',
+              collapsed: false,
+              items: [{ text: 'File Transfer', link: '/en/features/file-transfer' }]
+            },
+            {
+              text: 'Development',
+              collapsed: false,
+              items: [{ text: 'Setup', link: '/en/development/setup' }]
+            }
+          ]
+        },
+
+        footer: {
+          message: 'Released under the MIT License',
+          copyright: 'Copyright © 2024-present PureSend'
+        }
+      }
+    }
+  },
+
+  themeConfig: {
     socialLinks: [{ icon: 'github', link: 'https://github.com/Z-Only/puresend' }],
-
-    footer: {
-      message: '基于 MIT 许可发布',
-      copyright: 'Copyright © 2024-present PureSend'
-    },
 
     search: {
       provider: 'local'
@@ -59,7 +115,5 @@ export default defineConfig({
     outline: {
       level: [2, 3]
     }
-  },
-
-  lang: 'zh-CN'
+  }
 })

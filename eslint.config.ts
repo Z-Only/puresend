@@ -39,7 +39,7 @@ export default defineConfig([
     {
         files: ['**/*.ts', '**/*.vue'],
         rules: {
-            '@typescript-eslint/no-explicit-any': 'off',
+            '@typescript-eslint/no-explicit-any': 'warn',
             '@typescript-eslint/no-empty-object-type': 'off',
         },
     },

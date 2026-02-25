@@ -98,7 +98,7 @@ puresend/
 
 - **前端**: Vue 3 + TypeScript + Vuetify 3 + Pinia
 - **后端**: Tauri 2 (Rust)
-- **构建工具**: Vite 6
+- **构建工具**: Vite 7
 - **文档**: VitePress
 
 ## 常用命令

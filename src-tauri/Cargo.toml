@@ -31,7 +31,7 @@ tokio = { version = "1", features = ["full"] }
 base64 = "0.22"
 sha2 = "0.10"
 thiserror = "2"
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { version = "0.4.44", features = ["serde"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 local-ip-address = "0.6"
 bytes = "1"
@@ -45,11 +45,11 @@ qrcode = "0.14"
 urlencoding = "2.1"
 async-trait = "0.1.89"
 hostname = "0.4.2"
-open = "5"
 tauri-plugin-os = "2"
+open = "5"
 
 [dev-dependencies]
-tempfile = "3"
+tempfile = "3.26"
 
 # 发布优化配置
 [profile.release]

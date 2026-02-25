@@ -11,8 +11,24 @@ export type LanguageMode = 'zh-CN' | 'en-US' | 'system'
 /** Tab 栏布局模式 */
 export type TabLayout = 'horizontal' | 'vertical-left' | 'vertical-right'
 
+/** 字体大小模式 */
+export type FontSizeMode = 'system' | 'preset' | 'custom'
+
+/** 字体大小预设 */
+export type FontSizePreset = 'small' | 'medium' | 'large' | 'xlarge'
+
+/** 字体大小设置 */
+export interface FontSizeSettings {
+    /** 模式 */
+    mode: FontSizeMode
+    /** 预设大小（仅在 mode='preset' 时有效） */
+    preset: FontSizePreset
+    /** 自定义缩放比例（仅在 mode='custom' 时有效） */
+    customScale: number
+}
+
 /** 设置存储版本，用于迁移兼容 */
-export const SETTINGS_VERSION = 4
+export const SETTINGS_VERSION = 5
 
 /** 清理策略 */
 export type CleanupStrategy = 'byTime' | 'byCount' | 'disabled'
@@ -59,6 +75,8 @@ export interface AppSettings {
     history: HistorySettings
     /** Tab 栏布局模式 */
     tabLayout: TabLayout
+    /** 字体大小设置 */
+    fontSize: FontSizeSettings
 }
 
 /** 扩展的设置状态，包含版本信息 */
@@ -80,6 +98,13 @@ export const DEFAULT_AUTO_CLEANUP_SETTINGS: AutoCleanupSettings = {
     strategy: 'disabled',
 }
 
+/** 默认字体大小设置 */
+export const DEFAULT_FONT_SIZE_SETTINGS: FontSizeSettings = {
+    mode: 'system',
+    preset: 'medium',
+    customScale: 1.0,
+}
+
 /** 默认历史记录设置 */
 export const DEFAULT_HISTORY_SETTINGS: HistorySettings = {
     recordHistory: true,
@@ -94,6 +119,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     language: 'system',
     history: DEFAULT_HISTORY_SETTINGS,
     tabLayout: 'horizontal',
+    fontSize: DEFAULT_FONT_SIZE_SETTINGS,
 }
 
 /** 接收设置 */

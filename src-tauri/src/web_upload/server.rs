@@ -19,7 +19,7 @@ use tauri::{AppHandle, Emitter};
 use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
 
-use super::models::{UploadRecord, UploadRequest, UploadRequestStatus, WebUploadState};
+use super::models::{WebUploadRecord, UploadRequest, UploadRequestStatus, WebUploadState};
 
 /// Favicon 图标数据
 static FAVICON_ICO: &[u8] = include_bytes!("../../icons/32x32.png");
@@ -72,8 +72,8 @@ impl WebUploadServer {
             .layer(
                 CorsLayer::new()
                     .allow_origin(Any)
-                    .allow_methods(Any)
-                    .allow_headers(Any),
+                    .allow_methods([axum::http::Method::GET, axum::http::Method::POST])
+                    .allow_headers([header::CONTENT_TYPE, header::ACCEPT]),
             )
             .with_state(self.state.clone());
 
@@ -117,8 +117,8 @@ async fn favicon_handler() -> impl IntoResponse {
     let mut response = Response::new(Body::from(FAVICON_ICO));
     *response.status_mut() = StatusCode::OK;
     let headers = response.headers_mut();
-    headers.insert(header::CONTENT_TYPE, "image/png".parse().unwrap());
-    headers.insert(header::CACHE_CONTROL, "max-age=86400".parse().unwrap());
+    headers.insert(header::CONTENT_TYPE, axum::http::HeaderValue::from_static("image/png"));
+    headers.insert(header::CACHE_CONTROL, axum::http::HeaderValue::from_static("max-age=86400"));
     response
 }
 
@@ -342,7 +342,7 @@ async fn upload_handler(
             .as_secs();
 
         // 创建 UploadRecord 并添加到请求中
-        let record = UploadRecord {
+        let record = WebUploadRecord {
             id: record_id.clone(),
             file_name: file_name.clone(),
             uploaded_bytes: 0,

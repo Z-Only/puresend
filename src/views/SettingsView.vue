@@ -119,6 +119,39 @@ const tabLayout = computed({
     set: (value) => settingsStore.setTabLayout(value),
 })
 
+// 字体大小设置
+const fontSizeMode = computed({
+    get: () => settingsStore.fontSize.mode,
+    set: (value) => settingsStore.setFontSizeMode(value),
+})
+
+const fontSizePreset = computed({
+    get: () => settingsStore.fontSize.preset,
+    set: (value) => settingsStore.setFontSizePreset(value),
+})
+
+const fontSizeCustomScale = computed({
+    get: () => settingsStore.fontSize.customScale,
+    set: (value) => {
+        // 确保值在有效范围内（0.8 - 1.5）
+        const validValue = Math.max(0.8, Math.min(1.5, value))
+        settingsStore.setFontSizeCustomScale(validValue)
+    },
+})
+
+const fontSizeModeOptions = computed(() => [
+    { title: t('settings.fontSize.mode.system'), value: 'system' },
+    { title: t('settings.fontSize.mode.preset'), value: 'preset' },
+    { title: t('settings.fontSize.mode.custom'), value: 'custom' },
+])
+
+const fontSizePresetOptions = computed(() => [
+    { title: t('settings.fontSize.preset.small'), value: 'small' },
+    { title: t('settings.fontSize.preset.medium'), value: 'medium' },
+    { title: t('settings.fontSize.preset.large'), value: 'large' },
+    { title: t('settings.fontSize.preset.xlarge'), value: 'xlarge' },
+])
+
 // 应用版本
 const appVersion = __APP_VERSION__
 </script>
@@ -209,6 +242,78 @@ const appVersion = __APP_VERSION__
                 <ThemeSelector />
                 <v-divider />
                 <LanguageSelector />
+                <v-divider />
+                <!-- 字体大小设置 -->
+                <div class="d-flex flex-column ga-4">
+                    <div class="d-flex align-center justify-space-between">
+                        <div>
+                            <div class="text-subtitle-1">
+                                {{ t('settings.fontSize.label') }}
+                            </div>
+                        </div>
+                        <v-select
+                            v-model="fontSizeMode"
+                            :items="fontSizeModeOptions"
+                            density="compact"
+                            variant="outlined"
+                            hide-details
+                            style="max-width: 200px"
+                        />
+                    </div>
+                    <!-- 预设大小选项 -->
+                    <div
+                        v-if="fontSizeMode === 'preset'"
+                        class="d-flex align-center justify-space-between"
+                    >
+                        <div>
+                            <div class="text-subtitle-1">
+                                {{ t('settings.fontSize.mode.preset') }}
+                            </div>
+                        </div>
+                        <v-select
+                            v-model="fontSizePreset"
+                            :items="fontSizePresetOptions"
+                            density="compact"
+                            variant="outlined"
+                            hide-details
+                            style="max-width: 200px"
+                        />
+                    </div>
+                    <!-- 自定义缩放滑块 -->
+                    <div
+                        v-if="fontSizeMode === 'custom'"
+                        class="d-flex flex-column ga-2"
+                    >
+                        <div class="d-flex align-center justify-space-between">
+                            <div class="text-subtitle-1">
+                                {{ t('settings.fontSize.custom.label') }}
+                            </div>
+                            <span class="text-body-2">
+                                {{ Math.round(fontSizeCustomScale * 100) }}%
+                            </span>
+                        </div>
+                        <v-slider
+                            v-model="fontSizeCustomScale"
+                            :min="0.8"
+                            :max="1.5"
+                            :step="0.05"
+                            color="primary"
+                            hide-details
+                            density="compact"
+                        >
+                            <template #prepend>
+                                <span class="text-body-2 text-grey">
+                                    {{ t('settings.fontSize.custom.min') }}
+                                </span>
+                            </template>
+                            <template #append>
+                                <span class="text-body-2 text-grey">
+                                    {{ t('settings.fontSize.custom.max') }}
+                                </span>
+                            </template>
+                        </v-slider>
+                    </div>
+                </div>
                 <template v-if="!isMobile">
                     <v-divider />
                     <div class="d-flex align-center justify-space-between">

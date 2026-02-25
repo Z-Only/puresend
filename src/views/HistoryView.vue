@@ -4,10 +4,10 @@
         <v-card>
             <v-card-title class="d-flex align-center justify-space-between">
                 <span>{{ t('history.title') }}</span>
-                <div class="d-flex align-center ga-2">
+                <div class="header-actions">
                     <span
                         v-if="transferStore.historyCount > 0"
-                        class="text-body-2 text-grey"
+                        class="text-grey"
                     >
                         {{
                             t('history.recordCount', {
@@ -19,7 +19,7 @@
                         v-if="transferStore.selectedHistoryCount > 0"
                         color="error"
                         variant="text"
-                        size="small"
+                        size="x-small"
                         @click="handleBatchDelete"
                     >
                         {{
@@ -32,7 +32,7 @@
                         v-if="transferStore.historyCount > 0"
                         color="error"
                         variant="text"
-                        size="small"
+                        size="x-small"
                         @click="showClearDialog = true"
                     >
                         {{ t('history.clear') }}
@@ -44,7 +44,7 @@
 
             <!-- 筛选和排序 -->
             <v-card-text v-if="transferStore.historyCount > 0" class="pb-0">
-                <v-row dense>
+                <v-row density="comfortable">
                     <v-col cols="6" sm="3">
                         <v-select
                             v-model="filterDirection"
@@ -471,5 +471,16 @@ onMounted(async () => {
 .history-view {
     max-width: 800px;
     margin: 0 auto;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+
+.header-actions :deep(.v-btn__content) {
+    font-size: 14px;
 }
 </style>

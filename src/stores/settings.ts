@@ -11,9 +11,13 @@ import {
     type HistoryPrivacySettings,
     type AutoCleanupSettings,
     type ReceiveSettings,
+    type FontSizeMode,
+    type FontSizePreset,
+    type FontSizeSettings,
     DEFAULT_SETTINGS,
     DEFAULT_HISTORY_SETTINGS,
     DEFAULT_RECEIVE_SETTINGS,
+    DEFAULT_FONT_SIZE_SETTINGS,
     SETTINGS_VERSION,
     SETTINGS_STORAGE_KEY,
 } from '@/types/settings'
@@ -36,6 +40,7 @@ export const useSettingsStore = defineStore('settings', () => {
     const history = ref(DEFAULT_HISTORY_SETTINGS)
     const receiveSettings = ref<ReceiveSettings>(DEFAULT_RECEIVE_SETTINGS)
     const tabLayout = ref<TabLayout>(DEFAULT_SETTINGS.tabLayout)
+    const fontSize = ref(DEFAULT_FONT_SIZE_SETTINGS)
     const version = ref(SETTINGS_VERSION)
 
     // ============ 计算属性 ============
@@ -171,7 +176,9 @@ export const useSettingsStore = defineStore('settings', () => {
         migrated.history = oldSettings.history || DEFAULT_HISTORY_SETTINGS
 
         // 接收设置迁移
-        const oldReceiveSettings = (oldSettings as any).receiveSettings || {}
+        const legacySettings = oldSettings as unknown as Record<string, unknown>
+        const oldReceiveSettings =
+            (legacySettings.receiveSettings as ReceiveSettings) || {}
         migrated.receiveSettings = {
             autoReceive: oldReceiveSettings.autoReceive ?? false,
             fileOverwrite: oldReceiveSettings.fileOverwrite ?? false,
@@ -181,7 +188,12 @@ export const useSettingsStore = defineStore('settings', () => {
 
         // Tab 布局迁移
         if (!('tabLayout' in oldSettings)) {
-            ;(migrated as any).tabLayout = 'horizontal'
+            migrated.tabLayout = 'horizontal'
+        }
+
+        // 字体大小设置迁移
+        if (!('fontSize' in oldSettings)) {
+            migrated.fontSize = DEFAULT_FONT_SIZE_SETTINGS
         }
 
         return migrated
@@ -199,6 +211,7 @@ export const useSettingsStore = defineStore('settings', () => {
                 history: history.value,
                 receiveSettings: receiveSettings.value,
                 tabLayout: tabLayout.value,
+                fontSize: fontSize.value,
                 version: version.value,
             }
 
@@ -239,11 +252,20 @@ export const useSettingsStore = defineStore('settings', () => {
                 // 兼容旧版设置（没有 history 字段）
                 history.value = settings.history || DEFAULT_HISTORY_SETTINGS
                 // 兼容旧版设置（没有 receiveSettings 字段）
+                const loadedSettings = settings as unknown as Record<
+                    string,
+                    unknown
+                >
                 receiveSettings.value =
-                    (settings as any).receiveSettings ||
+                    (loadedSettings.receiveSettings as ReceiveSettings) ||
                     DEFAULT_RECEIVE_SETTINGS
                 // 兼容旧版设置（没有 tabLayout 字段）
-                tabLayout.value = (settings as any).tabLayout || 'horizontal'
+                tabLayout.value =
+                    (loadedSettings.tabLayout as TabLayout) || 'horizontal'
+                // 兼容旧版设置（没有 fontSize 字段）
+                fontSize.value =
+                    (loadedSettings.fontSize as FontSizeSettings) ||
+                    DEFAULT_FONT_SIZE_SETTINGS
 
                 // 如果没有设备名称，尝试获取本机设备名
                 if (!deviceName.value) {
@@ -385,6 +407,30 @@ export const useSettingsStore = defineStore('settings', () => {
     }
 
     /**
+     * 设置字体大小模式
+     */
+    async function setFontSizeMode(mode: FontSizeMode): Promise<boolean> {
+        fontSize.value = { ...fontSize.value, mode }
+        return saveSettings()
+    }
+
+    /**
+     * 设置字体大小预设
+     */
+    async function setFontSizePreset(preset: FontSizePreset): Promise<boolean> {
+        fontSize.value = { ...fontSize.value, preset }
+        return saveSettings()
+    }
+
+    /**
+     * 设置自定义字体大小缩放比例
+     */
+    async function setFontSizeCustomScale(scale: number): Promise<boolean> {
+        fontSize.value = { ...fontSize.value, customScale: scale }
+        return saveSettings()
+    }
+
+    /**
      * 监听系统主题变化
      */
     function watchSystemTheme(
@@ -422,6 +468,7 @@ export const useSettingsStore = defineStore('settings', () => {
         history,
         receiveSettings,
         tabLayout,
+        fontSize,
         version,
 
         // 计算属性
@@ -440,6 +487,9 @@ export const useSettingsStore = defineStore('settings', () => {
         setAutoReceive,
         setFileOverwrite,
         setTabLayout,
+        setFontSizeMode,
+        setFontSizePreset,
+        setFontSizeCustomScale,
         saveSettings,
         loadSettings,
         watchSystemTheme,

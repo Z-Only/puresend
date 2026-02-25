@@ -50,6 +50,25 @@
       "enUS": "English",
       "system": "System"
     },
+    "fontSize": {
+      "label": "Font Size",
+      "mode": {
+        "system": "System",
+        "preset": "Preset",
+        "custom": "Custom"
+      },
+      "preset": {
+        "small": "Small",
+        "medium": "Medium",
+        "large": "Large",
+        "xlarge": "Extra Large"
+      },
+      "custom": {
+        "label": "Custom Scale",
+        "min": "80%",
+        "max": "150%"
+      }
+    },
     "history": {
       "title": "History",
       "recordHistory": {

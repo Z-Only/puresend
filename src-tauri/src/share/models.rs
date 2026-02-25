@@ -6,6 +6,19 @@ use uuid::Uuid;
 
 use crate::models::FileMetadata;
 
+/// PIN 验证失败后的锁定时间（毫秒）：5 分钟
+const PIN_LOCK_DURATION_MS: u64 = 5 * 60 * 1000;
+/// PIN 验证最大失败次数
+const MAX_PIN_ATTEMPTS: u32 = 3;
+
+/// 获取当前时间戳（毫秒），如果系统时钟异常则返回 0
+fn current_timestamp_millis() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
+}
+
 /// 分享链接信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,10 +45,7 @@ pub struct ShareLinkInfo {
 impl ShareLinkInfo {
     /// 创建新的分享链接信息
     pub fn new(link: String, port: u16, files: Vec<FileMetadata>) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
+        let now = current_timestamp_millis();
 
         Self {
             link,
@@ -137,7 +147,7 @@ pub struct TransferProgress {
 /// 应用作为文件提供方，实际上是在上传文件给接收者。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct UploadRecord {
+pub struct ShareUploadRecord {
     /// 上传记录唯一 ID
     pub id: String,
     /// 文件名
@@ -159,13 +169,10 @@ pub struct UploadRecord {
     pub completed_at: Option<u64>,
 }
 
-impl UploadRecord {
+impl ShareUploadRecord {
     /// 创建新的上传记录
     pub fn new(file_name: String, total_bytes: u64) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
+        let now = current_timestamp_millis();
 
         Self {
             id: Uuid::new_v4().to_string(),
@@ -210,13 +217,9 @@ impl PinAttemptState {
     /// 记录 PIN 验证失败
     pub fn record_failure(&mut self) {
         self.attempts += 1;
-        if self.attempts >= 3 {
+        if self.attempts >= MAX_PIN_ATTEMPTS {
             self.locked = true;
-            let locked_until = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64
-                + 5 * 60 * 1000; // 锁定 5 分钟
+            let locked_until = current_timestamp_millis() + PIN_LOCK_DURATION_MS;
             self.locked_until = Some(locked_until);
         }
     }
@@ -227,10 +230,7 @@ impl PinAttemptState {
             return false;
         }
         if let Some(locked_until) = self.locked_until {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64;
+            let now = current_timestamp_millis();
             if now >= locked_until {
                 return false;
             }
@@ -244,10 +244,7 @@ impl PinAttemptState {
             return 0;
         }
         if let Some(locked_until) = self.locked_until {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64;
+            let now = current_timestamp_millis();
             if now >= locked_until {
                 0
             } else {
@@ -282,16 +279,13 @@ pub struct AccessRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_agent: Option<String>,
     /// 上传记录列表
-    pub upload_records: Vec<UploadRecord>,
+    pub upload_records: Vec<ShareUploadRecord>,
 }
 
 impl AccessRequest {
     /// 创建新的访问请求
     pub fn new(ip: String, user_agent: Option<String>) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
+        let now = current_timestamp_millis();
 
         Self {
             id: Uuid::new_v4().to_string(),

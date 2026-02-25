@@ -25,7 +25,7 @@ use tokio::sync::Mutex;
 use tokio_util::io::ReaderStream;
 use tower_http::cors::{Any, CorsLayer};
 
-use super::models::{ShareState, UploadRecord};
+use super::models::{ShareState, ShareUploadRecord};
 use crate::models::FileMetadata;
 
 /// Favicon 图标数据（嵌入二进制）
@@ -105,8 +105,8 @@ impl ShareServer {
             .layer(
                 CorsLayer::new()
                     .allow_origin(Any)
-                    .allow_methods(Any)
-                    .allow_headers(Any),
+                    .allow_methods([axum::http::Method::GET, axum::http::Method::POST])
+                    .allow_headers([header::CONTENT_TYPE, header::ACCEPT]),
             )
             .with_state(self.state.clone());
 
@@ -153,8 +153,8 @@ async fn favicon_handler() -> impl IntoResponse {
     let mut response = Response::new(Body::from(FAVICON_ICO));
     *response.status_mut() = StatusCode::OK;
     let headers = response.headers_mut();
-    headers.insert(header::CONTENT_TYPE, "image/png".parse().unwrap());
-    headers.insert(header::CACHE_CONTROL, "max-age=86400".parse().unwrap());
+    headers.insert(header::CONTENT_TYPE, axum::http::HeaderValue::from_static("image/png"));
+    headers.insert(header::CACHE_CONTROL, axum::http::HeaderValue::from_static("max-age=86400"));
     response
 }
 
@@ -171,11 +171,18 @@ async fn index_handler(
         .map(|s| parse_user_agent(s))
         .unwrap_or_default();
 
+    // 检测用户语言偏好
+    let accept_language = headers
+        .get(header::ACCEPT_LANGUAGE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("zh-CN");
+    let is_english = accept_language.starts_with("en");
+
     // 首先检查分享是否活跃并获取必要信息
     {
         let share_state = state.share_state.lock().await;
         if share_state.share_info.is_none() {
-            return Html("<html><body><h1>分享已结束</h1></body></html>").into_response();
+            return Html(generate_share_ended_html(is_english)).into_response();
         }
     }
 
@@ -183,7 +190,7 @@ async fn index_handler(
     {
         let share_state = state.share_state.lock().await;
         if share_state.is_ip_rejected(&client_ip) {
-            return Html("<html><body><h1>访问被拒绝</h1></body></html>").into_response();
+            return Html(generate_access_denied_html(is_english)).into_response();
         }
     }
 
@@ -210,13 +217,13 @@ async fn index_handler(
                     // 显示锁定页面
                     let remaining_ms = attempt.remaining_lock_time();
                     let remaining_secs = remaining_ms / 1000;
-                    let locked_html = generate_locked_html(remaining_secs);
+                    let locked_html = generate_locked_html(remaining_secs, is_english);
                     return Html(locked_html).into_response();
                 }
             }
 
             // 显示 PIN 输入页面
-            return Html(PIN_INPUT_HTML).into_response();
+            return Html(generate_pin_input_html(is_english)).into_response();
         }
 
         // 如果没有 PIN 且开启了自动接受，且没有请求记录，自动创建已接受的请求
@@ -264,7 +271,7 @@ async fn index_handler(
 
         // 如果没有访问权限，显示等待响应页面
         if !has_access && !share_state.settings.auto_accept {
-            return Html(WAITING_RESPONSE_HTML).into_response();
+            return Html(generate_waiting_response_html(is_english)).into_response();
         }
     }
 
@@ -273,67 +280,11 @@ async fn index_handler(
     let has_access = share_state.is_ip_allowed(&client_ip);
 
     if !has_access {
-        return Html(WAITING_RESPONSE_HTML).into_response();
+        return Html(generate_waiting_response_html(is_english)).into_response();
     }
 
     // 有访问权限，显示文件列表页面（通过 JS 轮询 /files API 动态加载）
-    let html = r#"<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="/favicon.ico">
-    <title>PureSend - 文件分享</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-        h1 { color: #333; }
-        ul { list-style: none; padding: 0; }
-        li { padding: 10px; border-bottom: 1px solid #eee; }
-        a { color: #1976d2; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .warning { background: #fff3cd; padding: 10px; border-radius: 4px; margin-bottom: 20px; }
-        .empty { color: #999; text-align: center; padding: 40px 0; }
-    </style>
-</head>
-<body>
-    <h1>PureSend 文件分享</h1>
-    <div class="warning">
-        ⚠️ 此链接仅限可信网络内使用，请勿分享到公共平台
-    </div>
-    <h2>可用文件</h2>
-    <ul id="file-list">
-        <li class="empty">加载中...</li>
-    </ul>
-    <script>
-        function formatSize(bytes) {
-            if (bytes === 0) return '0 B';
-            var units = ['B', 'KB', 'MB', 'GB', 'TB'];
-            var i = Math.floor(Math.log(bytes) / Math.log(1024));
-            return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + units[i];
-        }
-        var lastJson = '';
-        function refreshFiles() {
-            fetch('/files')
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
-                    var json = JSON.stringify(data.files);
-                    if (json === lastJson) return;
-                    lastJson = json;
-                    var ul = document.getElementById('file-list');
-                    if (!data.files || data.files.length === 0) {
-                        ul.innerHTML = '<li class="empty">暂无可用文件</li>';
-                        return;
-                    }
-                    ul.innerHTML = data.files.map(function(f) {
-                        return '<li><a href="/download/' + f.id + '" download="' + f.name + '">' + f.name + '</a> (' + formatSize(f.size) + ')</li>';
-                    }).join('');
-                })
-                .catch(function() {});
-        }
-        refreshFiles();
-        setInterval(refreshFiles, 1000);
-    </script>
-</body>
-</html>"#.to_string();
+    let html = generate_file_list_html(is_english);
 
     Html(html).into_response()
 }
@@ -560,23 +511,43 @@ async fn verify_pin_handler(
 }
 
 /// 生成锁定页面 HTML
-fn generate_locked_html(remaining_secs: u64) -> String {
+fn generate_locked_html(remaining_secs: u64, is_english: bool) -> String {
     let minutes = remaining_secs / 60;
     let seconds = remaining_secs % 60;
-    let time_str = if minutes > 0 {
-        format!("{} 分 {} 秒", minutes, seconds)
+    let time_str = if is_english {
+        if minutes > 0 {
+            format!("{} min {} sec", minutes, seconds)
+        } else {
+            format!("{} sec", seconds)
+        }
     } else {
-        format!("{} 秒", seconds)
+        if minutes > 0 {
+            format!("{} 分 {} 秒", minutes, seconds)
+        } else {
+            format!("{} 秒", seconds)
+        }
     };
+
+    let title = if is_english { "PureSend - Locked" } else { "PureSend - 已锁定" };
+    let heading = if is_english { "Access Locked" } else { "访问已锁定" };
+    let message = if is_english {
+        "Too many PIN attempts. Please try again later."
+    } else {
+        "PIN 码验证失败次数过多，请稍后再试"
+    };
+    let timer_label = if is_english { "Time remaining:" } else { "剩余时间：" };
+    let lang = if is_english { "en" } else { "zh-CN" };
+    let min_unit = if is_english { "min " } else { "分 " };
+    let sec_unit = if is_english { "sec" } else { "秒" };
 
     format!(
         r#"<!DOCTYPE html>
-<html>
+<html lang="{lang}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="/favicon.ico">
-    <title>PureSend - 已锁定</title>
+    <title>{title}</title>
     <style>
         body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 400px; margin: 100px auto; padding: 20px; text-align: center; }}
         h1 {{ color: #d32f2f; }}
@@ -586,12 +557,12 @@ fn generate_locked_html(remaining_secs: u64) -> String {
     </style>
 </head>
 <body>
-    <h1>访问已锁定</h1>
+    <h1>{heading}</h1>
     <div class="lock-icon">🔒</div>
-    <div class="message">PIN 码验证失败次数过多，请稍后再试</div>
-    <div class="timer" id="timer">剩余时间：{}</div>
+    <div class="message">{message}</div>
+    <div class="timer" id="timer">{timer_label} {0}</div>
     <script>
-        let remaining = {};
+        let remaining = {1};
         function updateTimer() {{
             if (remaining <= 0) {{
                 window.location.reload();
@@ -600,15 +571,15 @@ fn generate_locked_html(remaining_secs: u64) -> String {
             remaining--;
             const min = Math.floor(remaining / 60);
             const sec = remaining % 60;
-            const timeStr = min > 0 ? min + ' 分 ' + sec + ' 秒' : sec + ' 秒';
-            document.getElementById('timer').textContent = '剩余时间：' + timeStr;
+            const timeStr = min > 0 ? min + ' {2}' + sec + ' {3}' : sec + ' {3}';
+            document.getElementById('timer').textContent = '{4}' + timeStr;
             setTimeout(updateTimer, 1000);
         }}
         updateTimer();
     </script>
 </body>
 </html>"#,
-        time_str, remaining_secs
+        time_str, remaining_secs, min_unit, sec_unit, timer_label
     )
 }
 
@@ -817,7 +788,7 @@ async fn upload_handler(
             );
 
             // 创建上传记录并追加到访问请求的上传记录列表
-            let upload_record = UploadRecord::new(file_name.clone(), file_size);
+            let upload_record = ShareUploadRecord::new(file_name.clone(), file_size);
             let upload_id = upload_record.id.clone();
             {
                 let mut share_state = state.share_state.lock().await;
@@ -1212,137 +1183,6 @@ fn parse_user_agent(ua: &str) -> &'static str {
     }
 }
 
-/// PIN 输入页面模板（内嵌）
-#[allow(dead_code)]
-static PIN_INPUT_HTML: &str = r#"
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="/favicon.ico">
-    <title>PureSend - PIN 验证</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 400px; margin: 100px auto; padding: 20px; text-align: center; }
-        h1 { color: #333; margin-bottom: 20px; }
-        .input-container { width: 100%; max-width: 300px; margin: 0 auto 15px; }
-        input { width: 100%; padding: 12px; font-size: 18px; text-align: center; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { width: 100%; max-width: 300px; padding: 12px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
-        button:hover { background: #1565c0; }
-        .error { color: #d32f2f; margin-top: 10px; }
-    </style>
-</head>
-<body>
-    <h1>请输入 PIN 码</h1>
-    <div class="input-container">
-        <input type="text" id="pin" placeholder="输入 PIN 码">
-    </div>
-    <button onclick="verify()">验证</button>
-    <div id="error" class="error"></div>
-    
-    <script>
-        async function verify() {
-            const pin = document.getElementById('pin').value;
-            const errorDiv = document.getElementById('error');
-            
-            if (!pin) {
-                errorDiv.textContent = '请输入 PIN 码';
-                return;
-            }
-            
-            try {
-                const response = await fetch('/verify-pin', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ pin })
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    window.location.reload();
-                } else {
-                    if (result.locked) {
-                        errorDiv.textContent = '尝试次数过多，已锁定 5 分钟';
-                    } else {
-                        errorDiv.textContent = 'PIN 码错误，剩余尝试次数：' + (result.remainingAttempts || 0);
-                    }
-                }
-
-            } catch (e) {
-                errorDiv.textContent = '验证失败，请重试';
-            }
-        }
-        
-        document.getElementById('pin').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                verify();
-            }
-        });
-    </script>
-</body>
-</html>
-"#;
-
-/// 等待响应页面模板（内嵌）
-static WAITING_RESPONSE_HTML: &str = r#"
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="/favicon.ico">
-    <title>PureSend - 等待响应</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 400px; margin: 100px auto; padding: 20px; text-align: center; }
-        h1 { color: #1976d2; }
-        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #1976d2; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .message { color: #666; margin-top: 20px; }
-        .status { margin-top: 15px; font-weight: bold; color: #1976d2; }
-    </style>
-</head>
-<body>
-    <h1>等待响应中</h1>
-    <div class="spinner"></div>
-    <div class="message">等待分享方接受您的访问请求...</div>
-    <div class="status" id="status">正在检查状态...</div>
-    <script>
-        async function checkStatus() {
-            try {
-                const response = await fetch('/request-status');
-                const result = await response.json();
-                
-                const statusDiv = document.getElementById('status');
-                
-                if (result.status === 'accepted') {
-                    statusDiv.textContent = '✓ 已接受！正在跳转...';
-                    statusDiv.style.color = '#4caf50';
-                    // 请求已被接受，刷新页面显示文件
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 500);
-                } else if (result.status === 'rejected') {
-                    statusDiv.textContent = '✗ 访问请求被拒绝';
-                    statusDiv.style.color = '#f44336';
-                } else {
-                    // 继续轮询（包括 waiting_response=true、status=null、status='pending' 等情况）
-                    statusDiv.textContent = '等待分享方接受...';
-                    setTimeout(checkStatus, 1000);
-                }
-            } catch (e) {
-                console.error('检查状态失败:', e);
-                setTimeout(checkStatus, 2000);
-            }
-        }
-        
-        // 开始检查状态
-        checkStatus();
-    </script>
-</body>
-</html>
-"#;
-
 /// PIN 输入页面模板（内嵌，旧版保留）
 static _PIN_INPUT_HTML_OLD: &str = r#"
 <!DOCTYPE html>
@@ -1406,3 +1246,289 @@ static _PIN_INPUT_HTML_OLD: &str = r#"
 </body>
 </html>
 "#;
+
+/// 生成分享已结束页面 HTML
+fn generate_share_ended_html(is_english: bool) -> String {
+    let title = if is_english { "PureSend - Share Ended" } else { "PureSend - 分享已结束" };
+    let heading = if is_english { "Share Ended" } else { "分享已结束" };
+    let lang = if is_english { "en" } else { "zh-CN" };
+
+    format!(
+        r#"<!DOCTYPE html>
+<html lang="{lang}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/favicon.ico">
+    <title>{title}</title>
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 400px; margin: 100px auto; padding: 20px; text-align: center; }}
+        h1 {{ color: #666; }}
+        .icon {{ font-size: 48px; margin: 20px 0; }}
+    </style>
+</head>
+<body>
+    <div class="icon">📁</div>
+    <h1>{heading}</h1>
+</body>
+</html>"#
+    )
+}
+
+/// 生成访问被拒绝页面 HTML
+fn generate_access_denied_html(is_english: bool) -> String {
+    let title = if is_english { "PureSend - Access Denied" } else { "PureSend - 访问被拒绝" };
+    let heading = if is_english { "Access Denied" } else { "访问被拒绝" };
+    let lang = if is_english { "en" } else { "zh-CN" };
+
+    format!(
+        r#"<!DOCTYPE html>
+<html lang="{lang}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/favicon.ico">
+    <title>{title}</title>
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 400px; margin: 100px auto; padding: 20px; text-align: center; }}
+        h1 {{ color: #d32f2f; }}
+        .icon {{ font-size: 48px; margin: 20px 0; }}
+    </style>
+</head>
+<body>
+    <div class="icon">🚫</div>
+    <h1>{heading}</h1>
+</body>
+</html>"#
+    )
+}
+
+/// 生成 PIN 输入页面 HTML
+fn generate_pin_input_html(is_english: bool) -> String {
+    let title = if is_english { "PureSend - PIN Verification" } else { "PureSend - PIN 验证" };
+    let heading = if is_english { "Enter PIN Code" } else { "请输入 PIN 码" };
+    let placeholder = if is_english { "Enter PIN" } else { "输入 PIN 码" };
+    let button_text = if is_english { "Verify" } else { "验证" };
+    let lang = if is_english { "en" } else { "zh-CN" };
+    let empty_pin_error = if is_english { "Please enter PIN" } else { "请输入 PIN 码" };
+    let locked_error = if is_english { "Too many attempts. Locked for 5 minutes." } else { "尝试次数过多，已锁定 5 分钟" };
+    let incorrect_pin_prefix = if is_english { "Incorrect PIN. Remaining attempts: " } else { "PIN 码错误，剩余尝试次数：" };
+    let verify_failed_error = if is_english { "Verification failed. Please try again." } else { "验证失败，请重试" };
+
+    format!(
+        r#"<!DOCTYPE html>
+<html lang="{lang}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/favicon.ico">
+    <title>{title}</title>
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 400px; margin: 100px auto; padding: 20px; text-align: center; }}
+        h1 {{ color: #333; margin-bottom: 20px; }}
+        .input-container {{ width: 100%; max-width: 300px; margin: 0 auto 15px; }}
+        input {{ width: 100%; padding: 12px; font-size: 18px; text-align: center; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }}
+        button {{ width: 100%; max-width: 300px; padding: 12px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }}
+        button:hover {{ background: #1565c0; }}
+        .error {{ color: #d32f2f; margin-top: 10px; }}
+    </style>
+</head>
+<body>
+    <h1>{heading}</h1>
+    <div class="input-container">
+        <input type="text" id="pin" placeholder="{placeholder}">
+    </div>
+    <button onclick="verify()">{button_text}</button>
+    <div id="error" class="error"></div>
+    
+    <script>
+        async function verify() {{
+            const pin = document.getElementById('pin').value;
+            const errorDiv = document.getElementById('error');
+            
+            if (!pin) {{
+                errorDiv.textContent = '{empty_pin_error}';
+                return;
+            }}
+            
+            try {{
+                const response = await fetch('/verify-pin', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ pin }})
+                }});
+                
+                const result = await response.json();
+                
+                if (result.success) {{
+                    window.location.reload();
+                }} else {{
+                    if (result.locked) {{
+                        errorDiv.textContent = '{locked_error}';
+                    }} else {{
+                        errorDiv.textContent = '{incorrect_pin_prefix}' + (result.remainingAttempts || 0);
+                    }}
+                }}
+
+            }} catch (e) {{
+                errorDiv.textContent = '{verify_failed_error}';
+            }}
+        }}
+        
+        document.getElementById('pin').addEventListener('keypress', function(e) {{
+            if (e.key === 'Enter') {{
+                verify();
+            }}
+        }});
+    </script>
+</body>
+</html>"#
+    )
+}
+
+/// 生成等待响应页面 HTML
+fn generate_waiting_response_html(is_english: bool) -> String {
+    let title = if is_english { "PureSend - Waiting" } else { "PureSend - 等待响应" };
+    let heading = if is_english { "Waiting for Response" } else { "等待响应中" };
+    let message = if is_english {
+        "Waiting for the sharer to accept your access request..."
+    } else {
+        "等待分享方接受您的访问请求..."
+    };
+    let checking = if is_english { "Checking status..." } else { "正在检查状态..." };
+    let waiting = if is_english { "Waiting for approval..." } else { "等待分享方接受..." };
+    let accepted = if is_english { "✓ Accepted! Redirecting..." } else { "✓ 已接受！正在跳转..." };
+    let rejected = if is_english { "✗ Access request denied" } else { "✗ 访问请求被拒绝" };
+    let lang = if is_english { "en" } else { "zh-CN" };
+
+    format!(
+        r#"<!DOCTYPE html>
+<html lang="{lang}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/favicon.ico">
+    <title>{title}</title>
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 400px; margin: 100px auto; padding: 20px; text-align: center; }}
+        h1 {{ color: #1976d2; }}
+        .spinner {{ border: 4px solid #f3f3f3; border-top: 4px solid #1976d2; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }}
+        @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
+        .message {{ color: #666; margin-top: 20px; }}
+        .status {{ margin-top: 15px; font-weight: bold; color: #1976d2; }}
+    </style>
+</head>
+<body>
+    <h1>{heading}</h1>
+    <div class="spinner"></div>
+    <div class="message">{message}</div>
+    <div class="status" id="status">{checking}</div>
+    <script>
+        async function checkStatus() {{
+            try {{
+                const response = await fetch('/request-status');
+                const result = await response.json();
+                
+                const statusDiv = document.getElementById('status');
+                
+                if (result.status === 'accepted') {{
+                    statusDiv.textContent = '{accepted}';
+                    statusDiv.style.color = '#4caf50';
+                    setTimeout(() => {{
+                        window.location.reload();
+                    }}, 500);
+                }} else if (result.status === 'rejected') {{
+                    statusDiv.textContent = '{rejected}';
+                    statusDiv.style.color = '#f44336';
+                }} else {{
+                    statusDiv.textContent = '{waiting}';
+                    setTimeout(checkStatus, 1000);
+                }}
+            }} catch (e) {{
+                console.error('Failed to check status:', e);
+                setTimeout(checkStatus, 2000);
+            }}
+        }}
+        
+        checkStatus();
+    </script>
+</body>
+</html>"#
+    )
+}
+
+/// 生成文件列表页面 HTML
+fn generate_file_list_html(is_english: bool) -> String {
+    let title = if is_english { "PureSend - File Sharing" } else { "PureSend - 文件分享" };
+    let heading = if is_english { "PureSend File Sharing" } else { "PureSend 文件分享" };
+    let warning = if is_english {
+        "⚠️ This link is for trusted networks only. Do not share on public platforms."
+    } else {
+        "⚠️ 此链接仅限可信网络内使用，请勿分享到公共平台"
+    };
+    let files_heading = if is_english { "Available Files" } else { "可用文件" };
+    let loading = if is_english { "Loading..." } else { "加载中..." };
+    let no_files = if is_english { "No files available" } else { "暂无可用文件" };
+    let lang = if is_english { "en" } else { "zh-CN" };
+
+    format!(
+        r#"<!DOCTYPE html>
+<html lang="{lang}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/favicon.ico">
+    <title>{title}</title>
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }}
+        h1 {{ color: #333; }}
+        ul {{ list-style: none; padding: 0; }}
+        li {{ padding: 10px; border-bottom: 1px solid #eee; }}
+        a {{ color: #1976d2; text-decoration: none; }}
+        a:hover {{ text-decoration: underline; }}
+        .warning {{ background: #fff3cd; padding: 10px; border-radius: 4px; margin-bottom: 20px; }}
+        .empty {{ color: #999; text-align: center; padding: 40px 0; }}
+    </style>
+</head>
+<body>
+    <h1>{heading}</h1>
+    <div class="warning">
+        {warning}
+    </div>
+    <h2>{files_heading}</h2>
+    <ul id="file-list">
+        <li class="empty">{loading}</li>
+    </ul>
+    <script>
+        function formatSize(bytes) {{
+            if (bytes === 0) return '0 B';
+            var units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            var i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + units[i];
+        }}
+        var lastJson = '';
+        function refreshFiles() {{
+            fetch('/files')
+                .then(function(r) {{ return r.json(); }})
+                .then(function(data) {{
+                    var json = JSON.stringify(data.files);
+                    if (json === lastJson) return;
+                    lastJson = json;
+                    var ul = document.getElementById('file-list');
+                    if (!data.files || data.files.length === 0) {{
+                        ul.innerHTML = '<li class="empty">{no_files}</li>';
+                        return;
+                    }}
+                    ul.innerHTML = data.files.map(function(f) {{
+                        return '<li><a href="/download/' + f.id + '" download="' + f.name + '">' + f.name + '</a> (' + formatSize(f.size) + ')</li>';
+                    }}).join('');
+                }})
+                .catch(function() {{}});
+        }}
+        refreshFiles();
+        setInterval(refreshFiles, 1000);
+    </script>
+</body>
+</html>"#
+    )
+}

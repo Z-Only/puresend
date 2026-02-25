@@ -91,9 +91,14 @@ pub async fn prepare_file_transfer(
 ) -> Result<FileMetadata, String> {
     let path = PathBuf::from(&file_path);
 
-    if !path.exists() {
+    if !tokio::fs::try_exists(&path).await.unwrap_or(false) {
         return Err(format!("文件不存在：{}", file_path));
     }
+
+    // 路径规范化验证，防止路径遍历攻击
+    let path = tokio::fs::canonicalize(&path)
+        .await
+        .map_err(|e| format!("无法解析文件路径：{}", e))?;
 
     let file_name = path
         .file_name()
@@ -101,7 +106,7 @@ pub async fn prepare_file_transfer(
         .unwrap_or("unknown")
         .to_string();
 
-    let metadata = std::fs::metadata(&path).map_err(|e| e.to_string())?;
+    let metadata = tokio::fs::metadata(&path).await.map_err(|e| e.to_string())?;
     let mime_type = FileMetadata::infer_mime_type(&file_name);
 
     let file_metadata = FileMetadata::new(file_name, metadata.len(), mime_type);
@@ -172,7 +177,7 @@ pub async fn send_file(
                 t.completed_at = progress.estimated_time_remaining.map(|_| {
                     std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
+                        .unwrap_or_default()
                         .as_millis() as u64
                 });
 

@@ -17,6 +17,7 @@ import {
 import { usePlatform } from '@/composables'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import { useFontSize } from '@/composables/useFontSize'
 
 const route = useRoute()
 const router = useRouter()
@@ -26,6 +27,9 @@ const vuetifyTheme = useTheme()
 const discoveryStore = useDiscoveryStore()
 
 const { isMobile } = usePlatform()
+
+// 初始化字体大小
+useFontSize()
 
 // 垂直 Tab 栏折叠状态
 const isNavRailMode = ref(false)

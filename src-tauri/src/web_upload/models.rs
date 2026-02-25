@@ -4,6 +4,14 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
+/// 获取当前时间戳（毫秒），如果系统时钟异常则返回 0
+fn current_timestamp_millis() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
+}
+
 /// Web 上传请求状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -30,7 +38,7 @@ impl Default for UploadRequestStatus {
 /// 同一 IP 的所有上传文件记录聚合在对应的 UploadRequest 下。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct UploadRecord {
+pub struct WebUploadRecord {
     /// 记录唯一 ID
     pub id: String,
     /// 文件名
@@ -53,13 +61,10 @@ pub struct UploadRecord {
 }
 
 #[allow(dead_code)]
-impl UploadRecord {
+impl WebUploadRecord {
     /// 创建新的上传记录
     pub fn new(file_name: String, total_bytes: u64) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
+        let now = current_timestamp_millis();
 
         Self {
             id: Uuid::new_v4().to_string(),
@@ -95,16 +100,13 @@ pub struct UploadRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_agent: Option<String>,
     /// 该 IP 下的所有上传文件记录
-    pub upload_records: Vec<UploadRecord>,
+    pub upload_records: Vec<WebUploadRecord>,
 }
 
 impl UploadRequest {
     /// 创建新的上传请求（按 IP 创建，无需文件信息）
     pub fn new(client_ip: String) -> Self {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
+        let now = current_timestamp_millis();
 
         Self {
             id: Uuid::new_v4().to_string(),

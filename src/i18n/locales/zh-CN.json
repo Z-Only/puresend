@@ -50,6 +50,25 @@
       "enUS": "English",
       "system": "跟随系统"
     },
+    "fontSize": {
+      "label": "字体大小",
+      "mode": {
+        "system": "跟随系统",
+        "preset": "预设大小",
+        "custom": "自定义"
+      },
+      "preset": {
+        "small": "小",
+        "medium": "中",
+        "large": "大",
+        "xlarge": "特大"
+      },
+      "custom": {
+        "label": "自定义缩放",
+        "min": "80%",
+        "max": "150%"
+      }
+    },
     "history": {
       "title": "历史记录",
       "recordHistory": {

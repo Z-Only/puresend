@@ -28,6 +28,15 @@ pub const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(5);
 /// 设备过期时间（10秒无响应视为离线）
 pub const PEER_EXPIRE_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// 广播间隔时间
+const BROADCAST_INTERVAL: Duration = Duration::from_secs(3);
+
+/// 清理任务间隔时间
+const CLEANUP_INTERVAL: Duration = Duration::from_secs(5);
+
+/// UDP 接收缓冲区大小
+const UDP_RECV_BUFFER_SIZE: usize = 4096;
+
 /// mDNS 服务发现
 pub struct MdnsDiscovery {
     /// 本机设备名称
@@ -130,7 +139,7 @@ impl MdnsDiscovery {
                 }
 
                 // 每 3 秒广播一次
-                tokio::time::sleep(Duration::from_secs(3)).await;
+                tokio::time::sleep(BROADCAST_INTERVAL).await;
             }
         });
     }
@@ -154,7 +163,7 @@ impl MdnsDiscovery {
                 }
             };
 
-            let mut buf = vec![0u8; 4096];
+            let mut buf = vec![0u8; UDP_RECV_BUFFER_SIZE];
 
             loop {
                 let is_running = *running.lock().await;
@@ -170,7 +179,7 @@ impl MdnsDiscovery {
                         {
                             let now = std::time::SystemTime::now()
                                 .duration_since(std::time::UNIX_EPOCH)
-                                .unwrap()
+                                .unwrap_or_default()
                                 .as_millis() as u64;
 
                             let peer = PeerInfo {
@@ -218,12 +227,12 @@ impl MdnsDiscovery {
                 }
 
                 // 每 5 秒清理一次
-                tokio::time::sleep(Duration::from_secs(5)).await;
+                tokio::time::sleep(CLEANUP_INTERVAL).await;
 
                 let mut peers_guard = peers.lock().await;
                 let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
+                    .unwrap_or_default()
                     .as_millis() as u64;
 
                 // 找出过期设备
