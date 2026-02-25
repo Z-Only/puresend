@@ -91,7 +91,7 @@ pub async fn get_device_name() -> String {
                     .arg("ro.product.manufacturer")
                     .output()
                 {
-                    let manufacturer = String::from_utf8_lossy(&manufacturer_output)
+                    let manufacturer = String::from_utf8_lossy(&manufacturer_output.stdout)
                         .trim()
                         .to_string();
                     if !manufacturer.is_empty() {
