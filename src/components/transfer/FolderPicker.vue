@@ -47,6 +47,8 @@ import { invoke } from '@tauri-apps/api/core'
 import type { ContentItem } from '../../types'
 import { mdiFolder, mdiFolderOpen } from '@mdi/js'
 import { usePlatform } from '@/composables'
+// 移动端文件系统 API
+import { AndroidFs } from 'tauri-plugin-android-fs-api'
 
 const { t } = useI18n()
 const { isMobile } = usePlatform()
@@ -94,12 +96,10 @@ async function readDirRecursive(
     dirUri: string,
     basePath: string = ''
 ): Promise<FileInfo[]> {
-    const { readDir, getName, getByteLength } =
-        await import('tauri-plugin-android-fs-api')
-    const entries = await readDir(dirUri)
+    const entries = await AndroidFs.readDir(dirUri)
     const files: FileInfo[] = []
     for (const entry of entries) {
-        const name = await getName(entry.uri)
+        const name = await AndroidFs.getName(entry.uri)
         if (entry.isDir) {
             const subFiles = await readDirRecursive(
                 entry.uri,
@@ -107,7 +107,7 @@ async function readDirRecursive(
             )
             files.push(...subFiles)
         } else {
-            const size = await getByteLength(entry.uri)
+            const size = await AndroidFs.getByteLength(entry.uri)
             files.push({
                 path: entry.uri,
                 name,
@@ -125,15 +125,14 @@ async function pickFolder() {
 
     try {
         if (isMobile.value) {
-            const { showOpenDirPicker, getName } =
-                await import('tauri-plugin-android-fs-api')
-            const dirUri = await showOpenDirPicker()
+            // 移动端：使用 Android 文件系统插件
+            const dirUri = await AndroidFs.showOpenDirPicker()
 
             if (!dirUri) {
                 return
             }
 
-            const name = await getName(dirUri)
+            const name = await AndroidFs.getName(dirUri)
             const files = await readDirRecursive(dirUri)
 
             const totalSize = files.reduce((sum, f) => sum + f.size, 0)
@@ -154,6 +153,7 @@ async function pickFolder() {
 
             emit('select', selectedFolder.value)
         } else {
+            // 桌面端：使用 Tauri 原生对话框
             const selected = await open({
                 multiple: false,
                 directory: true,

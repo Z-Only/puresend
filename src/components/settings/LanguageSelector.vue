@@ -25,17 +25,19 @@ const currentLanguage = computed({
 </script>
 
 <template>
-    <v-radio-group
-        v-model="currentLanguage"
-        :label="t('settings.language.label')"
-        inline
-        hide-details
-    >
-        <v-radio
-            v-for="option in languageOptions"
-            :key="option.value"
-            :label="option.title"
-            :value="option.value"
+    <div class="d-flex align-center justify-space-between">
+        <div>
+            <div class="text-subtitle-1">
+                {{ t('settings.language.label') }}
+            </div>
+        </div>
+        <v-select
+            v-model="currentLanguage"
+            :items="languageOptions"
+            density="compact"
+            variant="outlined"
+            hide-details
+            style="max-width: 200px"
         />
-    </v-radio-group>
+    </div>
 </template>

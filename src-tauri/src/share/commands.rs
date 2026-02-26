@@ -66,12 +66,11 @@ pub async fn start_share(
     let actual_port = server.start(file_paths).await?;
 
     // 获取本机 IP 地址
-    let local_ip = get_local_ip().unwrap_or_else(|| "127.0.0.1".to_string());
-    // 生成简洁的 URL 格式，只包含协议、IP 和端口
-    let link = format!("http://{}:{}", local_ip, actual_port);
+    let local_ips = crate::network::get_local_ips();
+    let links: Vec<String> = local_ips.iter().map(|ip| format!("http://{}:{}", ip, actual_port)).collect();
 
     // 创建分享信息
-    let mut share_info = ShareLinkInfo::new(link, actual_port, valid_files);
+    let mut share_info = ShareLinkInfo::new(links, actual_port, valid_files);
 
     // 先克隆需要的值，避免所有权问题
     let pin_clone = settings.pin.clone();
@@ -289,12 +288,3 @@ pub async fn update_share_settings(
     Ok(())
 }
 
-/// 获取本机 IP 地址
-fn get_local_ip() -> Option<String> {
-    use std::net::UdpSocket;
-
-    // 尝试连接外部地址获取本机 IP（不会真正发送数据）
-    let socket = UdpSocket::bind("0.0.0.0:0").ok()?;
-    socket.connect("8.8.8.8:80").ok()?;
-    socket.local_addr().ok().map(|addr| addr.ip().to_string())
-}

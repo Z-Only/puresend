@@ -131,7 +131,7 @@ export async function cleanupCompletedTasks(): Promise<number> {
 export async function getNetworkInfo(): Promise<{
     isReceiving: boolean
     port: number
-    networkAddress: string
+    networkAddresses: string[]
     shareCode: string
 }> {
     return invoke('get_network_info')
@@ -144,7 +144,7 @@ export async function getNetworkInfo(): Promise<{
 export async function startReceiving(port?: number): Promise<{
     isReceiving: boolean
     port: number
-    networkAddress: string
+    networkAddresses: string[]
     shareCode: string
     autoReceive: boolean
     fileOverwrite: boolean

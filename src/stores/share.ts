@@ -76,7 +76,7 @@ export const useShareStore = defineStore('share', () => {
     const isSharing = computed(() => shareInfo.value?.status === 'active')
 
     /** 分享链接 */
-    const shareLink = computed(() => shareInfo.value?.link || '')
+    const shareLinks = computed(() => shareInfo.value?.links || [])
 
     /** 待处理的访问请求 */
     const pendingRequests = computed(() =>
@@ -699,7 +699,7 @@ export const useShareStore = defineStore('share', () => {
         contentType,
         // 计算属性
         isSharing,
-        shareLink,
+        shareLinks,
         pendingRequests,
         acceptedRequests,
         rejectedRequests,

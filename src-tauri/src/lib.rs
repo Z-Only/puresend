@@ -5,6 +5,7 @@
 mod discovery;
 mod error;
 mod models;
+mod network;
 mod share;
 mod transfer;
 mod web_upload;

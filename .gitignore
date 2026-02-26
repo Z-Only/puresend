@@ -23,6 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 
+# AI assistant files
+AGENTS.md
 .aone_copilot
 
 # Tauri build artifacts

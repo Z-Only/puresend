@@ -29,9 +29,15 @@
                         <span class="label">{{ t('network.deviceName') }}</span>
                         <span class="value">{{ networkInfo.deviceName }}</span>
                     </div>
-                    <div class="network-info-item">
-                        <span class="label">{{ t('network.ipAddress') }}</span>
-                        <span class="value">{{ networkInfo.ipAddress }}</span>
+                    <div
+                        v-for="(ipAddress, index) in networkInfo.ipAddresses"
+                        :key="index"
+                        class="network-info-item"
+                    >
+                        <span class="label">{{
+                            index === 0 ? t('network.ipAddress') : ''
+                        }}</span>
+                        <span class="value">{{ ipAddress }}</span>
                     </div>
                     <div class="network-info-item">
                         <span class="label">{{ t('network.port') }}</span>
@@ -139,7 +145,9 @@ const isDarkTheme = computed(() => vuetifyTheme.global.current.value.dark)
 // 网络信息计算属性
 const networkInfo = computed(() => ({
     deviceName: settingsStore.deviceName || '--',
-    ipAddress: transferStore.networkAddress || '--',
+    ipAddresses: transferStore.networkAddresses?.length
+        ? transferStore.networkAddresses
+        : ['--'],
     port:
         transferStore.receivePort > 0
             ? transferStore.receivePort.toString()

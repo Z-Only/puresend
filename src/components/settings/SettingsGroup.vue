@@ -6,10 +6,10 @@ defineProps<{
 
 <template>
     <v-card class="mb-4">
-        <v-card-title class="text-h6 pb-0">
+        <v-card-title class="text-h6 pb-2">
             {{ title }}
         </v-card-title>
-        <v-card-text>
+        <v-card-text class="pt-2">
             <slot />
         </v-card-text>
     </v-card>

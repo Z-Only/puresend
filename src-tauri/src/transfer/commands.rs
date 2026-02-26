@@ -32,8 +32,8 @@ pub struct ReceivingState {
     pub is_receiving: bool,
     /// 监听端口
     pub port: u16,
-    /// 网络地址
-    pub network_address: String,
+    /// 网络地址列表
+    pub network_addresses: Vec<String>,
     /// 分享码
     pub share_code: String,
     /// 是否自动接收
@@ -372,9 +372,6 @@ pub async fn start_receiving(
     state: State<'_, TransferState>,
     port: Option<u16>,
 ) -> Result<ReceivingState, String> {
-    use std::net::IpAddr;
-    use std::str::FromStr;
-
     // 读取当前接收设置
     let current_settings = {
         let settings = get_receive_settings_lock()
@@ -390,7 +387,7 @@ pub async fn start_receiving(
             return Ok(ReceivingState {
                 is_receiving: true,
                 port: receiving_state.port,
-                network_address: receiving_state.network_address.clone(),
+                network_addresses: receiving_state.network_addresses.clone(),
                 share_code: receiving_state.share_code.clone(),
                 auto_receive: current_settings.auto_receive,
                 file_overwrite: current_settings.file_overwrite,
@@ -423,9 +420,8 @@ pub async fn start_receiving(
         .await
         .map_err(|e| e.to_string())?;
 
-    // 获取本地 IP 地址
-    let network_address = get_local_ip().unwrap_or_else(|| IpAddr::from_str("127.0.0.1").unwrap());
-    let network_address_str = network_address.to_string();
+    // 获取本地所有 IP 地址
+    let network_addresses = crate::network::get_local_ips();
 
     // 生成分享码（6 位数字，基于端口和时间戳）
     let share_code = format!(
@@ -449,13 +445,13 @@ pub async fn start_receiving(
         let mut receiving_state = state.receiving_state.lock().await;
         receiving_state.is_receiving = true;
         receiving_state.port = listen_port;
-        receiving_state.network_address = network_address_str.clone();
+        receiving_state.network_addresses = network_addresses.clone();
         receiving_state.share_code = share_code.clone();
 
         ReceivingState {
             is_receiving: true,
             port: listen_port,
-            network_address: network_address_str,
+            network_addresses,
             share_code,
             auto_receive: current_settings.auto_receive,
             file_overwrite: current_settings.file_overwrite,
@@ -494,7 +490,7 @@ pub async fn stop_receiving(state: State<'_, TransferState>) -> Result<(), Strin
         let mut receiving_state = state.receiving_state.lock().await;
         receiving_state.is_receiving = false;
         receiving_state.port = 0;
-        receiving_state.network_address.clear();
+        receiving_state.network_addresses.clear();
         receiving_state.share_code.clear();
     }
 
@@ -515,7 +511,7 @@ pub async fn get_network_info(state: State<'_, TransferState>) -> Result<Receivi
     Ok(ReceivingState {
         is_receiving: receiving_state.is_receiving,
         port: receiving_state.port,
-        network_address: receiving_state.network_address.clone(),
+        network_addresses: receiving_state.network_addresses.clone(),
         share_code: receiving_state.share_code.clone(),
         auto_receive: settings.auto_receive,
         file_overwrite: settings.file_overwrite,
@@ -624,19 +620,6 @@ fn collect_files_recursive(
     }
 
     Ok(())
-}
-
-/// 获取本机 IP 地址
-fn get_local_ip() -> Option<std::net::IpAddr> {
-    // 尝试获取本机 IP 地址
-    if let Ok(socket) = std::net::UdpSocket::bind("0.0.0.0:0") {
-        if socket.connect("8.8.8.8:80").is_ok() {
-            if let Ok(addr) = socket.local_addr() {
-                return Some(addr.ip());
-            }
-        }
-    }
-    None
 }
 
 // ============ 接收设置相关命令 ============

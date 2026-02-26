@@ -23,8 +23,8 @@ fn current_timestamp_millis() -> u64 {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ShareLinkInfo {
-    /// 分享链接
-    pub link: String,
+    /// 分享链接列表
+    pub links: Vec<String>,
     /// HTTP 服务器端口
     pub port: u16,
     /// 分享的文件列表
@@ -44,11 +44,11 @@ pub struct ShareLinkInfo {
 
 impl ShareLinkInfo {
     /// 创建新的分享链接信息
-    pub fn new(link: String, port: u16, files: Vec<FileMetadata>) -> Self {
+    pub fn new(links: Vec<String>, port: u16, files: Vec<FileMetadata>) -> Self {
         let now = current_timestamp_millis();
 
         Self {
-            link,
+            links,
             port,
             files,
             created_at: now,

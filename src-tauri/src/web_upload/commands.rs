@@ -38,8 +38,8 @@ pub struct WebUploadInfo {
     pub enabled: bool,
     /// 服务器端口
     pub port: u16,
-    /// 上传链接
-    pub url: String,
+    /// 上传链接列表
+    pub urls: Vec<String>,
 }
 
 /// 启动 Web 上传服务器
@@ -73,8 +73,8 @@ pub async fn start_web_upload(
     let actual_port = server.start().await?;
 
     // 获取本机 IP 地址
-    let local_ip = get_local_ip().unwrap_or_else(|| "127.0.0.1".to_string());
-    let url = format!("http://{}:{}", local_ip, actual_port);
+    let local_ips = crate::network::get_local_ips();
+    let urls: Vec<String> = local_ips.iter().map(|ip| format!("http://{}:{}", ip, actual_port)).collect();
 
     // 保存服务器实例
     {
@@ -85,7 +85,7 @@ pub async fn start_web_upload(
     Ok(WebUploadInfo {
         enabled: true,
         port: actual_port,
-        url,
+        urls,
     })
 }
 
@@ -177,11 +177,3 @@ pub async fn reject_web_upload(
     Ok(())
 }
 
-/// 获取本机 IP 地址
-fn get_local_ip() -> Option<String> {
-    use std::net::UdpSocket;
-
-    let socket = UdpSocket::bind("0.0.0.0:0").ok()?;
-    socket.connect("8.8.8.8:80").ok()?;
-    socket.local_addr().ok().map(|addr| addr.ip().to_string())
-}

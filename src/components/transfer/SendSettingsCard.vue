@@ -25,57 +25,68 @@
                         />
                     </div>
 
-                    <!-- Web 下载链接和二维码（开启后显示） -->
+                    <!-- Web 下载链接列表和二维码（开启后显示） -->
                     <div
-                        v-if="shareStore.isSharing && shareStore.shareInfo"
+                        v-if="
+                            shareStore.isSharing &&
+                            shareStore.shareLinks?.length
+                        "
                         class="mt-4"
                     >
-                        <div class="d-flex align-center mb-2">
-                            <div class="text-body-2 text-medium-emphasis mr-2">
-                                {{ t('send.settings.webDownloadLink') }}:
-                            </div>
-                            <code class="text-body-2">{{
-                                shareStore.shareLink
+                        <div class="text-body-2 text-medium-emphasis mb-2">
+                            {{ t('send.settings.webDownloadLink') }}:
+                        </div>
+                        <div
+                            v-for="(shareLink, index) in shareStore.shareLinks"
+                            :key="index"
+                            class="url-item-row"
+                        >
+                            <code class="text-body-2 url-link">{{
+                                shareLink
                             }}</code>
-                            <v-btn
-                                :icon="mdiContentCopy"
-                                size="x-small"
-                                variant="text"
-                                class="ml-1"
-                                @click="handleCopyLink"
-                            />
-                            <v-tooltip
-                                location="top"
-                                open-on-hover
-                                :content-class="
-                                    isDarkTheme
-                                        ? 'qr-tooltip-dark'
-                                        : 'qr-tooltip-light'
-                                "
-                            >
-                                <template #activator="{ props: tooltipProps }">
-                                    <v-btn
-                                        v-bind="tooltipProps"
-                                        :icon="mdiQrcode"
-                                        size="x-small"
-                                        variant="text"
-                                        class="ml-1"
-                                    />
-                                </template>
-                                <div class="qr-tooltip-content">
-                                    <img
-                                        v-if="qrCodeDataUrl"
-                                        :src="qrCodeDataUrl"
-                                        :alt="
-                                            t('send.settings.webDownloadQrcode')
-                                        "
-                                        class="qr-code-tooltip-image"
-                                    />
-                                    <div v-else class="qr-code-loading">
-                                        {{ t('share.qrcode.generating') }}
+                            <div class="url-actions">
+                                <v-btn
+                                    :icon="mdiContentCopy"
+                                    size="x-small"
+                                    variant="text"
+                                    @click="handleCopyUrl(shareLink)"
+                                />
+                                <v-tooltip
+                                    location="top"
+                                    open-on-hover
+                                    :content-class="
+                                        isDarkTheme
+                                            ? 'qr-tooltip-dark'
+                                            : 'qr-tooltip-light'
+                                    "
+                                >
+                                    <template
+                                        #activator="{ props: tooltipProps }"
+                                    >
+                                        <v-btn
+                                            v-bind="tooltipProps"
+                                            :icon="mdiQrcode"
+                                            size="x-small"
+                                            variant="text"
+                                        />
+                                    </template>
+                                    <div class="qr-tooltip-content">
+                                        <img
+                                            v-if="qrCodeDataUrls[shareLink]"
+                                            :src="qrCodeDataUrls[shareLink]"
+                                            :alt="
+                                                t(
+                                                    'send.settings.webDownloadQrcode'
+                                                )
+                                            "
+                                            class="qr-code-tooltip-image"
+                                        />
+                                        <div v-else class="qr-code-loading">
+                                            {{ t('share.qrcode.generating') }}
+                                        </div>
                                     </div>
-                                </div>
-                            </v-tooltip>
+                                </v-tooltip>
+                            </div>
                         </div>
                     </div>
 
@@ -195,7 +206,7 @@ const isDarkTheme = computed(() => vuetifyTheme.global.current.value.dark)
 // 本地状态
 const webDownloadEnabled = ref(false)
 const webDownloadLoading = ref(false)
-const qrCodeDataUrl = ref<string>('')
+const qrCodeDataUrls = ref<Record<string, string>>({})
 const showPinConfig = ref(false)
 const showCopied = ref(false)
 
@@ -226,24 +237,38 @@ watch(
     { deep: true }
 )
 
-// 监听 shareStore.shareLink 生成二维码
+// 监听 shareStore.shareLinks 生成所有链接的二维码
 watch(
-    () => shareStore.shareLink,
-    async (link) => {
-        if (link) {
-            try {
-                qrCodeDataUrl.value = await QRCode.toDataURL(link, {
-                    width: 200,
-                    margin: 2,
-                })
-            } catch (e) {
-                console.error('[SendSettingsCard] 生成二维码失败:', e)
+    () => shareStore.shareLinks,
+    async (links) => {
+        if (links?.length) {
+            const newQrCodes: Record<string, string> = {}
+            for (const link of links) {
+                try {
+                    newQrCodes[link] = await QRCode.toDataURL(link, {
+                        width: 200,
+                        margin: 2,
+                    })
+                } catch (e) {
+                    console.error('[SendSettingsCard] 生成二维码失败:', e)
+                }
             }
+            qrCodeDataUrls.value = newQrCodes
         } else {
-            qrCodeDataUrl.value = ''
+            qrCodeDataUrls.value = {}
         }
     }
 )
+
+// 复制指定链接
+async function handleCopyUrl(url: string) {
+    try {
+        await copyToClipboard(url)
+        showCopied.value = true
+    } catch (e) {
+        console.error('复制链接失败:', e)
+    }
+}
 
 // 处理 Web 下载开关变化
 async function handleWebDownloadChange(value: boolean | null) {
@@ -283,14 +308,6 @@ async function handleWebDownloadChange(value: boolean | null) {
     }
 }
 
-// 处理复制链接
-async function handleCopyLink() {
-    if (shareStore.shareLink) {
-        await copyToClipboard(shareStore.shareLink)
-        showCopied.value = true
-    }
-}
-
 // 处理自动接受开关变化
 async function handleAutoAcceptChange(value: boolean | null) {
     if (value !== null) {
@@ -319,6 +336,28 @@ async function handleConfirmPin(pin: string) {
 
 .setting-label {
     font-weight: 500;
+}
+
+.url-item-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+    gap: 8px;
+}
+
+.url-link {
+    flex: 1;
+    min-width: 0;
+    word-break: break-all;
+    text-align: left;
+}
+
+.url-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
 }
 
 .qr-tooltip-content {

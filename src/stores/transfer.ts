@@ -70,7 +70,7 @@ export const useTransferStore = defineStore('transfer', () => {
     const receivePort = ref<number>(0)
 
     /** 本机网络地址 */
-    const networkAddress = ref<string>('')
+    const networkAddresses = ref<string[]>([])
 
     /** 接收目录 */
     const receiveDirectory = ref<string>('~/Downloads/PureSend')
@@ -545,7 +545,7 @@ export const useTransferStore = defineStore('transfer', () => {
             const result = await getNetworkInfoService()
             receivePort.value = result.port
             // 后端使用 camelCase 序列化，直接访问
-            networkAddress.value = result.networkAddress || ''
+            networkAddresses.value = result.networkAddresses || []
         } catch (e) {
             error.value = `获取网络信息失败：${e}`
             console.error('获取网络信息失败:', e)
@@ -566,7 +566,7 @@ export const useTransferStore = defineStore('transfer', () => {
             const result = await startReceivingService()
             receivePort.value = result.port
             // 后端使用 camelCase 序列化，直接访问
-            networkAddress.value = result.networkAddress || ''
+            networkAddresses.value = result.networkAddresses || []
         } catch (e) {
             error.value = `启动接收失败：${e}`
             console.error('启动接收失败:', e)
@@ -583,7 +583,7 @@ export const useTransferStore = defineStore('transfer', () => {
         try {
             await stopReceivingService()
             receivePort.value = 0
-            // 保留 networkAddress，停止接收时 IP 仍然可以显示
+            // 保留 networkAddresses，停止接收时 IP 仍然可以显示
         } catch (e) {
             error.value = `停止接收失败：${e}`
             console.error('停止接收失败:', e)
@@ -1383,7 +1383,7 @@ export const useTransferStore = defineStore('transfer', () => {
         initialized,
         listenPort,
         receivePort,
-        networkAddress,
+        networkAddresses,
         receiveDirectory,
         tasks,
         selectedTaskId,

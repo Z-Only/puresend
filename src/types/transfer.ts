@@ -169,8 +169,8 @@ export function calculateProgress(transferred: number, total: number): number {
 
 /** 分享链接信息 */
 export interface ShareLinkInfo {
-    /** 分享链接 */
-    link: string
+    /** 分享链接列表 */
+    links: string[]
     /** HTTP 服务器端口 */
     port: number
     /** 分享的文件列表 */
@@ -485,8 +485,8 @@ export interface WebUploadInfo {
     enabled: boolean
     /** 服务器端口 */
     port: number
-    /** 上传链接 */
-    url: string
+    /** 上传链接列表 */
+    urls: string[]
 }
 
 /** 访问请求 */

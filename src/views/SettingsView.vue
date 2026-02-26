@@ -610,19 +610,21 @@ const appVersion = __APP_VERSION__
 
                 <!-- 端口范围配置 -->
                 <div>
-                    <div class="text-subtitle-1 mb-1">
+                    <div class="text-subtitle-1 mb-2">
                         {{ t('settings.developer.portRange.label') }}
                     </div>
-                    <div class="text-body-2 text-grey mb-3">
+                    <div class="text-body-2 text-grey mb-4">
                         {{ t('settings.developer.portRange.hint') }}
                     </div>
 
                     <!-- 文件接收服务器 -->
-                    <div class="mb-3">
-                        <div class="text-body-2 font-weight-medium mb-1">
-                            {{ t('settings.developer.portRange.transfer') }}
+                    <div class="port-range-item mb-4">
+                        <div class="port-range-label">
+                            <div class="text-body-2 font-weight-medium">
+                                {{ t('settings.developer.portRange.transfer') }}
+                            </div>
                         </div>
-                        <div class="d-flex align-center ga-2">
+                        <div class="port-range-inputs">
                             <v-text-field
                                 v-model.number="transferPortMin"
                                 type="number"
@@ -634,10 +636,10 @@ const appVersion = __APP_VERSION__
                                 density="compact"
                                 variant="outlined"
                                 hide-details
-                                style="max-width: 140px"
+                                class="port-input"
                                 @blur="saveTransferPortRange"
                             />
-                            <span class="text-body-2">—</span>
+                            <span class="port-separator">—</span>
                             <v-text-field
                                 v-model.number="transferPortMax"
                                 type="number"
@@ -649,18 +651,22 @@ const appVersion = __APP_VERSION__
                                 density="compact"
                                 variant="outlined"
                                 hide-details
-                                style="max-width: 140px"
+                                class="port-input"
                                 @blur="saveTransferPortRange"
                             />
                         </div>
                     </div>
 
                     <!-- HTTP 上传服务器 -->
-                    <div class="mb-3">
-                        <div class="text-body-2 font-weight-medium mb-1">
-                            {{ t('settings.developer.portRange.webUpload') }}
+                    <div class="port-range-item mb-4">
+                        <div class="port-range-label">
+                            <div class="text-body-2 font-weight-medium">
+                                {{
+                                    t('settings.developer.portRange.webUpload')
+                                }}
+                            </div>
                         </div>
-                        <div class="d-flex align-center ga-2">
+                        <div class="port-range-inputs">
                             <v-text-field
                                 v-model.number="webUploadPortMin"
                                 type="number"
@@ -672,10 +678,10 @@ const appVersion = __APP_VERSION__
                                 density="compact"
                                 variant="outlined"
                                 hide-details
-                                style="max-width: 140px"
+                                class="port-input"
                                 @blur="saveWebUploadPortRange"
                             />
-                            <span class="text-body-2">—</span>
+                            <span class="port-separator">—</span>
                             <v-text-field
                                 v-model.number="webUploadPortMax"
                                 type="number"
@@ -687,18 +693,20 @@ const appVersion = __APP_VERSION__
                                 density="compact"
                                 variant="outlined"
                                 hide-details
-                                style="max-width: 140px"
+                                class="port-input"
                                 @blur="saveWebUploadPortRange"
                             />
                         </div>
                     </div>
 
                     <!-- HTTP 下载服务器 -->
-                    <div>
-                        <div class="text-body-2 font-weight-medium mb-1">
-                            {{ t('settings.developer.portRange.share') }}
+                    <div class="port-range-item">
+                        <div class="port-range-label">
+                            <div class="text-body-2 font-weight-medium">
+                                {{ t('settings.developer.portRange.share') }}
+                            </div>
                         </div>
-                        <div class="d-flex align-center ga-2">
+                        <div class="port-range-inputs">
                             <v-text-field
                                 v-model.number="sharePortMin"
                                 type="number"
@@ -710,10 +718,10 @@ const appVersion = __APP_VERSION__
                                 density="compact"
                                 variant="outlined"
                                 hide-details
-                                style="max-width: 140px"
+                                class="port-input"
                                 @blur="saveSharePortRange"
                             />
-                            <span class="text-body-2">—</span>
+                            <span class="port-separator">—</span>
                             <v-text-field
                                 v-model.number="sharePortMax"
                                 type="number"
@@ -725,7 +733,7 @@ const appVersion = __APP_VERSION__
                                 density="compact"
                                 variant="outlined"
                                 hide-details
-                                style="max-width: 140px"
+                                class="port-input"
                                 @blur="saveSharePortRange"
                             />
                         </div>
@@ -788,5 +796,78 @@ const appVersion = __APP_VERSION__
 .about-link-btn {
     font-size: 0.875rem !important;
     letter-spacing: normal !important;
+}
+
+/* 端口范围配置响应式布局 */
+.port-range-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+    padding-right: 8px;
+}
+
+.port-range-item:last-child {
+    margin-bottom: 0;
+}
+
+.port-range-label {
+    flex: 0 0 180px;
+    min-width: 180px;
+    padding-top: 8px;
+}
+
+.port-range-inputs {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: flex-end;
+    min-width: 0;
+}
+
+.port-input {
+    flex: 0 0 100px;
+    max-width: 100px;
+}
+
+.port-input :deep(.v-field__input) {
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+}
+
+.port-separator {
+    color: rgba(var(--v-theme-on-surface), 0.6);
+    font-weight: 500;
+    padding: 0 4px;
+    flex-shrink: 0;
+}
+
+/* 响应式：小屏幕下换行显示 */
+@media (max-width: 600px) {
+    .port-range-item {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .port-range-label {
+        flex: none;
+        min-width: auto;
+        width: 100%;
+        padding-top: 0;
+        margin-bottom: 4px;
+    }
+
+    .port-range-inputs {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .port-input {
+        flex: 1;
+        min-width: 80px;
+        max-width: none;
+    }
 }
 </style>
