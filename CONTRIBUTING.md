@@ -1,5 +1,7 @@
 # 贡献指南
 
+**语言**: [中文](CONTRIBUTING.md) | [English](CONTRIBUTING_EN.md)
+
 感谢您考虑为 PureSend 做出贡献！
 
 ## 如何贡献

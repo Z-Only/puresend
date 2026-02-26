@@ -22,6 +22,9 @@
   },
   "settings": {
     "title": "Settings",
+    "advanced": {
+      "showLabel": "Advanced Settings"
+    },
     "device": {
       "title": "Device",
       "deviceName": {
@@ -34,7 +37,8 @@
     "appearance": "Appearance",
     "tabLayout": {
       "label": "Tab Layout",
-      "horizontal": "Horizontal",
+      "horizontalTop": "Horizontal (Top)",
+      "horizontalBottom": "Horizontal (Bottom)",
       "verticalLeft": "Vertical (Left)",
       "verticalRight": "Vertical (Right)"
     },
@@ -97,9 +101,27 @@
       "currentCount": "Current records: {count}",
       "cleanupNow": "Cleanup Now"
     },
+    "developer": {
+      "title": "Developer",
+      "devTools": {
+        "label": "Developer Tools",
+        "description": "Enable in-app Developer Tools (DevTools)",
+        "androidHint": "Android devices require remote debugging via Chrome DevTools"
+      },
+      "portRange": {
+        "label": "Service Port Range",
+        "hint": "Set to 0 for automatic port assignment. Custom port range must be between 1024-65535",
+        "transfer": "File Transfer Server",
+        "webUpload": "Web Upload Server",
+        "share": "Web Download Server",
+        "minPort": "Min Port",
+        "maxPort": "Max Port"
+      }
+    },
     "about": {
       "title": "About",
       "version": "Version",
+      "changelog": "Changelog",
       "homepage": "Homepage",
       "github": "GitHub Project",
       "collapse": "Collapse",

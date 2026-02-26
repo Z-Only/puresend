@@ -14,10 +14,14 @@ import {
     type FontSizeMode,
     type FontSizePreset,
     type FontSizeSettings,
+    type DeveloperSettings,
+    type PortRange,
+    type PortRangeConfig,
     DEFAULT_SETTINGS,
     DEFAULT_HISTORY_SETTINGS,
     DEFAULT_RECEIVE_SETTINGS,
     DEFAULT_FONT_SIZE_SETTINGS,
+    DEFAULT_DEVELOPER_SETTINGS,
     SETTINGS_VERSION,
     SETTINGS_STORAGE_KEY,
 } from '@/types/settings'
@@ -41,6 +45,8 @@ export const useSettingsStore = defineStore('settings', () => {
     const receiveSettings = ref<ReceiveSettings>(DEFAULT_RECEIVE_SETTINGS)
     const tabLayout = ref<TabLayout>(DEFAULT_SETTINGS.tabLayout)
     const fontSize = ref(DEFAULT_FONT_SIZE_SETTINGS)
+    const developerSettings = ref<DeveloperSettings>(DEFAULT_DEVELOPER_SETTINGS)
+    const showAdvancedSettings = ref(DEFAULT_SETTINGS.showAdvancedSettings)
     const version = ref(SETTINGS_VERSION)
 
     // ============ 计算属性 ============
@@ -186,14 +192,27 @@ export const useSettingsStore = defineStore('settings', () => {
             maxPendingRequests: oldReceiveSettings.maxPendingRequests ?? 50,
         }
 
-        // Tab 布局迁移
-        if (!('tabLayout' in oldSettings)) {
-            migrated.tabLayout = 'horizontal'
+        // Tab 布局迁移：旧版 'horizontal' 映射到 'horizontal-top'
+        const legacyTabLayout = legacySettings.tabLayout
+        if (!legacyTabLayout) {
+            migrated.tabLayout = 'horizontal-top'
+        } else if (legacyTabLayout === 'horizontal') {
+            migrated.tabLayout = 'horizontal-top'
         }
 
         // 字体大小设置迁移
         if (!('fontSize' in oldSettings)) {
             migrated.fontSize = DEFAULT_FONT_SIZE_SETTINGS
+        }
+
+        // 开发者设置迁移
+        if (!('developerSettings' in oldSettings)) {
+            migrated.developerSettings = DEFAULT_DEVELOPER_SETTINGS
+        }
+
+        // 高级设置显示迁移
+        if (!('showAdvancedSettings' in oldSettings)) {
+            migrated.showAdvancedSettings = false
         }
 
         return migrated
@@ -212,6 +231,8 @@ export const useSettingsStore = defineStore('settings', () => {
                 receiveSettings: receiveSettings.value,
                 tabLayout: tabLayout.value,
                 fontSize: fontSize.value,
+                developerSettings: developerSettings.value,
+                showAdvancedSettings: showAdvancedSettings.value,
                 version: version.value,
             }
 
@@ -266,6 +287,13 @@ export const useSettingsStore = defineStore('settings', () => {
                 fontSize.value =
                     (loadedSettings.fontSize as FontSizeSettings) ||
                     DEFAULT_FONT_SIZE_SETTINGS
+                // 兼容旧版设置（没有 developerSettings 字段）
+                developerSettings.value =
+                    (loadedSettings.developerSettings as DeveloperSettings) ||
+                    DEFAULT_DEVELOPER_SETTINGS
+                // 兼容旧版设置（没有 showAdvancedSettings 字段）
+                showAdvancedSettings.value =
+                    (loadedSettings.showAdvancedSettings as boolean) ?? false
 
                 // 如果没有设备名称，尝试获取本机设备名
                 if (!deviceName.value) {
@@ -431,6 +459,42 @@ export const useSettingsStore = defineStore('settings', () => {
     }
 
     /**
+     * 设置开发者工具开关
+     */
+    async function setDevToolsEnabled(enabled: boolean): Promise<boolean> {
+        developerSettings.value = {
+            ...developerSettings.value,
+            devToolsEnabled: enabled,
+        }
+        return saveSettings()
+    }
+
+    /**
+     * 设置端口范围配置
+     */
+    async function setPortRange(
+        service: keyof PortRangeConfig,
+        range: PortRange
+    ): Promise<boolean> {
+        developerSettings.value = {
+            ...developerSettings.value,
+            portRange: {
+                ...developerSettings.value.portRange,
+                [service]: range,
+            },
+        }
+        return saveSettings()
+    }
+
+    /**
+     * 设置是否显示高级设置
+     */
+    async function setShowAdvancedSettings(enabled: boolean): Promise<boolean> {
+        showAdvancedSettings.value = enabled
+        return saveSettings()
+    }
+
+    /**
      * 监听系统主题变化
      */
     function watchSystemTheme(
@@ -469,6 +533,8 @@ export const useSettingsStore = defineStore('settings', () => {
         receiveSettings,
         tabLayout,
         fontSize,
+        developerSettings,
+        showAdvancedSettings,
         version,
 
         // 计算属性
@@ -487,6 +553,9 @@ export const useSettingsStore = defineStore('settings', () => {
         setAutoReceive,
         setFileOverwrite,
         setTabLayout,
+        setDevToolsEnabled,
+        setPortRange,
+        setShowAdvancedSettings,
         setFontSizeMode,
         setFontSizePreset,
         setFontSizeCustomScale,

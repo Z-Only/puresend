@@ -13,9 +13,10 @@ use discovery::DiscoveryState;
 use share::ShareManagerState;
 use transfer::TransferState;
 use web_upload::WebUploadManagerState;
+use tauri::Manager;
 
 #[cfg(target_os = "macos")]
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 #[cfg(target_os = "macos")]
 use tauri::menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
@@ -171,6 +172,21 @@ fn update_menu_language(_lang: String) -> Result<(), String> {
     Ok(())
 }
 
+/// 切换 WebView DevTools 开关
+#[tauri::command]
+fn toggle_devtools(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        if enabled {
+            window.open_devtools();
+        } else {
+            window.close_devtools();
+        }
+        Ok(())
+    } else {
+        Err("Main window not found".to_string())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
@@ -180,6 +196,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_android_fs::init())
         .manage(TransferState::default())
         .manage(DiscoveryState::default())
         .manage(ShareManagerState::default())
@@ -237,6 +254,7 @@ pub fn run() {
             crate::web_upload::reject_web_upload,
             // Menu commands
             update_menu_language,
+            toggle_devtools,
         ]);
 
     // macOS: 构建自定义菜单栏并处理菜单事件

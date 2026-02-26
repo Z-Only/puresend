@@ -1,13 +1,23 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import SettingsGroup from '@/components/settings/SettingsGroup.vue'
 import ThemeSelector from '@/components/settings/ThemeSelector.vue'
 import LanguageSelector from '@/components/settings/LanguageSelector.vue'
 import { usePlatform } from '@/composables'
 import { useSettingsStore } from '@/stores/settings'
-import { computed, ref } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
+import { computed, ref, onMounted } from 'vue'
+import type { PortRange } from '@/types/settings'
+
+// 高级设置开关
+const showAdvancedSettings = computed({
+    get: () => settingsStore.showAdvancedSettings,
+    set: (value) => settingsStore.setShowAdvancedSettings(value),
+})
 
 const { t } = useI18n()
+const router = useRouter()
 const { isMobile } = usePlatform()
 const settingsStore = useSettingsStore()
 
@@ -109,7 +119,11 @@ const strategyOptions = computed(() => [
 
 // Tab 栏布局
 const tabLayoutOptions = computed(() => [
-    { title: t('settings.tabLayout.horizontal'), value: 'horizontal' },
+    { title: t('settings.tabLayout.horizontalTop'), value: 'horizontal-top' },
+    {
+        title: t('settings.tabLayout.horizontalBottom'),
+        value: 'horizontal-bottom',
+    },
     { title: t('settings.tabLayout.verticalLeft'), value: 'vertical-left' },
     { title: t('settings.tabLayout.verticalRight'), value: 'vertical-right' },
 ])
@@ -152,6 +166,91 @@ const fontSizePresetOptions = computed(() => [
     { title: t('settings.fontSize.preset.xlarge'), value: 'xlarge' },
 ])
 
+// 开发者设置
+const devToolsEnabled = computed({
+    get: () => settingsStore.developerSettings.devToolsEnabled,
+    set: async (value) => {
+        await settingsStore.setDevToolsEnabled(value)
+        try {
+            await invoke('toggle_devtools', { enabled: value })
+        } catch {
+            // Tauri 不可用时忽略
+        }
+    },
+})
+
+// 端口范围配置
+const transferPortMin = ref(0)
+const transferPortMax = ref(0)
+const webUploadPortMin = ref(0)
+const webUploadPortMax = ref(0)
+const sharePortMin = ref(0)
+const sharePortMax = ref(0)
+
+function loadPortRangeValues() {
+    const portRange = settingsStore.developerSettings.portRange
+    transferPortMin.value = portRange.transfer.minPort
+    transferPortMax.value = portRange.transfer.maxPort
+    webUploadPortMin.value = portRange.webUpload.minPort
+    webUploadPortMax.value = portRange.webUpload.maxPort
+    sharePortMin.value = portRange.share.minPort
+    sharePortMax.value = portRange.share.maxPort
+}
+
+onMounted(() => {
+    loadPortRangeValues()
+})
+
+function normalizePortValue(value: number): number {
+    if (!Number.isInteger(value) || isNaN(value)) return 0
+    if (value === 0) return 0
+    if (value < 1024) return 1024
+    if (value > 65535) return 65535
+    return value
+}
+
+function normalizePortRange(minPort: number, maxPort: number): PortRange {
+    let normalizedMin = normalizePortValue(minPort)
+    let normalizedMax = normalizePortValue(maxPort)
+    if (
+        normalizedMin !== 0 &&
+        normalizedMax !== 0 &&
+        normalizedMin > normalizedMax
+    ) {
+        const temp = normalizedMin
+        normalizedMin = normalizedMax
+        normalizedMax = temp
+    }
+    return { minPort: normalizedMin, maxPort: normalizedMax }
+}
+
+async function saveTransferPortRange() {
+    const range = normalizePortRange(
+        transferPortMin.value,
+        transferPortMax.value
+    )
+    transferPortMin.value = range.minPort
+    transferPortMax.value = range.maxPort
+    await settingsStore.setPortRange('transfer', range)
+}
+
+async function saveWebUploadPortRange() {
+    const range = normalizePortRange(
+        webUploadPortMin.value,
+        webUploadPortMax.value
+    )
+    webUploadPortMin.value = range.minPort
+    webUploadPortMax.value = range.maxPort
+    await settingsStore.setPortRange('webUpload', range)
+}
+
+async function saveSharePortRange() {
+    const range = normalizePortRange(sharePortMin.value, sharePortMax.value)
+    sharePortMin.value = range.minPort
+    sharePortMax.value = range.maxPort
+    await settingsStore.setPortRange('share', range)
+}
+
 // 应用版本
 const appVersion = __APP_VERSION__
 </script>
@@ -189,7 +288,7 @@ const appVersion = __APP_VERSION__
                                     size="small"
                                     @click="startEditDeviceName"
                                 >
-                                    {{ t('common.edit', '编辑') }}
+                                    {{ t('common.edit') }}
                                 </v-btn>
                                 <v-btn
                                     variant="text"
@@ -462,10 +561,183 @@ const appVersion = __APP_VERSION__
             </div>
         </SettingsGroup>
 
+        <!-- 高级设置开关 -->
+        <div class="d-flex justify-end mt-6 mb-2">
+            <v-checkbox
+                v-model="showAdvancedSettings"
+                :label="t('settings.advanced.showLabel')"
+                density="compact"
+                hide-details
+                color="primary"
+            />
+        </div>
+
+        <!-- 开发者设置 -->
+        <SettingsGroup
+            v-if="showAdvancedSettings"
+            :title="t('settings.developer.title')"
+            class="mt-2"
+        >
+            <div class="d-flex flex-column ga-4">
+                <!-- DevTools 开关 -->
+                <div class="d-flex align-center justify-space-between">
+                    <div>
+                        <div class="text-subtitle-1">
+                            {{ t('settings.developer.devTools.label') }}
+                        </div>
+                        <div class="text-body-2 text-grey">
+                            {{ t('settings.developer.devTools.description') }}
+                        </div>
+                    </div>
+                    <v-switch
+                        v-model="devToolsEnabled"
+                        color="primary"
+                        hide-details
+                    />
+                </div>
+
+                <!-- Android DevTools 提示 -->
+                <v-alert
+                    v-if="isMobile && devToolsEnabled"
+                    type="info"
+                    variant="tonal"
+                    density="compact"
+                >
+                    {{ t('settings.developer.devTools.androidHint') }}
+                </v-alert>
+
+                <v-divider />
+
+                <!-- 端口范围配置 -->
+                <div>
+                    <div class="text-subtitle-1 mb-1">
+                        {{ t('settings.developer.portRange.label') }}
+                    </div>
+                    <div class="text-body-2 text-grey mb-3">
+                        {{ t('settings.developer.portRange.hint') }}
+                    </div>
+
+                    <!-- 文件接收服务器 -->
+                    <div class="mb-3">
+                        <div class="text-body-2 font-weight-medium mb-1">
+                            {{ t('settings.developer.portRange.transfer') }}
+                        </div>
+                        <div class="d-flex align-center ga-2">
+                            <v-text-field
+                                v-model.number="transferPortMin"
+                                type="number"
+                                :min="0"
+                                :max="65535"
+                                :label="
+                                    t('settings.developer.portRange.minPort')
+                                "
+                                density="compact"
+                                variant="outlined"
+                                hide-details
+                                style="max-width: 140px"
+                                @blur="saveTransferPortRange"
+                            />
+                            <span class="text-body-2">—</span>
+                            <v-text-field
+                                v-model.number="transferPortMax"
+                                type="number"
+                                :min="0"
+                                :max="65535"
+                                :label="
+                                    t('settings.developer.portRange.maxPort')
+                                "
+                                density="compact"
+                                variant="outlined"
+                                hide-details
+                                style="max-width: 140px"
+                                @blur="saveTransferPortRange"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- HTTP 上传服务器 -->
+                    <div class="mb-3">
+                        <div class="text-body-2 font-weight-medium mb-1">
+                            {{ t('settings.developer.portRange.webUpload') }}
+                        </div>
+                        <div class="d-flex align-center ga-2">
+                            <v-text-field
+                                v-model.number="webUploadPortMin"
+                                type="number"
+                                :min="0"
+                                :max="65535"
+                                :label="
+                                    t('settings.developer.portRange.minPort')
+                                "
+                                density="compact"
+                                variant="outlined"
+                                hide-details
+                                style="max-width: 140px"
+                                @blur="saveWebUploadPortRange"
+                            />
+                            <span class="text-body-2">—</span>
+                            <v-text-field
+                                v-model.number="webUploadPortMax"
+                                type="number"
+                                :min="0"
+                                :max="65535"
+                                :label="
+                                    t('settings.developer.portRange.maxPort')
+                                "
+                                density="compact"
+                                variant="outlined"
+                                hide-details
+                                style="max-width: 140px"
+                                @blur="saveWebUploadPortRange"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- HTTP 下载服务器 -->
+                    <div>
+                        <div class="text-body-2 font-weight-medium mb-1">
+                            {{ t('settings.developer.portRange.share') }}
+                        </div>
+                        <div class="d-flex align-center ga-2">
+                            <v-text-field
+                                v-model.number="sharePortMin"
+                                type="number"
+                                :min="0"
+                                :max="65535"
+                                :label="
+                                    t('settings.developer.portRange.minPort')
+                                "
+                                density="compact"
+                                variant="outlined"
+                                hide-details
+                                style="max-width: 140px"
+                                @blur="saveSharePortRange"
+                            />
+                            <span class="text-body-2">—</span>
+                            <v-text-field
+                                v-model.number="sharePortMax"
+                                type="number"
+                                :min="0"
+                                :max="65535"
+                                :label="
+                                    t('settings.developer.portRange.maxPort')
+                                "
+                                density="compact"
+                                variant="outlined"
+                                hide-details
+                                style="max-width: 140px"
+                                @blur="saveSharePortRange"
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </SettingsGroup>
+
         <!-- 关于 -->
         <SettingsGroup :title="t('settings.about.title')" class="mt-6">
             <div class="d-flex flex-column align-center py-4">
-                <v-avatar size="64" class="mb-3">
+                <v-avatar size="96" class="mb-3">
                     <v-img src="/icons/icon.png" alt="PureSend" />
                 </v-avatar>
                 <div class="text-h6 font-weight-bold">PureSend</div>
@@ -477,6 +749,16 @@ const appVersion = __APP_VERSION__
                         variant="text"
                         color="primary"
                         size="small"
+                        class="about-link-btn"
+                        @click="router.push('/changelog')"
+                    >
+                        {{ t('settings.about.changelog') }}
+                    </v-btn>
+                    <v-btn
+                        variant="text"
+                        color="primary"
+                        size="small"
+                        class="about-link-btn"
                         href="https://puresend.vercel.app"
                         target="_blank"
                     >
@@ -486,6 +768,7 @@ const appVersion = __APP_VERSION__
                         variant="text"
                         color="primary"
                         size="small"
+                        class="about-link-btn"
                         href="https://github.com/z-only/puresend"
                         target="_blank"
                     >
@@ -500,5 +783,10 @@ const appVersion = __APP_VERSION__
 <style scoped>
 .settings-view {
     padding: 24px;
+}
+
+.about-link-btn {
+    font-size: 0.875rem !important;
+    letter-spacing: normal !important;
 }
 </style>

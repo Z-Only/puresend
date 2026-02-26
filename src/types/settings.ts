@@ -9,7 +9,11 @@ export type ThemeMode = 'light' | 'dark' | 'system'
 export type LanguageMode = 'zh-CN' | 'en-US' | 'system'
 
 /** Tab 栏布局模式 */
-export type TabLayout = 'horizontal' | 'vertical-left' | 'vertical-right'
+export type TabLayout =
+    | 'horizontal-top'
+    | 'horizontal-bottom'
+    | 'vertical-left'
+    | 'vertical-right'
 
 /** 字体大小模式 */
 export type FontSizeMode = 'system' | 'preset' | 'custom'
@@ -28,7 +32,7 @@ export interface FontSizeSettings {
 }
 
 /** 设置存储版本，用于迁移兼容 */
-export const SETTINGS_VERSION = 5
+export const SETTINGS_VERSION = 7
 
 /** 清理策略 */
 export type CleanupStrategy = 'byTime' | 'byCount' | 'disabled'
@@ -63,6 +67,32 @@ export interface HistorySettings {
     autoCleanup: AutoCleanupSettings
 }
 
+/** 端口范围 */
+export interface PortRange {
+    /** 最小端口（0 表示系统自动分配） */
+    minPort: number
+    /** 最大端口（0 表示系统自动分配） */
+    maxPort: number
+}
+
+/** 端口范围配置 */
+export interface PortRangeConfig {
+    /** 文件接收服务器端口范围 */
+    transfer: PortRange
+    /** HTTP 上传服务器端口范围 */
+    webUpload: PortRange
+    /** HTTP 下载服务器端口范围 */
+    share: PortRange
+}
+
+/** 开发者设置 */
+export interface DeveloperSettings {
+    /** DevTools 开关 */
+    devToolsEnabled: boolean
+    /** 端口范围配置 */
+    portRange: PortRangeConfig
+}
+
 /** 应用设置 */
 export interface AppSettings {
     /** 设备名称 */
@@ -77,6 +107,8 @@ export interface AppSettings {
     tabLayout: TabLayout
     /** 字体大小设置 */
     fontSize: FontSizeSettings
+    /** 是否显示高级设置 */
+    showAdvancedSettings: boolean
 }
 
 /** 扩展的设置状态，包含版本信息 */
@@ -84,6 +116,8 @@ export interface SettingsState extends AppSettings {
     version: number
     /** 接收设置 */
     receiveSettings?: ReceiveSettings
+    /** 开发者设置 */
+    developerSettings?: DeveloperSettings
 }
 
 /** 默认隐私设置 */
@@ -105,6 +139,25 @@ export const DEFAULT_FONT_SIZE_SETTINGS: FontSizeSettings = {
     customScale: 1.0,
 }
 
+/** 默认端口范围 */
+export const DEFAULT_PORT_RANGE: PortRange = {
+    minPort: 0,
+    maxPort: 0,
+}
+
+/** 默认端口范围配置 */
+export const DEFAULT_PORT_RANGE_CONFIG: PortRangeConfig = {
+    transfer: { ...DEFAULT_PORT_RANGE },
+    webUpload: { ...DEFAULT_PORT_RANGE },
+    share: { ...DEFAULT_PORT_RANGE },
+}
+
+/** 默认开发者设置 */
+export const DEFAULT_DEVELOPER_SETTINGS: DeveloperSettings = {
+    devToolsEnabled: false,
+    portRange: DEFAULT_PORT_RANGE_CONFIG,
+}
+
 /** 默认历史记录设置 */
 export const DEFAULT_HISTORY_SETTINGS: HistorySettings = {
     recordHistory: true,
@@ -118,8 +171,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
     theme: 'system',
     language: 'system',
     history: DEFAULT_HISTORY_SETTINGS,
-    tabLayout: 'horizontal',
+    tabLayout: 'horizontal-top',
     fontSize: DEFAULT_FONT_SIZE_SETTINGS,
+    showAdvancedSettings: false,
 }
 
 /** 接收设置 */

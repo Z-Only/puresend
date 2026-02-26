@@ -22,6 +22,9 @@
   },
   "settings": {
     "title": "设置",
+    "advanced": {
+      "showLabel": "高级设置"
+    },
     "device": {
       "title": "设备",
       "deviceName": {
@@ -34,7 +37,8 @@
     "appearance": "外观",
     "tabLayout": {
       "label": "Tab 栏布局",
-      "horizontal": "水平",
+      "horizontalTop": "水平（顶部）",
+      "horizontalBottom": "水平（底部）",
       "verticalLeft": "垂直（左侧）",
       "verticalRight": "垂直（右侧）"
     },
@@ -97,9 +101,27 @@
       "currentCount": "当前记录数：{count} 条",
       "cleanupNow": "立即清理"
     },
+    "developer": {
+      "title": "开发者",
+      "devTools": {
+        "label": "开发者工具",
+        "description": "启用应用内开发者工具（DevTools）",
+        "androidHint": "Android 设备需要通过 Chrome DevTools 远程调试"
+      },
+      "portRange": {
+        "label": "服务端口范围",
+        "hint": "设置为 0 表示系统自动分配端口，自定义端口范围需在 1024-65535 之间",
+        "transfer": "文件接收服务器",
+        "webUpload": "Web 上传服务器",
+        "share": "Web 下载服务器",
+        "minPort": "最小端口",
+        "maxPort": "最大端口"
+      }
+    },
     "about": {
       "title": "关于",
       "version": "版本",
+      "changelog": "更新日志",
       "homepage": "项目主页",
       "github": "GitHub 项目",
       "collapse": "收起",

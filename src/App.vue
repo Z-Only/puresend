@@ -34,6 +34,20 @@ useFontSize()
 // 垂直 Tab 栏折叠状态
 const isNavRailMode = ref(false)
 
+// 计算当前是否为水平布局（顶部或底部）
+const isHorizontalLayout = computed(() => {
+    if (isMobile.value) return true
+    return (
+        settingsStore.tabLayout === 'horizontal-top' ||
+        settingsStore.tabLayout === 'horizontal-bottom'
+    )
+})
+
+// 计算当前是否为水平底部布局
+const isHorizontalBottom = computed(() => {
+    return settingsStore.tabLayout === 'horizontal-bottom'
+})
+
 // 计算当前是否为垂直布局
 const isVerticalLayout = computed(() => {
     if (isMobile.value) return false
@@ -146,8 +160,34 @@ onUnmounted(() => {
 
 <template>
     <v-app>
-        <!-- 水平布局：顶部应用栏 -->
-        <v-app-bar v-if="!isVerticalLayout" density="comfortable">
+        <!-- 桌面端水平布局：顶部应用栏 -->
+        <v-app-bar
+            v-if="isHorizontalLayout && !isMobile && !isHorizontalBottom"
+            density="comfortable"
+        >
+            <v-tabs
+                :model-value="currentRoute"
+                align-tabs="center"
+                grow
+                @update:model-value="navigateTo"
+            >
+                <v-tab
+                    v-for="item in navigationItems"
+                    :key="item.route"
+                    :value="item.route"
+                >
+                    <v-icon :icon="item.icon" class="mr-2" />
+                    {{ item.title }}
+                </v-tab>
+            </v-tabs>
+        </v-app-bar>
+
+        <!-- 水平底部布局的应用栏 -->
+        <v-app-bar
+            v-if="isHorizontalLayout && !isMobile && isHorizontalBottom"
+            density="comfortable"
+            location="bottom"
+        >
             <v-tabs
                 :model-value="currentRoute"
                 align-tabs="center"
@@ -242,8 +282,11 @@ onUnmounted(() => {
         </v-navigation-drawer>
 
         <!-- 主内容区域 -->
-        <v-main>
-            <div class="main-content-scroll">
+        <v-main :class="{ 'mobile-main': isMobile }">
+            <div
+                class="main-content-scroll"
+                :class="{ 'mobile-content-scroll': isMobile }"
+            >
                 <router-view v-slot="{ Component }">
                     <transition name="fade" mode="out-in">
                         <component :is="Component" />
@@ -251,6 +294,24 @@ onUnmounted(() => {
                 </router-view>
             </div>
         </v-main>
+
+        <!-- 移动端底部导航栏 -->
+        <v-bottom-navigation
+            v-if="isMobile"
+            :model-value="currentRoute"
+            grow
+            class="mobile-bottom-nav"
+            @update:model-value="navigateTo"
+        >
+            <v-btn
+                v-for="item in navigationItems"
+                :key="item.route"
+                :value="item.route"
+            >
+                <v-icon :icon="item.icon" />
+                <span>{{ item.title }}</span>
+            </v-btn>
+        </v-bottom-navigation>
     </v-app>
 </template>
 
@@ -333,5 +394,30 @@ body,
 
 .nav-list .nav-item .v-icon {
     font-size: 24px !important;
+}
+
+/* 移动端沉浸式状态栏适配 */
+.mobile-main {
+    padding-top: env(safe-area-inset-top, 0px) !important;
+}
+
+@supports not (padding-top: env(safe-area-inset-top)) {
+    .mobile-main {
+        padding-top: 24px !important;
+    }
+}
+
+/* 移动端底部导航栏 */
+.mobile-bottom-nav {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 1000 !important;
+}
+
+/* 移动端内容区域底部留出导航栏空间 */
+.mobile-content-scroll {
+    padding-bottom: 56px;
 }
 </style>

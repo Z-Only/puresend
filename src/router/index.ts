@@ -25,6 +25,12 @@ const routes = [
         component: () => import('@/views/SettingsView.vue'),
         meta: { titleKey: 'nav.settings' },
     },
+    {
+        path: '/changelog',
+        name: 'Changelog',
+        component: () => import('@/views/ChangelogView.vue'),
+        meta: { titleKey: 'settings.about.changelog' },
+    },
 ]
 
 const router = createRouter({

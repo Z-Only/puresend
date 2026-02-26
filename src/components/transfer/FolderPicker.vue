@@ -46,8 +46,10 @@ import { open } from '@tauri-apps/plugin-dialog'
 import { invoke } from '@tauri-apps/api/core'
 import type { ContentItem } from '../../types'
 import { mdiFolder, mdiFolderOpen } from '@mdi/js'
+import { usePlatform } from '@/composables'
 
 const { t } = useI18n()
+const { isMobile } = usePlatform()
 
 /** 文件信息接口 */
 interface FileInfo {
@@ -69,10 +71,9 @@ const emit = defineEmits<{
 const loading = ref(false)
 const selectedFolder = ref<FolderContentItem | null>(null)
 const errorMessage = ref('')
-const fileCount = ref(0)
 
 /**
- * 递归获取文件夹下的所有文件
+ * 递归获取文件夹下的所有文件（桌面端）
  */
 async function getFilesInFolder(folderPath: string): Promise<FileInfo[]> {
     try {
@@ -86,51 +87,110 @@ async function getFilesInFolder(folderPath: string): Promise<FileInfo[]> {
     }
 }
 
+/**
+ * 递归读取 Android 文件夹（移动端）
+ */
+async function readDirRecursive(
+    dirUri: string,
+    basePath: string = ''
+): Promise<FileInfo[]> {
+    const { readDir, getName, getByteLength } =
+        await import('tauri-plugin-android-fs-api')
+    const entries = await readDir(dirUri)
+    const files: FileInfo[] = []
+    for (const entry of entries) {
+        const name = await getName(entry.uri)
+        if (entry.isDir) {
+            const subFiles = await readDirRecursive(
+                entry.uri,
+                basePath ? `${basePath}/${name}` : name
+            )
+            files.push(...subFiles)
+        } else {
+            const size = await getByteLength(entry.uri)
+            files.push({
+                path: entry.uri,
+                name,
+                size,
+                relative_path: basePath ? `${basePath}/${name}` : name,
+            })
+        }
+    }
+    return files
+}
+
 async function pickFolder() {
     loading.value = true
     errorMessage.value = ''
+
     try {
-        const selected = await open({
-            multiple: false,
-            directory: true,
-            title: t('folderPicker.selectFolder'),
-        })
+        if (isMobile.value) {
+            const { showOpenDirPicker, getName } =
+                await import('tauri-plugin-android-fs-api')
+            const dirUri = await showOpenDirPicker()
 
-        if (selected && typeof selected === 'string') {
-            const name = selected.split(/[/\\]/).pop() || selected
+            if (!dirUri) {
+                return
+            }
 
-            // 获取文件夹下的所有文件
-            const files = await getFilesInFolder(selected)
-            fileCount.value = files.length
+            const name = await getName(dirUri)
+            const files = await readDirRecursive(dirUri)
 
-            // 计算总大小
             const totalSize = files.reduce((sum, f) => sum + f.size, 0)
-
-            // 验证路径合法性（防止路径遍历攻击）
-            const normalizedPath = selected.replace(/\\/g, '/')
 
             selectedFolder.value = {
                 type: 'folder',
-                path: normalizedPath,
+                path: dirUri,
                 name,
                 size: totalSize,
                 mimeType: 'application/x-directory',
                 createdAt: Date.now(),
-                files: files.map((f) => ({
-                    ...f,
-                    path: f.path?.replace(/\\/g, '/') || f.path,
-                    relative_path: f.relative_path?.replace(/\\/g, '/') || '',
-                })),
+                files: files,
             }
 
-            // 如果文件夹为空，显示提示但仍发送事件
             if (files.length === 0) {
                 errorMessage.value = t('folderPicker.emptyFolder')
             }
 
             emit('select', selectedFolder.value)
+        } else {
+            const selected = await open({
+                multiple: false,
+                directory: true,
+                title: t('folderPicker.selectFolder'),
+            })
+
+            if (selected && typeof selected === 'string') {
+                const name = selected.split(/[/\\]/).pop() || selected
+
+                const files = await getFilesInFolder(selected)
+
+                const totalSize = files.reduce((sum, f) => sum + f.size, 0)
+
+                const normalizedPath = selected.replace(/\\/g, '/')
+
+                selectedFolder.value = {
+                    type: 'folder',
+                    path: normalizedPath,
+                    name,
+                    size: totalSize,
+                    mimeType: 'application/x-directory',
+                    createdAt: Date.now(),
+                    files: files.map((f) => ({
+                        ...f,
+                        path: f.path?.replace(/\\/g, '/') || f.path,
+                        relative_path:
+                            f.relative_path?.replace(/\\/g, '/') || '',
+                    })),
+                }
+
+                if (files.length === 0) {
+                    errorMessage.value = t('folderPicker.emptyFolder')
+                }
+
+                emit('select', selectedFolder.value)
+            }
         }
-        // 用户取消选择时不显示错误信息，静默关闭即可
     } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error)
         errorMessage.value = t('folderPicker.selectFailed', { error: errorMsg })

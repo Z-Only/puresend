@@ -1,6 +1,38 @@
 <!-- 文件选择组件 - 支持拖拽和点击选择 -->
 <template>
+    <!-- 移动端：简化的卡片，仅显示选择文件按钮 -->
+    <v-card v-if="isMobile" class="file-selector file-selector--mobile">
+        <v-card-text
+            class="d-flex flex-column align-center justify-center pa-8"
+        >
+            <v-btn
+                color="primary"
+                variant="outlined"
+                block
+                size="large"
+                class="text-center"
+                :loading="loading"
+                @click.stop="openFileDialog"
+            >
+                <v-icon :icon="mdiFolderOpen" class="mr-2" size="24" />
+                {{ t('fileSelector.selectFile') }}
+            </v-btn>
+
+            <v-alert
+                v-if="errorMessage"
+                type="error"
+                variant="tonal"
+                class="mt-4"
+                density="compact"
+            >
+                {{ errorMessage }}
+            </v-alert>
+        </v-card-text>
+    </v-card>
+
+    <!-- 桌面端：完整的拖拽+选择按钮 UI -->
     <v-card
+        v-else
         class="file-selector"
         :class="{ 'file-selector--dragover': isDragover }"
         @dragover.prevent="handleDragOver"
@@ -61,8 +93,10 @@ import { open } from '@tauri-apps/plugin-dialog'
 import { inferMimeType } from '../../types'
 import { getFileMetadata } from '../../services/transferService'
 import { mdiCloudUpload, mdiFilePlus, mdiFolderOpen } from '@mdi/js'
+import { usePlatform } from '@/composables'
 
 const { t } = useI18n()
+const { isMobile } = usePlatform()
 
 const emit = defineEmits<{
     (
@@ -184,5 +218,9 @@ async function openFileDialog() {
 .file-selector--dragover {
     border-color: rgb(var(--v-theme-primary));
     background: rgba(var(--v-theme-primary), 0.05);
+}
+
+.file-selector--mobile {
+    min-height: auto;
 }
 </style>
