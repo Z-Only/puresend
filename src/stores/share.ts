@@ -249,6 +249,7 @@ export const useShareStore = defineStore('share', () => {
             }),
             ...(update.speed !== undefined && { speed: update.speed }),
             ...(update.status !== undefined && {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 status: update.status as any,
             }),
             ...(update.startedAt !== undefined && {

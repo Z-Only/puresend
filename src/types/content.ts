@@ -120,7 +120,7 @@ export interface ContentItem {
     /** 创建时间戳 */
     createdAt: number
     /** 额外元数据 */
-    metadata?: Record<string, any>
+    metadata?: Record<string, string>
 }
 
 /** 内容类型显示信息 */
@@ -130,7 +130,7 @@ export interface ContentTypeInfo {
     /** 显示名称 i18n 键 */
     labelKey: string
     /** 图标 */
-    icon: any
+    icon: string
     /** 描述 i18n 键 */
     descriptionKey: string
 }

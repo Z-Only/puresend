@@ -41,18 +41,31 @@ export default defineConfig(async () => ({
         chunkSizeWarningLimit: 600,
         rollupOptions: {
             output: {
-                // 手动分割代码块
-                manualChunks: {
-                    // Vue 相关库
-                    'vendor-vue': ['vue', 'vue-router', 'pinia'],
-                    // Vuetify UI 框架
-                    'vendor-vuetify': ['vuetify'],
-                    // 国际化
-                    'vendor-i18n': ['vue-i18n'],
-                    // 其他第三方库
-                    vendor: ['qrcode'],
+                // 使用 Rolldown 的 advancedChunks 替代已过时的 manualChunks
+                // 类型断言用于绕过标准 Vite 类型定义的限制
+                advancedChunks: {
+                    groups: [
+                        // Vue 相关库
+                        {
+                            name: 'vendor-vue',
+                            test: /\/node_modules\/(vue|vue-router|pinia)\//,
+                        },
+                        // Vuetify UI 框架
+                        {
+                            name: 'vendor-vuetify',
+                            test: /\/node_modules\/vuetify\//,
+                        },
+                        // 国际化
+                        {
+                            name: 'vendor-i18n',
+                            test: /\/node_modules\/vue-i18n\//,
+                        },
+                        // 其他第三方库
+                        { name: 'vendor', test: /\/node_modules\/qrcode\// },
+                    ],
                 },
-            },
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } as any,
         },
     },
 

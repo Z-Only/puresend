@@ -1466,5 +1466,7 @@ export const useTransferStore = defineStore('transfer', () => {
 
 // 导出给 HistoryView 使用
 if (typeof window !== 'undefined') {
-    ;(window as any).__TRANSFER_STORE__ = useTransferStore
+    ;(
+        window as { __TRANSFER_STORE__?: typeof useTransferStore }
+    ).__TRANSFER_STORE__ = useTransferStore
 }

@@ -159,8 +159,8 @@ function getStatusColor(status: PeerStatus): string {
     return getPeerStatusColor(status)
 }
 
-function getDeviceIcon(type: DeviceType) {
-    const icons: Record<DeviceType, any> = {
+function getDeviceIcon(type: DeviceType): string {
+    const icons: Record<DeviceType, string> = {
         desktop: mdiDesktopTowerMonitor,
         mobile: mdiCellphone,
         web: mdiWeb,
