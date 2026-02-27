@@ -611,15 +611,6 @@ const compressionModeOptions = computed(() => [
             class="mt-2"
         >
             <div class="d-flex flex-column ga-4">
-                <!-- P2P 模式提示 -->
-                <v-alert
-                    type="info"
-                    variant="tonal"
-                    density="compact"
-                    class="mb-2"
-                >
-                    {{ t('settings.transferEnhancement.p2pOnlyHint') }}
-                </v-alert>
                 <!-- 传输加密 -->
                 <div class="d-flex align-center justify-space-between">
                     <div>

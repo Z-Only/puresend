@@ -103,20 +103,19 @@
     },
     "transferEnhancement": {
       "title": "传输增强",
-      "p2pOnlyHint": "传输增强功能目前仅对本地网络 P2P 直连模式有效，Web 上传/下载（HTTP 协议）的加密和压缩功能将在后续版本中支持。",
       "encryption": {
         "label": "传输加密",
-        "description": "使用 AES-256 加密保护传输数据",
+        "description": "使用 AES-256 加密保护传输数据（适用于所有传输模式）",
         "enabled": "已开启",
         "disabled": "已关闭"
       },
       "compression": {
         "label": "动态压缩",
-        "description": "传输前自动压缩数据以提升效率",
+        "description": "传输前自动压缩数据以提升效率（适用于所有传输模式）",
         "mode": {
           "label": "压缩模式",
           "smart": "智能压缩",
-          "smartDescription": "根据文件类型自动调整压缩策略",
+          "smartDescription": "根据文件类型自动调整压缩策略（适用于所有传输模式）",
           "manual": "手动压缩级别"
         },
         "level": {

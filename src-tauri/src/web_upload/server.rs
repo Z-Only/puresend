@@ -1,50 +1,81 @@
 //! Web 上传 HTTP 服务器实现
 //!
-//! 提供文件上传的 HTTP 服务，采用按 IP 审批模式
+//! 提供文件上传的 HTTP 服务，支持分块上传、断点续传、传输加密和动态压缩
 
 use axum::extract::DefaultBodyLimit;
 use axum::{
     body::Body,
-    extract::{connect_info::ConnectInfo, Multipart, State as AxumState},
-    http::{header, HeaderMap, StatusCode},
+    extract::{connect_info::ConnectInfo, Multipart, Path, State as AxumState},
+    http::{header, HeaderMap, HeaderName, StatusCode},
     response::{Html, IntoResponse, Json, Response},
     routing::{get, post},
     Router,
 };
-use serde::Serialize;
+use bytes::Bytes;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Instant;
 use tauri::{AppHandle, Emitter};
+use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
 
-use super::models::{WebUploadRecord, UploadRequest, UploadRequestStatus, WebUploadState};
+use super::models::{UploadRequest, UploadRequestStatus, WebUploadRecord, WebUploadState};
+use crate::transfer::compression::Compressor;
+use crate::transfer::crypto::is_encryption_enabled;
+use crate::transfer::http_crypto::{
+    HandshakeRequest, HandshakeResponse, HttpCryptoSessionManager,
+};
 
-/// Favicon 图标数据
 static FAVICON_ICO: &[u8] = include_bytes!("../../icons/32x32.png");
 
-/// 上传服务器状态
+const HTTP_CHUNK_SIZE: usize = 1024 * 1024; // 1MB
+const UPLOAD_SESSION_EXPIRY_SECS: u64 = 24 * 3600; // 24h
+
+/// Chunked upload session
 #[derive(Debug)]
-pub struct UploadServerState {
-    /// Web 上传状态
-    pub upload_state: Arc<Mutex<WebUploadState>>,
-    /// Tauri 应用句柄
-    pub app_handle: AppHandle,
+pub struct ChunkedUploadSession {
+    id: String,
+    file_name: String,
+    file_size: u64,
+    chunk_size: usize,
+    chunk_count: usize,
+    received_chunks: HashSet<usize>,
+    temp_dir: PathBuf,
+    client_ip: String,
+    request_id: String,
+    created_at: Instant,
 }
 
-/// Web 上传服务器实例
+impl ChunkedUploadSession {
+    fn is_expired(&self) -> bool {
+        self.created_at.elapsed().as_secs() > UPLOAD_SESSION_EXPIRY_SECS
+    }
+
+    fn is_complete(&self) -> bool {
+        self.received_chunks.len() == self.chunk_count
+    }
+}
+
+#[derive(Debug)]
+pub struct UploadServerState {
+    pub upload_state: Arc<Mutex<WebUploadState>>,
+    pub app_handle: AppHandle,
+    pub crypto_sessions: Arc<Mutex<HttpCryptoSessionManager>>,
+    pub upload_sessions: Arc<Mutex<HashMap<String, ChunkedUploadSession>>>,
+}
+
 pub struct WebUploadServer {
-    /// 监听地址
     pub addr: SocketAddr,
-    /// 服务器状态
     pub state: Arc<UploadServerState>,
-    /// 关闭信号
     shutdown_tx: Option<tokio::sync::oneshot::Sender<()>>,
 }
 
 impl WebUploadServer {
-    /// 创建新的上传服务器
     pub fn new(upload_state: Arc<Mutex<WebUploadState>>, app_handle: AppHandle) -> Self {
         let addr = SocketAddr::from(([0, 0, 0, 0], 0));
 
@@ -53,17 +84,26 @@ impl WebUploadServer {
             state: Arc::new(UploadServerState {
                 upload_state,
                 app_handle,
+                crypto_sessions: Arc::new(Mutex::new(HttpCryptoSessionManager::new())),
+                upload_sessions: Arc::new(Mutex::new(HashMap::new())),
             }),
             shutdown_tx: None,
         }
     }
 
-    /// 启动服务器
     pub async fn start(&mut self) -> Result<u16, String> {
         let app = Router::new()
             .route("/", get(index_handler))
             .route("/favicon.ico", get(favicon_handler))
             .route("/request-status", get(request_status_handler))
+            .route("/capabilities", get(capabilities_handler))
+            .route("/crypto/handshake", post(crypto_handshake_handler))
+            .route("/upload/init", post(upload_init_handler))
+            .route(
+                "/upload/chunk",
+                post(upload_chunk_handler).layer(DefaultBodyLimit::max(10 * 1024 * 1024)),
+            )
+            .route("/upload/status/{upload_id}", get(upload_session_status_handler))
             .route(
                 "/upload",
                 post(upload_handler).layer(DefaultBodyLimit::max(10 * 1024 * 1024 * 1024)),
@@ -73,7 +113,17 @@ impl WebUploadServer {
                 CorsLayer::new()
                     .allow_origin(Any)
                     .allow_methods([axum::http::Method::GET, axum::http::Method::POST])
-                    .allow_headers([header::CONTENT_TYPE, header::ACCEPT]),
+                    .allow_headers([
+                        header::CONTENT_TYPE,
+                        header::ACCEPT,
+                        HeaderName::from_static("x-upload-id"),
+                        HeaderName::from_static("x-chunk-index"),
+                        HeaderName::from_static("x-encryption-session"),
+                        HeaderName::from_static("x-compression"),
+                    ])
+                    .expose_headers([
+                        HeaderName::from_static("x-file-hash"),
+                    ]),
             )
             .with_state(self.state.clone());
 
@@ -88,6 +138,18 @@ impl WebUploadServer {
 
         let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
         self.shutdown_tx = Some(shutdown_tx);
+
+        // Periodic cleanup of expired sessions
+        let crypto_sessions = self.state.crypto_sessions.clone();
+        let upload_sessions = self.state.upload_sessions.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(300));
+            loop {
+                interval.tick().await;
+                crypto_sessions.lock().await.cleanup_expired();
+                upload_sessions.lock().await.retain(|_, s| !s.is_expired());
+            }
+        });
 
         tokio::spawn(async move {
             axum::serve(
@@ -104,7 +166,6 @@ impl WebUploadServer {
         Ok(actual_port)
     }
 
-    /// 停止服务器
     pub fn stop(&mut self) {
         if let Some(tx) = self.shutdown_tx.take() {
             let _ = tx.send(());
@@ -112,17 +173,422 @@ impl WebUploadServer {
     }
 }
 
-/// Favicon 处理器
+// ─── Handlers ───────────────────────────────────────────────────────────────
+
 async fn favicon_handler() -> impl IntoResponse {
     let mut response = Response::new(Body::from(FAVICON_ICO));
     *response.status_mut() = StatusCode::OK;
     let headers = response.headers_mut();
-    headers.insert(header::CONTENT_TYPE, axum::http::HeaderValue::from_static("image/png"));
-    headers.insert(header::CACHE_CONTROL, axum::http::HeaderValue::from_static("max-age=86400"));
+    headers.insert(
+        header::CONTENT_TYPE,
+        axum::http::HeaderValue::from_static("image/png"),
+    );
+    headers.insert(
+        header::CACHE_CONTROL,
+        axum::http::HeaderValue::from_static("max-age=86400"),
+    );
     response
 }
 
-/// 首页处理器 - 按 IP 检查审批状态，决定显示上传页面或等待页面
+async fn capabilities_handler() -> Json<ServerCapabilities> {
+    let encryption = is_encryption_enabled();
+    let compression_config = crate::transfer::compression::get_compression_config();
+    Json(ServerCapabilities {
+        encryption,
+        compression: compression_config.enabled,
+        chunk_size: HTTP_CHUNK_SIZE,
+    })
+}
+
+async fn crypto_handshake_handler(
+    ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
+    AxumState(state): AxumState<Arc<UploadServerState>>,
+    Json(payload): Json<HandshakeRequest>,
+) -> Json<HandshakeResponse> {
+    if !is_encryption_enabled() {
+        return Json(HandshakeResponse {
+            encryption: false,
+            server_public_key: None,
+            session_id: None,
+        });
+    }
+
+    let client_ip = client_addr.ip().to_string();
+    let mut crypto_sessions = state.crypto_sessions.lock().await;
+
+    match crypto_sessions.handshake(&payload.client_public_key, client_ip) {
+        Ok((session_id, server_pub_key)) => Json(HandshakeResponse {
+            encryption: true,
+            server_public_key: Some(server_pub_key),
+            session_id: Some(session_id),
+        }),
+        Err(e) => {
+            eprintln!("加密握手失败: {}", e);
+            Json(HandshakeResponse {
+                encryption: false,
+                server_public_key: None,
+                session_id: None,
+            })
+        }
+    }
+}
+
+/// Initialize chunked upload session
+async fn upload_init_handler(
+    ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
+    AxumState(state): AxumState<Arc<UploadServerState>>,
+    Json(payload): Json<UploadInitRequest>,
+) -> Json<UploadInitResponse> {
+    let client_ip = client_addr.ip().to_string();
+
+    let (is_allowed, receive_directory, request_id) = {
+        let upload_state = state.upload_state.lock().await;
+        let allowed = upload_state.is_ip_allowed(&client_ip);
+        let req_id = upload_state
+            .requests
+            .values()
+            .find(|r| r.client_ip == client_ip)
+            .map(|r| r.id.clone())
+            .unwrap_or_default();
+        (allowed, upload_state.receive_directory.clone(), req_id)
+    };
+
+    if !is_allowed || request_id.is_empty() {
+        return Json(UploadInitResponse {
+            success: false,
+            upload_id: String::new(),
+            chunk_size: 0,
+            chunk_count: 0,
+            message: Some("未授权上传".to_string()),
+        });
+    }
+
+    let chunk_size = if payload.chunk_size > 0 {
+        payload.chunk_size
+    } else {
+        HTTP_CHUNK_SIZE
+    };
+    let chunk_count = ((payload.file_size as f64) / (chunk_size as f64)).ceil() as usize;
+    let upload_id = uuid::Uuid::new_v4().to_string();
+
+    // Create temp directory for chunks
+    let temp_dir = PathBuf::from(&receive_directory)
+        .join(".puresend_chunks")
+        .join(&upload_id);
+    if let Err(e) = tokio::fs::create_dir_all(&temp_dir).await {
+        return Json(UploadInitResponse {
+            success: false,
+            upload_id: String::new(),
+            chunk_size: 0,
+            chunk_count: 0,
+            message: Some(format!("创建临时目录失败: {}", e)),
+        });
+    }
+
+    let session = ChunkedUploadSession {
+        id: upload_id.clone(),
+        file_name: payload.file_name.clone(),
+        file_size: payload.file_size,
+        chunk_size,
+        chunk_count,
+        received_chunks: HashSet::new(),
+        temp_dir,
+        client_ip,
+        request_id,
+        created_at: Instant::now(),
+    };
+
+    state
+        .upload_sessions
+        .lock()
+        .await
+        .insert(upload_id.clone(), session);
+
+    Json(UploadInitResponse {
+        success: true,
+        upload_id,
+        chunk_size,
+        chunk_count,
+        message: None,
+    })
+}
+
+/// Upload a single chunk
+async fn upload_chunk_handler(
+    ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
+    AxumState(state): AxumState<Arc<UploadServerState>>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Json<UploadChunkResponse> {
+    let client_ip = client_addr.ip().to_string();
+
+    let upload_id = headers
+        .get("x-upload-id")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+    let chunk_index: usize = headers
+        .get("x-chunk-index")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+
+    if upload_id.is_empty() {
+        return Json(UploadChunkResponse {
+            success: false,
+            message: "缺少 X-Upload-Id".to_string(),
+            complete: false,
+            file_hash: None,
+        });
+    }
+
+    let mut data = body.to_vec();
+
+    // Decrypt if needed
+    let encryption_session_id = headers
+        .get("x-encryption-session")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+    if !encryption_session_id.is_empty() {
+        let crypto_sessions = state.crypto_sessions.lock().await;
+        if let Some(session) = crypto_sessions.get_session(&encryption_session_id) {
+            match session.decrypt(&data) {
+                Ok(decrypted) => data = decrypted,
+                Err(e) => {
+                    return Json(UploadChunkResponse {
+                        success: false,
+                        message: format!("解密失败: {}", e),
+                        complete: false,
+                        file_hash: None,
+                    });
+                }
+            }
+        }
+    }
+
+    // Decompress if needed
+    let compression = headers
+        .get("x-compression")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    if compression == "zstd" {
+        match Compressor::decompress(&data) {
+            Ok(decompressed) => data = decompressed,
+            Err(e) => {
+                return Json(UploadChunkResponse {
+                    success: false,
+                    message: format!("解压失败: {}", e),
+                    complete: false,
+                    file_hash: None,
+                });
+            }
+        }
+    }
+
+    // Save chunk to temp file and check completion
+    let mut upload_sessions = state.upload_sessions.lock().await;
+    let session = match upload_sessions.get_mut(&upload_id) {
+        Some(s) if s.client_ip == client_ip => s,
+        _ => {
+            return Json(UploadChunkResponse {
+                success: false,
+                message: "上传会话不存在".to_string(),
+                complete: false,
+                file_hash: None,
+            });
+        }
+    };
+
+    let chunk_path = session.temp_dir.join(format!("chunk_{}", chunk_index));
+    if let Err(e) = tokio::fs::write(&chunk_path, &data).await {
+        return Json(UploadChunkResponse {
+            success: false,
+            message: format!("写入分块失败: {}", e),
+            complete: false,
+            file_hash: None,
+        });
+    }
+
+    session.received_chunks.insert(chunk_index);
+
+    // Emit progress event
+    let progress = (session.received_chunks.len() as f64 / session.chunk_count as f64) * 100.0;
+    let _ = state.app_handle.emit(
+        "web-upload-file-progress",
+        FileProgressEvent {
+            request_id: session.request_id.clone(),
+            record_id: session.id.clone(),
+            file_name: session.file_name.clone(),
+            uploaded_bytes: session.received_chunks.len() as u64 * session.chunk_size as u64,
+            total_bytes: session.file_size,
+            progress,
+            speed: 0,
+        },
+    );
+
+    if session.is_complete() {
+        // Merge chunks into final file
+        let file_name = session.file_name.clone();
+        let file_size = session.file_size;
+        let chunk_count = session.chunk_count;
+        let temp_dir = session.temp_dir.clone();
+        let request_id = session.request_id.clone();
+        let record_id = session.id.clone();
+
+        let (receive_directory, file_overwrite) = {
+            let upload_state = state.upload_state.lock().await;
+            (
+                upload_state.receive_directory.clone(),
+                upload_state.file_overwrite,
+            )
+        };
+
+        let receive_dir = PathBuf::from(&receive_directory);
+        let mut final_path = receive_dir.join(&file_name);
+        if !file_overwrite && final_path.exists() {
+            final_path = get_unique_path(&final_path);
+        }
+
+        // Merge all chunks
+        let mut hasher = Sha256::new();
+        match tokio::fs::File::create(&final_path).await {
+            Ok(mut output) => {
+                for i in 0..chunk_count {
+                    let chunk_path = temp_dir.join(format!("chunk_{}", i));
+                    match tokio::fs::read(&chunk_path).await {
+                        Ok(chunk_data) => {
+                            hasher.update(&chunk_data);
+                            if let Err(e) = output.write_all(&chunk_data).await {
+                                return Json(UploadChunkResponse {
+                                    success: false,
+                                    message: format!("合并分块失败: {}", e),
+                                    complete: false,
+                                    file_hash: None,
+                                });
+                            }
+                        }
+                        Err(e) => {
+                            return Json(UploadChunkResponse {
+                                success: false,
+                                message: format!("读取分块失败: {}", e),
+                                complete: false,
+                                file_hash: None,
+                            });
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                return Json(UploadChunkResponse {
+                    success: false,
+                    message: format!("创建目标文件失败: {}", e),
+                    complete: false,
+                    file_hash: None,
+                });
+            }
+        }
+
+        let file_hash = hex::encode(hasher.finalize());
+
+        // Cleanup temp directory
+        let _ = tokio::fs::remove_dir_all(&temp_dir).await;
+
+        // Update upload record
+        {
+            let mut upload_state = state.upload_state.lock().await;
+            if let Some(req) = upload_state
+                .requests
+                .values_mut()
+                .find(|r| r.id == request_id)
+            {
+                let record = WebUploadRecord {
+                    id: record_id.clone(),
+                    file_name: file_name.clone(),
+                    uploaded_bytes: file_size,
+                    total_bytes: file_size,
+                    progress: 100.0,
+                    speed: 0,
+                    status: "completed".to_string(),
+                    started_at: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs(),
+                    completed_at: Some(
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs(),
+                    ),
+                };
+                req.upload_records.push(record);
+            }
+        }
+
+        let _ = state.app_handle.emit(
+            "web-upload-file-complete",
+            FileCompleteEvent {
+                request_id,
+                record_id,
+                file_name,
+                total_bytes: file_size,
+                status: "completed".to_string(),
+            },
+        );
+
+        // Remove the session
+        upload_sessions.remove(&upload_id);
+
+        return Json(UploadChunkResponse {
+            success: true,
+            message: "上传完成".to_string(),
+            complete: true,
+            file_hash: Some(file_hash),
+        });
+    }
+
+    Json(UploadChunkResponse {
+        success: true,
+        message: format!("分块 {} 已接收", chunk_index),
+        complete: false,
+        file_hash: None,
+    })
+}
+
+/// Query upload session status (for resume)
+async fn upload_session_status_handler(
+    ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
+    AxumState(state): AxumState<Arc<UploadServerState>>,
+    Path(upload_id): Path<String>,
+) -> Json<UploadSessionStatusResponse> {
+    let client_ip = client_addr.ip().to_string();
+    let upload_sessions = state.upload_sessions.lock().await;
+
+    match upload_sessions.get(&upload_id) {
+        Some(session) if session.client_ip == client_ip && !session.is_expired() => {
+            let mut received: Vec<usize> = session.received_chunks.iter().copied().collect();
+            received.sort();
+            Json(UploadSessionStatusResponse {
+                found: true,
+                upload_id: session.id.clone(),
+                file_name: Some(session.file_name.clone()),
+                received_chunks: received,
+                total_chunks: session.chunk_count,
+                complete: session.is_complete(),
+            })
+        }
+        _ => Json(UploadSessionStatusResponse {
+            found: false,
+            upload_id,
+            file_name: None,
+            received_chunks: vec![],
+            total_chunks: 0,
+            complete: false,
+        }),
+    }
+}
+
+/// Index handler
 async fn index_handler(
     ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
@@ -142,12 +608,10 @@ async fn index_handler(
 
     let mut upload_state = state.upload_state.lock().await;
 
-    // 检查该 IP 是否已被拒绝
     if upload_state.is_ip_rejected(&client_ip) {
         return Html(generate_rejected_page(is_english)).into_response();
     }
 
-    // 检查该 IP 是否已有请求记录
     let has_request = upload_state
         .requests
         .values()
@@ -155,7 +619,6 @@ async fn index_handler(
 
     if !has_request {
         if upload_state.auto_receive {
-            // 自动接收：创建已接受的请求，添加到 allowed_ips
             let mut request = UploadRequest::new(client_ip.clone());
             request.status = UploadRequestStatus::Accepted;
             request.user_agent = user_agent;
@@ -167,7 +630,6 @@ async fn index_handler(
             }
             let _ = state.app_handle.emit("web-upload-task", &request);
         } else {
-            // 需要审批：创建待处理的请求
             let mut request = UploadRequest::new(client_ip.clone());
             request.user_agent = user_agent;
             upload_state
@@ -177,7 +639,6 @@ async fn index_handler(
         }
     }
 
-    // 检查是否有上传权限
     let is_allowed = upload_state.is_ip_allowed(&client_ip);
 
     if is_allowed {
@@ -187,61 +648,15 @@ async fn index_handler(
     }
 }
 
-/// 请求状态响应
+/// Request status handler
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RequestStatusResponse {
-    /// 是否存在请求记录
     has_request: bool,
-    /// 请求状态
     #[serde(skip_serializing_if = "Option::is_none")]
     status: Option<String>,
 }
 
-/// 上传 API 响应
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct UploadResponse {
-    success: bool,
-    message: String,
-}
-
-/// 文件上传开始事件
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct FileStartEvent {
-    request_id: String,
-    record_id: String,
-    file_name: String,
-    total_bytes: u64,
-    client_ip: String,
-}
-
-/// 文件上传进度事件
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct FileProgressEvent {
-    request_id: String,
-    record_id: String,
-    file_name: String,
-    uploaded_bytes: u64,
-    total_bytes: u64,
-    progress: f64,
-    speed: u64,
-}
-
-/// 文件上传完成事件
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct FileCompleteEvent {
-    request_id: String,
-    record_id: String,
-    file_name: String,
-    total_bytes: u64,
-    status: String,
-}
-
-/// 请求状态轮询处理器
 async fn request_status_handler(
     ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
     AxumState(state): AxumState<Arc<UploadServerState>>,
@@ -274,7 +689,7 @@ async fn request_status_handler(
     }
 }
 
-/// 文件上传处理器（按 IP 授权，接收 multipart 文件数据）
+/// Legacy multipart upload handler (backward compatible)
 async fn upload_handler(
     ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
     AxumState(state): AxumState<Arc<UploadServerState>>,
@@ -282,7 +697,6 @@ async fn upload_handler(
 ) -> Json<UploadResponse> {
     let client_ip = client_addr.ip().to_string();
 
-    // 检查该 IP 是否已授权
     let (is_allowed, file_overwrite, receive_directory, request_id) = {
         let upload_state = state.upload_state.lock().await;
         let allowed = upload_state.is_ip_allowed(&client_ip);
@@ -341,7 +755,6 @@ async fn upload_handler(
             .unwrap_or_default()
             .as_secs();
 
-        // 创建 UploadRecord 并添加到请求中
         let record = WebUploadRecord {
             id: record_id.clone(),
             file_name: file_name.clone(),
@@ -365,7 +778,6 @@ async fn upload_handler(
             }
         }
 
-        // 发送文件开始事件
         let _ = state.app_handle.emit(
             "web-upload-file-start",
             FileStartEvent {
@@ -377,20 +789,16 @@ async fn upload_handler(
             },
         );
 
-        // 确定文件保存路径
         let mut file_path = receive_dir.join(&file_name);
         if !file_overwrite && file_path.exists() {
             file_path = get_unique_path(&file_path);
         }
 
-        // 流式接收文件数据并写入磁盘
         let start_time = std::time::Instant::now();
         let total_written: u64;
 
         match tokio::fs::File::create(&file_path).await {
             Ok(mut output_file) => {
-                use tokio::io::AsyncWriteExt;
-
                 match field.bytes().await {
                     Ok(data) => {
                         let data_len = data.len() as u64;
@@ -406,7 +814,6 @@ async fn upload_handler(
                                 },
                             );
 
-                            // 更新记录状态
                             let mut upload_state = state.upload_state.lock().await;
                             if let Some(req) = upload_state
                                 .requests
@@ -434,7 +841,6 @@ async fn upload_handler(
 
                         total_written = data_len;
 
-                        // 发送进度事件
                         let elapsed = start_time.elapsed().as_secs_f64();
                         let speed = if elapsed > 0.0 {
                             (total_written as f64 / elapsed) as u64
@@ -528,7 +934,6 @@ async fn upload_handler(
             }
         }
 
-        // 更新记录为完成状态
         let completed_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -558,7 +963,6 @@ async fn upload_handler(
             }
         }
 
-        // 发送文件完成事件
         let _ = state.app_handle.emit(
             "web-upload-file-complete",
             FileCompleteEvent {
@@ -586,7 +990,6 @@ async fn upload_handler(
     })
 }
 
-/// 获取唯一文件路径（避免覆盖）
 fn get_unique_path(path: &PathBuf) -> PathBuf {
     let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("file");
     let extension = path.extension().and_then(|s| s.to_str()).unwrap_or("");
@@ -607,51 +1010,112 @@ fn get_unique_path(path: &PathBuf) -> PathBuf {
     }
 }
 
-/// 404 处理器
 async fn fallback_handler() -> impl IntoResponse {
     (StatusCode::NOT_FOUND, "404 Not Found")
 }
 
-/// 生成上传页面 HTML（已授权 IP 直接上传，无需审批流程）
+// ─── Data types ─────────────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize)]
+struct ServerCapabilities {
+    encryption: bool,
+    compression: bool,
+    chunk_size: usize,
+}
+
+#[derive(Debug, Deserialize)]
+struct UploadInitRequest {
+    file_name: String,
+    file_size: u64,
+    #[serde(default)]
+    chunk_size: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct UploadInitResponse {
+    success: bool,
+    upload_id: String,
+    chunk_size: usize,
+    chunk_count: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    message: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct UploadChunkResponse {
+    success: bool,
+    message: String,
+    complete: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    file_hash: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct UploadSessionStatusResponse {
+    found: bool,
+    upload_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    file_name: Option<String>,
+    received_chunks: Vec<usize>,
+    total_chunks: usize,
+    complete: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UploadResponse {
+    success: bool,
+    message: String,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct FileStartEvent {
+    request_id: String,
+    record_id: String,
+    file_name: String,
+    total_bytes: u64,
+    client_ip: String,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct FileProgressEvent {
+    request_id: String,
+    record_id: String,
+    file_name: String,
+    uploaded_bytes: u64,
+    total_bytes: u64,
+    progress: f64,
+    speed: u64,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct FileCompleteEvent {
+    request_id: String,
+    record_id: String,
+    file_name: String,
+    total_bytes: u64,
+    status: String,
+}
+
+// ─── HTML Templates ─────────────────────────────────────────────────────────
+
+/// Enhanced upload page with chunked upload, encryption, compression, and resume
 fn generate_upload_page(is_english: bool) -> String {
-    let title = if is_english {
-        "PureSend - Upload Files"
-    } else {
-        "PureSend - 文件上传"
-    };
-    let select_files = if is_english {
-        "Select Files"
-    } else {
-        "选择文件"
-    };
-    let drag_hint = if is_english {
-        "or drag and drop files here"
-    } else {
-        "或将文件拖拽到此处"
-    };
+    let title = if is_english { "PureSend - Upload Files" } else { "PureSend - 文件上传" };
+    let select_files = if is_english { "Select Files" } else { "选择文件" };
+    let drag_hint = if is_english { "or drag and drop files here" } else { "或将文件拖拽到此处" };
     let upload_btn = if is_english { "Upload" } else { "上传" };
-    let transferring = if is_english {
-        "Uploading files..."
-    } else {
-        "正在上传文件..."
-    };
-    let success = if is_english {
-        "Files uploaded successfully!"
-    } else {
-        "文件上传成功！"
-    };
-    let failed = if is_english {
-        "Upload failed"
-    } else {
-        "上传失败"
-    };
+    let transferring = if is_english { "Uploading files..." } else { "正在上传文件..." };
+    let success_msg = if is_english { "Files uploaded successfully!" } else { "文件上传成功！" };
+    let failed_msg = if is_english { "Upload failed" } else { "上传失败" };
     let file_label = if is_english { "file(s)" } else { "个文件" };
-    let total_size_label = if is_english {
-        "Total size"
-    } else {
-        "总大小"
-    };
+    let total_size_label = if is_english { "Total size" } else { "总大小" };
     let remove_label = if is_english { "Remove" } else { "移除" };
+    let encrypted_label = if is_english { "Encrypted" } else { "已加密" };
+    let lang = if is_english { "en" } else { "zh-CN" };
 
     format!(
         r##"<!DOCTYPE html>
@@ -668,6 +1132,8 @@ fn generate_upload_page(is_english: bool) -> String {
         .card {{ background: #fff; border-radius: 16px; padding: 32px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }}
         h1 {{ font-size: 24px; font-weight: 600; margin-bottom: 8px; text-align: center; }}
         .subtitle {{ color: #666; text-align: center; margin-bottom: 24px; font-size: 14px; }}
+        .badges {{ display: flex; gap: 6px; justify-content: center; margin-bottom: 16px; }}
+        .badge {{ font-size: 11px; padding: 2px 8px; border-radius: 4px; color: #fff; background: #2e7d32; }}
         .drop-zone {{ border: 2px dashed #ddd; border-radius: 12px; padding: 40px 20px; text-align: center; cursor: pointer; transition: all 0.2s; }}
         .drop-zone:hover, .drop-zone.dragover {{ border-color: #1976d2; background: #e3f2fd; }}
         .drop-zone-icon {{ font-size: 48px; margin-bottom: 12px; }}
@@ -688,6 +1154,13 @@ fn generate_upload_page(is_english: bool) -> String {
         .status.success {{ display: block; background: #e8f5e9; color: #2e7d32; }}
         .status.error {{ display: block; background: #ffebee; color: #c62828; }}
         .hidden {{ display: none !important; }}
+        .progress-bar {{ width: 100%; height: 6px; background: #e0e0e0; border-radius: 3px; margin-top: 8px; overflow: hidden; }}
+        .progress-fill {{ height: 100%; background: #1976d2; transition: width 0.3s; width: 0%; }}
+        .progress-text {{ font-size: 12px; color: #666; margin-top: 4px; text-align: center; }}
+        .resume-prompt {{ margin-top: 16px; padding: 12px; background: #fff3e0; border-radius: 8px; text-align: center; font-size: 13px; }}
+        .resume-prompt button {{ margin: 8px 4px 0; padding: 6px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }}
+        .resume-btn {{ background: #1976d2; color: #fff; }}
+        .restart-btn {{ background: #e0e0e0; color: #333; }}
         @media (prefers-color-scheme: dark) {{
             body {{ background: #121212; color: #e0e0e0; }}
             .card {{ background: #1e1e1e; box-shadow: 0 2px 12px rgba(0,0,0,0.3); }}
@@ -705,6 +1178,7 @@ fn generate_upload_page(is_english: bool) -> String {
         <div class="card">
             <h1>📤 {title}</h1>
             <p class="subtitle">PureSend</p>
+            <div class="badges" id="capBadges"></div>
 
             <div class="drop-zone" id="dropZone">
                 <div class="drop-zone-icon">📁</div>
@@ -715,9 +1189,12 @@ fn generate_upload_page(is_english: bool) -> String {
 
             <div class="file-list hidden" id="fileList"></div>
             <div class="stats hidden" id="stats"></div>
+            <div id="resumePrompt" class="resume-prompt hidden"></div>
 
             <button class="upload-btn" id="uploadBtn" disabled>{upload_btn}</button>
 
+            <div class="progress-bar hidden" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+            <div class="progress-text hidden" id="progressText"></div>
             <div class="status" id="status"></div>
         </div>
     </div>
@@ -729,13 +1206,93 @@ fn generate_upload_page(is_english: bool) -> String {
         const statsEl = document.getElementById("stats");
         const uploadBtn = document.getElementById("uploadBtn");
         const statusEl = document.getElementById("status");
+        const progressBar = document.getElementById("progressBar");
+        const progressFill = document.getElementById("progressFill");
+        const progressText = document.getElementById("progressText");
         let selectedFiles = [];
+        let caps = null;
+        let cryptoKey = null;
+        let sessionId = null;
+        let nonceCounter = 0;
 
         function formatSize(bytes) {{
             if (bytes === 0) return "0 B";
             const k = 1024, sizes = ["B", "KB", "MB", "GB"];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+        }}
+
+        async function initEnhanced() {{
+            try {{
+                const resp = await fetch("/capabilities");
+                caps = await resp.json();
+                const badgesEl = document.getElementById("capBadges");
+                if (caps.encryption) {{
+                    badgesEl.innerHTML += '<span class="badge">{encrypted_label}</span>';
+                    await performHandshake();
+                }}
+            }} catch(e) {{
+                caps = {{ encryption: false, compression: false, chunk_size: 1048576 }};
+            }}
+        }}
+
+        async function performHandshake() {{
+            try {{
+                const keyPair = await crypto.subtle.generateKey(
+                    {{ name: "ECDH", namedCurve: "P-256" }}, true, ["deriveBits"]
+                );
+                const pubRaw = await crypto.subtle.exportKey("raw", keyPair.publicKey);
+                const pubB64 = btoa(String.fromCharCode.apply(null, new Uint8Array(pubRaw)));
+
+                const resp = await fetch("/crypto/handshake", {{
+                    method: "POST",
+                    headers: {{ "Content-Type": "application/json" }},
+                    body: JSON.stringify({{ client_public_key: pubB64 }})
+                }});
+                const result = await resp.json();
+                if (!result.encryption) return;
+
+                sessionId = result.session_id;
+                const serverPubBytes = Uint8Array.from(atob(result.server_public_key), c => c.charCodeAt(0));
+                const serverPubKey = await crypto.subtle.importKey(
+                    "raw", serverPubBytes, {{ name: "ECDH", namedCurve: "P-256" }}, false, []
+                );
+                const sharedBits = await crypto.subtle.deriveBits(
+                    {{ name: "ECDH", public: serverPubKey }}, keyPair.privateKey, 256
+                );
+                const hkdfKey = await crypto.subtle.importKey("raw", sharedBits, "HKDF", false, ["deriveKey"]);
+                cryptoKey = await crypto.subtle.deriveKey(
+                    {{ name: "HKDF", hash: "SHA-256", salt: new Uint8Array(0), info: new TextEncoder().encode("puresend-http-encryption") }},
+                    hkdfKey,
+                    {{ name: "AES-GCM", length: 256 }},
+                    false, ["encrypt"]
+                );
+            }} catch(e) {{
+                console.warn("Handshake failed:", e);
+                if (caps) caps.encryption = false;
+            }}
+        }}
+
+        function generateNonce() {{
+            const nonce = new Uint8Array(12);
+            const view = new DataView(nonce.buffer);
+            view.setUint32(0, nonceCounter & 0xFFFFFFFF, true);
+            view.setUint32(4, (nonceCounter / 0x100000000) & 0xFFFFFFFF, true);
+            const rand = crypto.getRandomValues(new Uint8Array(4));
+            nonce.set(rand, 8);
+            nonceCounter++;
+            return nonce;
+        }}
+
+        async function encryptChunk(data) {{
+            const nonce = generateNonce();
+            const encrypted = await crypto.subtle.encrypt(
+                {{ name: "AES-GCM", iv: nonce }}, cryptoKey, data
+            );
+            const output = new Uint8Array(12 + encrypted.byteLength);
+            output.set(nonce, 0);
+            output.set(new Uint8Array(encrypted), 12);
+            return output;
         }}
 
         function updateUI() {{
@@ -749,7 +1306,6 @@ fn generate_upload_page(is_english: bool) -> String {
             fileListEl.classList.remove("hidden");
             statsEl.classList.remove("hidden");
             uploadBtn.disabled = false;
-
             let totalSize = 0;
             selectedFiles.forEach((file, index) => {{
                 totalSize += file.size;
@@ -761,10 +1317,7 @@ fn generate_upload_page(is_english: bool) -> String {
             statsEl.textContent = `${{selectedFiles.length}} {file_label}，{total_size_label}: ${{formatSize(totalSize)}}`;
         }}
 
-        function removeFile(index) {{
-            selectedFiles.splice(index, 1);
-            updateUI();
-        }}
+        function removeFile(index) {{ selectedFiles.splice(index, 1); updateUI(); }}
 
         function addFiles(files) {{
             for (const file of files) {{
@@ -772,15 +1325,71 @@ fn generate_upload_page(is_english: bool) -> String {
                     selectedFiles.push(file);
                 }}
             }}
-            statusEl.className = "status";
-            statusEl.textContent = "";
+            statusEl.className = "status"; statusEl.textContent = "";
             updateUI();
         }}
 
-        dropZone.addEventListener("dragover", (e) => {{ e.preventDefault(); dropZone.classList.add("dragover"); }});
-        dropZone.addEventListener("dragleave", () => {{ dropZone.classList.remove("dragover"); }});
-        dropZone.addEventListener("drop", (e) => {{ e.preventDefault(); dropZone.classList.remove("dragover"); addFiles(e.dataTransfer.files); }});
+        dropZone.addEventListener("dragover", e => {{ e.preventDefault(); dropZone.classList.add("dragover"); }});
+        dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+        dropZone.addEventListener("drop", e => {{ e.preventDefault(); dropZone.classList.remove("dragover"); addFiles(e.dataTransfer.files); }});
         fileInput.addEventListener("change", () => {{ addFiles(fileInput.files); fileInput.value = ""; }});
+
+        async function uploadChunked(file) {{
+            const chunkSize = (caps && caps.chunk_size) || 1048576;
+            const initResp = await fetch("/upload/init", {{
+                method: "POST",
+                headers: {{ "Content-Type": "application/json" }},
+                body: JSON.stringify({{ file_name: file.name, file_size: file.size, chunk_size: chunkSize }})
+            }});
+            const initResult = await initResp.json();
+            if (!initResult.success) throw new Error(initResult.message);
+
+            const uploadId = initResult.upload_id;
+            sessionStorage.setItem("puresend_upload_id_" + file.name, uploadId);
+
+            let startChunk = 0;
+            try {{
+                const statusResp = await fetch("/upload/status/" + uploadId);
+                const statusResult = await statusResp.json();
+                if (statusResult.found && statusResult.received_chunks.length > 0) {{
+                    startChunk = statusResult.received_chunks.length;
+                }}
+            }} catch(e) {{}}
+
+            const totalChunks = initResult.chunk_count;
+            for (let i = startChunk; i < totalChunks; i++) {{
+                const start = i * chunkSize;
+                const end = Math.min(start + chunkSize, file.size);
+                let chunk = new Uint8Array(await file.slice(start, end).arrayBuffer());
+
+                const hdrs = {{ "X-Upload-Id": uploadId, "X-Chunk-Index": String(i) }};
+                if (cryptoKey && sessionId) {{
+                    chunk = await encryptChunk(chunk);
+                    hdrs["X-Encryption-Session"] = sessionId;
+                }}
+
+                const resp = await fetch("/upload/chunk", {{ method: "POST", headers: hdrs, body: chunk }});
+                const result = await resp.json();
+                if (!result.success) throw new Error(result.message);
+
+                const pct = Math.round((i + 1) / totalChunks * 100);
+                progressFill.style.width = pct + "%";
+                progressText.textContent = pct + "% (" + formatSize(end) + " / " + formatSize(file.size) + ")";
+
+                if (result.complete) {{
+                    sessionStorage.removeItem("puresend_upload_id_" + file.name);
+                    return result.file_hash;
+                }}
+            }}
+            return null;
+        }}
+
+        async function uploadLegacy() {{
+            const formData = new FormData();
+            selectedFiles.forEach(file => formData.append("files", file));
+            const response = await fetch("/upload", {{ method: "POST", body: formData }});
+            return await response.json();
+        }}
 
         uploadBtn.addEventListener("click", async () => {{
             if (selectedFiles.length === 0) return;
@@ -788,68 +1397,66 @@ fn generate_upload_page(is_english: bool) -> String {
             statusEl.className = "status uploading";
             statusEl.textContent = "{transferring}";
             statusEl.style.display = "block";
-
-            const formData = new FormData();
-            selectedFiles.forEach(file => formData.append("files", file));
+            progressBar.classList.remove("hidden");
+            progressText.classList.remove("hidden");
+            progressFill.style.width = "0%";
 
             try {{
-                const response = await fetch("/upload", {{ method: "POST", body: formData }});
-                const result = await response.json();
-
-                if (result.success) {{
+                if (caps && (caps.encryption || caps.compression)) {{
+                    for (const file of selectedFiles) {{
+                        await uploadChunked(file);
+                    }}
                     statusEl.className = "status success";
-                    statusEl.textContent = "{success}";
+                    statusEl.textContent = "{success_msg}";
+                    progressFill.style.background = "#4caf50";
                     selectedFiles = [];
                     updateUI();
                 }} else {{
-                    statusEl.className = "status error";
-                    statusEl.textContent = result.message || "{failed}";
+                    const result = await uploadLegacy();
+                    if (result.success) {{
+                        statusEl.className = "status success";
+                        statusEl.textContent = "{success_msg}";
+                        progressFill.style.width = "100%";
+                        progressFill.style.background = "#4caf50";
+                        selectedFiles = [];
+                        updateUI();
+                    }} else {{
+                        statusEl.className = "status error";
+                        statusEl.textContent = result.message || "{failed_msg}";
+                        uploadBtn.disabled = false;
+                    }}
                 }}
-            }} catch (err) {{
+            }} catch(err) {{
                 statusEl.className = "status error";
-                statusEl.textContent = "{failed}: " + err.message;
+                statusEl.textContent = "{failed_msg}: " + err.message;
                 uploadBtn.disabled = false;
             }}
         }});
+
+        initEnhanced();
     </script>
 </body>
 </html>"##,
-        lang = if is_english { "en" } else { "zh-CN" },
+        lang = lang,
         title = title,
         select_files = select_files,
         drag_hint = drag_hint,
         upload_btn = upload_btn,
         transferring = transferring,
-        success = success,
-        failed = failed,
+        success_msg = success_msg,
+        failed_msg = failed_msg,
         file_label = file_label,
         total_size_label = total_size_label,
         remove_label = remove_label,
+        encrypted_label = encrypted_label,
     )
 }
 
-/// 生成等待响应页面 HTML
 fn generate_waiting_page(is_english: bool) -> String {
-    let title = if is_english {
-        "PureSend - Waiting"
-    } else {
-        "PureSend - 等待中"
-    };
-    let waiting_text = if is_english {
-        "Waiting for approval..."
-    } else {
-        "等待接收方确认..."
-    };
-    let waiting_desc = if is_english {
-        "Your upload request has been sent. Please wait for the receiver to approve."
-    } else {
-        "您的上传请求已发送，请等待接收方确认。"
-    };
-    let rejected_text = if is_english {
-        "Access denied"
-    } else {
-        "访问被拒绝"
-    };
+    let title = if is_english { "PureSend - Waiting" } else { "PureSend - 等待中" };
+    let waiting_text = if is_english { "Waiting for approval..." } else { "等待接收方确认..." };
+    let waiting_desc = if is_english { "Your upload request has been sent. Please wait for the receiver to approve." } else { "您的上传请求已发送，请等待接收方确认。" };
+    let rejected_text = if is_english { "Access denied" } else { "访问被拒绝" };
 
     format!(
         r##"<!DOCTYPE html>
@@ -921,23 +1528,10 @@ fn generate_waiting_page(is_english: bool) -> String {
     )
 }
 
-/// 生成访问被拒绝页面 HTML
 fn generate_rejected_page(is_english: bool) -> String {
-    let title = if is_english {
-        "PureSend - Access Denied"
-    } else {
-        "PureSend - 访问被拒绝"
-    };
-    let rejected_text = if is_english {
-        "Access Denied"
-    } else {
-        "访问被拒绝"
-    };
-    let rejected_desc = if is_english {
-        "Your upload request has been rejected by the receiver."
-    } else {
-        "您的上传请求已被接收方拒绝。"
-    };
+    let title = if is_english { "PureSend - Access Denied" } else { "PureSend - 访问被拒绝" };
+    let rejected_text = if is_english { "Access Denied" } else { "访问被拒绝" };
+    let rejected_desc = if is_english { "Your upload request has been rejected by the receiver." } else { "您的上传请求已被接收方拒绝。" };
 
     format!(
         r##"<!DOCTYPE html>

@@ -103,20 +103,19 @@
     },
     "transferEnhancement": {
       "title": "Transfer Enhancement",
-      "p2pOnlyHint": "Transfer enhancement features currently only apply to local network P2P direct connections. Encryption and compression for Web Upload/Download (HTTP) will be supported in future versions.",
       "encryption": {
         "label": "Transfer Encryption",
-        "description": "Protect transfer data with AES-256 encryption",
+        "description": "Protect transfer data with AES-256 encryption (applies to all transfer modes)",
         "enabled": "Enabled",
         "disabled": "Disabled"
       },
       "compression": {
         "label": "Dynamic Compression",
-        "description": "Automatically compress data before transfer to improve efficiency",
+        "description": "Automatically compress data before transfer to improve efficiency (applies to all transfer modes)",
         "mode": {
           "label": "Compression Mode",
           "smart": "Smart Compression",
-          "smartDescription": "Automatically adjust compression strategy based on file type",
+          "smartDescription": "Automatically adjust compression strategy based on file type (applies to all transfer modes)",
           "manual": "Manual Compression Level"
         },
         "level": {

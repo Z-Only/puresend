@@ -1,11 +1,11 @@
 //! HTTP 服务器实现
 //!
-//! 提供文件分享的 HTTP 服务
+//! 提供文件分享的 HTTP 服务，支持断点续传、传输加密和动态压缩
 
 use axum::{
     body::Body,
     extract::{connect_info::ConnectInfo, Path, State as AxumState},
-    http::{header, HeaderMap, StatusCode},
+    http::{header, HeaderMap, HeaderName, StatusCode},
     response::{Html, IntoResponse, Json, Response},
     routing::{get, post},
     Router,
@@ -21,41 +21,41 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use tauri::{AppHandle, Emitter};
 use tokio::fs::File;
+use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tokio::sync::Mutex;
 use tokio_util::io::ReaderStream;
 use tower_http::cors::{Any, CorsLayer};
 
 use super::models::{ShareState, ShareUploadRecord};
 use crate::models::FileMetadata;
+use crate::transfer::compression::{
+    create_compressor_from_config, get_compression_config, Compressor,
+};
+use crate::transfer::crypto::is_encryption_enabled;
+use crate::transfer::http_crypto::{
+    HandshakeRequest, HandshakeResponse, HttpCryptoSessionManager,
+};
 
-/// Favicon 图标数据（嵌入二进制）
-/// 使用 32x32 PNG 格式，从项目图标转换
 static FAVICON_ICO: &[u8] = include_bytes!("../../icons/32x32.png");
 
-/// 分享服务器状态
+const HTTP_CHUNK_SIZE: usize = 1024 * 1024; // 1MB
+
 #[derive(Debug)]
 pub struct ServerState {
-    /// 分享状态
     pub share_state: Arc<Mutex<ShareState>>,
-    /// 分享的文件路径映射（哈希 ID -> 实际路径）
     pub file_paths: Arc<Mutex<std::collections::HashMap<String, PathBuf>>>,
-    /// 哈希 ID 到文件名的映射（用于 HTML 显示）
     pub hash_to_filename: Arc<Mutex<std::collections::HashMap<String, String>>>,
-    /// Tauri 应用句柄，用于发送事件
     pub app_handle: AppHandle,
+    pub crypto_sessions: Arc<Mutex<HttpCryptoSessionManager>>,
 }
-/// 服务器实例
+
 pub struct ShareServer {
-    /// 监听地址
     pub addr: SocketAddr,
-    /// 服务器状态
     pub state: Arc<ServerState>,
-    /// 关闭信号
     shutdown_tx: Option<tokio::sync::oneshot::Sender<()>>,
 }
 
 impl ShareServer {
-    /// 创建新的分享服务器
     pub fn new(share_state: Arc<Mutex<ShareState>>, app_handle: AppHandle, port: u16) -> Self {
         let addr = SocketAddr::from(([0, 0, 0, 0], port));
 
@@ -66,19 +66,17 @@ impl ShareServer {
                 file_paths: Arc::new(Mutex::new(std::collections::HashMap::new())),
                 hash_to_filename: Arc::new(Mutex::new(std::collections::HashMap::new())),
                 app_handle,
+                crypto_sessions: Arc::new(Mutex::new(HttpCryptoSessionManager::new())),
             }),
             shutdown_tx: None,
         }
     }
 
-    /// 启动服务器
     pub async fn start(&mut self, files: Vec<(FileMetadata, PathBuf)>) -> Result<u16, String> {
-        // 更新文件路径映射，使用文件路径的 SHA256 哈希值作为 ID
         {
             let mut file_paths = self.state.file_paths.lock().await;
             let mut hash_to_filename = self.state.hash_to_filename.lock().await;
             for (metadata, path) in files {
-                // 使用文件路径的 SHA256 哈希值作为下载 ID，隐藏真实路径
                 let hash = Sha256::digest(path.to_string_lossy().as_bytes());
                 let hash_id = hex::encode(hash);
 
@@ -93,24 +91,43 @@ impl ShareServer {
             }
         }
 
-        // 创建路由
         let app = Router::new()
             .route("/", get(index_handler))
             .route("/favicon.ico", get(favicon_handler))
             .route("/files", get(list_files_handler))
             .route("/verify-pin", post(verify_pin_handler))
             .route("/request-status", get(request_status_handler))
+            .route("/capabilities", get(capabilities_handler))
+            .route("/crypto/handshake", post(crypto_handshake_handler))
+            .route("/download/{file_id}/meta", get(download_meta_handler))
+            .route(
+                "/download/{file_id}/chunk/{chunk_index}",
+                get(download_chunk_handler),
+            )
             .route("/download/{file_id}", get(upload_handler))
             .fallback(fallback_handler)
             .layer(
                 CorsLayer::new()
                     .allow_origin(Any)
                     .allow_methods([axum::http::Method::GET, axum::http::Method::POST])
-                    .allow_headers([header::CONTENT_TYPE, header::ACCEPT]),
+                    .allow_headers([
+                        header::CONTENT_TYPE,
+                        header::ACCEPT,
+                        header::RANGE,
+                        HeaderName::from_static("x-encryption-session"),
+                    ])
+                    .expose_headers([
+                        header::CONTENT_RANGE,
+                        header::ACCEPT_RANGES,
+                        header::ETAG,
+                        HeaderName::from_static("x-chunk-index"),
+                        HeaderName::from_static("x-original-size"),
+                        HeaderName::from_static("x-compression"),
+                        HeaderName::from_static("x-encryption"),
+                    ]),
             )
             .with_state(self.state.clone());
 
-        // 绑定端口（如果端口为0则自动分配）
         let listener = tokio::net::TcpListener::bind(self.addr)
             .await
             .map_err(|e| format!("绑定端口失败: {}", e))?;
@@ -120,11 +137,19 @@ impl ShareServer {
             .map_err(|e| format!("获取端口失败: {}", e))?
             .port();
 
-        // 创建关闭通道
         let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
         self.shutdown_tx = Some(shutdown_tx);
 
-        // 启动服务器，使用 into_make_service_with_connect_info 来支持 ConnectInfo
+        // Spawn periodic cleanup for expired crypto sessions
+        let crypto_sessions = self.state.crypto_sessions.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(300));
+            loop {
+                interval.tick().await;
+                crypto_sessions.lock().await.cleanup_expired();
+            }
+        });
+
         tokio::spawn(async move {
             axum::serve(
                 listener,
@@ -140,7 +165,6 @@ impl ShareServer {
         Ok(actual_port)
     }
 
-    /// 停止服务器
     pub fn stop(&mut self) {
         if let Some(tx) = self.shutdown_tx.take() {
             let _ = tx.send(());
@@ -148,17 +172,351 @@ impl ShareServer {
     }
 }
 
-/// Favicon 处理器
+// ─── Helper functions ───────────────────────────────────────────────────────
+
+fn parse_range(range_str: &str, file_size: u64) -> Option<(u64, u64)> {
+    let range_str = range_str.strip_prefix("bytes=")?;
+    let parts: Vec<&str> = range_str.splitn(2, '-').collect();
+    if parts.len() != 2 {
+        return None;
+    }
+
+    let start = if parts[0].is_empty() {
+        let suffix_len: u64 = parts[1].parse().ok()?;
+        file_size.saturating_sub(suffix_len)
+    } else {
+        parts[0].parse().ok()?
+    };
+
+    let end = if parts[1].is_empty() {
+        file_size - 1
+    } else {
+        parts[1].parse::<u64>().ok()?.min(file_size - 1)
+    };
+
+    if start > end || start >= file_size {
+        return None;
+    }
+
+    Some((start, end))
+}
+
+fn generate_etag(file_path: &std::path::Path, file_size: u64) -> String {
+    let mtime = std::fs::metadata(file_path)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let hash = Sha256::digest(format!("{}_{}", file_path.display(), mtime).as_bytes());
+    format!("\"{}_{}_{}\"", &hex::encode(hash)[..8], file_size, mtime)
+}
+
+/// Check if current client IP has download access
+async fn check_download_access(
+    state: &Arc<ServerState>,
+    client_ip: &str,
+) -> Result<(), Response> {
+    let share_state = state.share_state.lock().await;
+
+    if share_state.share_info.is_none() {
+        return Err(
+            Html("<html><body><h1>分享已结束</h1></body></html>").into_response()
+        );
+    }
+
+    if share_state.is_ip_rejected(client_ip) {
+        return Err(
+            Html("<html><body><h1>访问被拒绝</h1></body></html>").into_response()
+        );
+    }
+
+    let has_pin = share_state.settings.pin.is_some()
+        && !share_state
+            .settings
+            .pin
+            .as_ref()
+            .map_or(true, String::is_empty);
+    let is_verified = share_state.is_ip_verified(client_ip);
+
+    if has_pin && !is_verified {
+        return Err(
+            Html("<html><body><h1>需要验证 PIN</h1></body></html>").into_response()
+        );
+    }
+
+    if !share_state.is_ip_allowed(client_ip) {
+        return Err(
+            Html("<html><body><h1>等待访问授权中，请稍后重试</h1></body></html>").into_response()
+        );
+    }
+
+    Ok(())
+}
+
+// ─── Handlers ───────────────────────────────────────────────────────────────
+
 async fn favicon_handler() -> impl IntoResponse {
     let mut response = Response::new(Body::from(FAVICON_ICO));
     *response.status_mut() = StatusCode::OK;
     let headers = response.headers_mut();
-    headers.insert(header::CONTENT_TYPE, axum::http::HeaderValue::from_static("image/png"));
-    headers.insert(header::CACHE_CONTROL, axum::http::HeaderValue::from_static("max-age=86400"));
+    headers.insert(
+        header::CONTENT_TYPE,
+        axum::http::HeaderValue::from_static("image/png"),
+    );
+    headers.insert(
+        header::CACHE_CONTROL,
+        axum::http::HeaderValue::from_static("max-age=86400"),
+    );
     response
 }
 
-/// 首页处理器
+/// Server capabilities endpoint
+async fn capabilities_handler() -> Json<ServerCapabilities> {
+    let encryption = is_encryption_enabled();
+    let compression_config = get_compression_config();
+    Json(ServerCapabilities {
+        encryption,
+        compression: compression_config.enabled,
+        compression_algorithm: if compression_config.enabled {
+            Some("zstd".to_string())
+        } else {
+            None
+        },
+        chunk_size: HTTP_CHUNK_SIZE,
+    })
+}
+
+/// Crypto handshake endpoint (P-256 ECDH)
+async fn crypto_handshake_handler(
+    ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
+    AxumState(state): AxumState<Arc<ServerState>>,
+    Json(payload): Json<HandshakeRequest>,
+) -> Json<HandshakeResponse> {
+    if !is_encryption_enabled() {
+        return Json(HandshakeResponse {
+            encryption: false,
+            server_public_key: None,
+            session_id: None,
+        });
+    }
+
+    let client_ip = client_addr.ip().to_string();
+    let mut crypto_sessions = state.crypto_sessions.lock().await;
+
+    match crypto_sessions.handshake(&payload.client_public_key, client_ip) {
+        Ok((session_id, server_pub_key)) => Json(HandshakeResponse {
+            encryption: true,
+            server_public_key: Some(server_pub_key),
+            session_id: Some(session_id),
+        }),
+        Err(e) => {
+            eprintln!("加密握手失败: {}", e);
+            Json(HandshakeResponse {
+                encryption: false,
+                server_public_key: None,
+                session_id: None,
+            })
+        }
+    }
+}
+
+/// Download metadata (chunk info for encrypted/compressed mode)
+async fn download_meta_handler(
+    ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
+    AxumState(state): AxumState<Arc<ServerState>>,
+    Path(file_id): Path<String>,
+) -> Response {
+    let client_ip = client_addr.ip().to_string();
+    if let Err(resp) = check_download_access(&state, &client_ip).await {
+        return resp;
+    }
+
+    let file_path = {
+        let file_paths = state.file_paths.lock().await;
+        file_paths.get(&file_id).cloned()
+    };
+
+    let Some(path) = file_path else {
+        return (StatusCode::NOT_FOUND, "File not found").into_response();
+    };
+
+    if !path.exists() || !path.is_file() {
+        return (StatusCode::NOT_FOUND, "File not found").into_response();
+    }
+
+    let file_name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("download")
+        .to_string();
+    let file_size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+    let mime_type = FileMetadata::infer_mime_type(&file_name);
+
+    let encryption = is_encryption_enabled();
+    let compression_config = get_compression_config();
+    let compression_active = compression_config.enabled
+        && !Compressor::should_skip_compression(&mime_type);
+
+    let chunk_count = ((file_size as f64) / (HTTP_CHUNK_SIZE as f64)).ceil() as usize;
+
+    Json(DownloadMeta {
+        file_id,
+        file_name,
+        file_size,
+        chunk_size: HTTP_CHUNK_SIZE,
+        chunk_count,
+        encryption,
+        compression: if compression_active {
+            Some("zstd".to_string())
+        } else {
+            None
+        },
+        mime_type,
+    })
+    .into_response()
+}
+
+/// Download a single processed chunk (compressed + encrypted)
+async fn download_chunk_handler(
+    ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
+    AxumState(state): AxumState<Arc<ServerState>>,
+    Path((file_id, chunk_index)): Path<(String, usize)>,
+    headers: HeaderMap,
+) -> Response {
+    let client_ip = client_addr.ip().to_string();
+    if let Err(resp) = check_download_access(&state, &client_ip).await {
+        return resp;
+    }
+
+    let file_path = {
+        let file_paths = state.file_paths.lock().await;
+        file_paths.get(&file_id).cloned()
+    };
+
+    let Some(path) = file_path else {
+        return (StatusCode::NOT_FOUND, "File not found").into_response();
+    };
+
+    if !path.exists() || !path.is_file() {
+        return (StatusCode::NOT_FOUND, "File not found").into_response();
+    }
+
+    let file_name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("download")
+        .to_string();
+    let file_size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+    let mime_type = FileMetadata::infer_mime_type(&file_name);
+
+    // Read the chunk
+    let offset = chunk_index as u64 * HTTP_CHUNK_SIZE as u64;
+    if offset >= file_size {
+        return (StatusCode::BAD_REQUEST, "Chunk index out of range").into_response();
+    }
+    let remaining = file_size - offset;
+    let read_size = (remaining as usize).min(HTTP_CHUNK_SIZE);
+
+    let mut file = match File::open(&path).await {
+        Ok(f) => f,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Open file failed: {}", e),
+            )
+                .into_response()
+        }
+    };
+    if let Err(e) = file.seek(std::io::SeekFrom::Start(offset)).await {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Seek failed: {}", e),
+        )
+            .into_response();
+    }
+    let mut buffer = vec![0u8; read_size];
+    if let Err(e) = file.read_exact(&mut buffer).await {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Read failed: {}", e),
+        )
+            .into_response();
+    }
+
+    let original_size = buffer.len();
+
+    // Pipeline: compress (optional) → encrypt (optional)
+    let compression_config = get_compression_config();
+    let mut data = buffer;
+    let mut compressed = false;
+
+    if compression_config.enabled {
+        if let Some(compressor) = create_compressor_from_config() {
+            if let Some(level) = compressor.get_level(&mime_type) {
+                if let Ok(compressed_data) = Compressor::compress(&data, level) {
+                    if compressed_data.len() < data.len() {
+                        data = compressed_data;
+                        compressed = true;
+                    }
+                }
+            }
+        }
+    }
+
+    let encryption_enabled = is_encryption_enabled();
+    let mut encrypted = false;
+
+    if encryption_enabled {
+        let session_id = headers
+            .get("x-encryption-session")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+
+        if !session_id.is_empty() {
+            let mut crypto_sessions = state.crypto_sessions.lock().await;
+            if let Some(session) = crypto_sessions.get_session_mut(session_id) {
+                match session.encrypt(&data) {
+                    Ok(encrypted_data) => {
+                        data = encrypted_data;
+                        encrypted = true;
+                    }
+                    Err(e) => {
+                        eprintln!("分块加密失败: {}", e);
+                    }
+                }
+            }
+        }
+    }
+
+    let mut response = Response::new(Body::from(data));
+    *response.status_mut() = StatusCode::OK;
+    let resp_headers = response.headers_mut();
+    resp_headers.insert(
+        HeaderName::from_static("x-chunk-index"),
+        chunk_index.to_string().parse().unwrap(),
+    );
+    resp_headers.insert(
+        HeaderName::from_static("x-original-size"),
+        original_size.to_string().parse().unwrap(),
+    );
+    if compressed {
+        resp_headers.insert(
+            HeaderName::from_static("x-compression"),
+            "zstd".parse().unwrap(),
+        );
+    }
+    if encrypted {
+        resp_headers.insert(
+            HeaderName::from_static("x-encryption"),
+            "aes-256-gcm".parse().unwrap(),
+        );
+    }
+
+    response
+}
+
+/// Index handler
 async fn index_handler(
     ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
@@ -171,14 +529,12 @@ async fn index_handler(
         .map(|s| parse_user_agent(s))
         .unwrap_or_default();
 
-    // 检测用户语言偏好
     let accept_language = headers
         .get(header::ACCEPT_LANGUAGE)
         .and_then(|v| v.to_str().ok())
         .unwrap_or("zh-CN");
     let is_english = accept_language.starts_with("en");
 
-    // 首先检查分享是否活跃并获取必要信息
     {
         let share_state = state.share_state.lock().await;
         if share_state.share_info.is_none() {
@@ -186,7 +542,6 @@ async fn index_handler(
         }
     }
 
-    // 检查是否被拒绝
     {
         let share_state = state.share_state.lock().await;
         if share_state.is_ip_rejected(&client_ip) {
@@ -194,7 +549,6 @@ async fn index_handler(
         }
     }
 
-    // 检查是否需要 PIN 验证
     {
         let mut share_state = state.share_state.lock().await;
 
@@ -207,14 +561,11 @@ async fn index_handler(
         let is_verified = share_state.is_ip_verified(&client_ip);
         let has_access = share_state.is_ip_allowed(&client_ip);
 
-        // 如果启用了 PIN 且访问者未验证
         if has_pin && !is_verified && !has_access {
-            // 检查是否被锁定
             let pin_attempt = share_state.pin_attempts.get(&client_ip).cloned();
 
             if let Some(attempt) = &pin_attempt {
                 if attempt.is_still_locked() {
-                    // 显示锁定页面
                     let remaining_ms = attempt.remaining_lock_time();
                     let remaining_secs = remaining_ms / 1000;
                     let locked_html = generate_locked_html(remaining_secs, is_english);
@@ -222,11 +573,9 @@ async fn index_handler(
                 }
             }
 
-            // 显示 PIN 输入页面
             return Html(generate_pin_input_html(is_english)).into_response();
         }
 
-        // 如果没有 PIN 且开启了自动接受，且没有请求记录，自动创建已接受的请求
         let has_request = share_state
             .access_requests
             .values()
@@ -239,14 +588,11 @@ async fn index_handler(
                 .access_requests
                 .insert(new_request.id.clone(), new_request.clone());
 
-            // 添加到已验证 IP 列表
             if !share_state.verified_ips.contains(&client_ip) {
                 share_state.verified_ips.push(client_ip.clone());
             }
 
-            // 发送事件通知前端
             let _ = state.app_handle.emit("access-request", new_request);
-            // 同时发送已接受事件
             let _ = state.app_handle.emit(
                 "access-request-accepted",
                 share_state
@@ -257,25 +603,20 @@ async fn index_handler(
             );
         }
 
-        // 如果没有 PIN 且没有开启自动接受，且没有请求记录，创建待处理的请求
         if !has_pin && !share_state.settings.auto_accept && !has_request {
             let new_request =
                 super::models::AccessRequest::new(client_ip.clone(), Some(user_agent.to_string()));
             share_state
                 .access_requests
                 .insert(new_request.id.clone(), new_request.clone());
-
-            // 发送事件通知前端有新的访问请求
             let _ = state.app_handle.emit("access-request", new_request);
         }
 
-        // 如果没有访问权限，显示等待响应页面
         if !has_access && !share_state.settings.auto_accept {
             return Html(generate_waiting_response_html(is_english)).into_response();
         }
     }
 
-    // 重新获取状态检查访问权限
     let share_state = state.share_state.lock().await;
     let has_access = share_state.is_ip_allowed(&client_ip);
 
@@ -283,13 +624,11 @@ async fn index_handler(
         return Html(generate_waiting_response_html(is_english)).into_response();
     }
 
-    // 有访问权限，显示文件列表页面（通过 JS 轮询 /files API 动态加载）
     let html = generate_file_list_html(is_english);
-
     Html(html).into_response()
 }
 
-/// 文件列表 API
+/// File list API
 async fn list_files_handler(
     ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
     AxumState(state): AxumState<Arc<ServerState>>,
@@ -308,7 +647,6 @@ async fn list_files_handler(
 
     let client_ip = client_addr.ip().to_string();
 
-    // 检查访问权限
     if share_state.is_ip_rejected(&client_ip) {
         return (
             StatusCode::FORBIDDEN,
@@ -319,7 +657,6 @@ async fn list_files_handler(
         );
     }
 
-    // 检查是否需要 PIN（只要设置了 PIN 码且未验证就需要）
     let has_pin = share_state.settings.pin.is_some()
         && !share_state
             .settings
@@ -327,14 +664,10 @@ async fn list_files_handler(
             .as_ref()
             .map_or(true, String::is_empty);
     let is_verified = share_state.is_ip_verified(&client_ip);
-
-    // 检查是否已有访问请求（无论状态如何）
     let has_request = share_state
         .access_requests
         .values()
         .any(|r| r.ip == client_ip);
-
-    // 如果需要 PIN 且没有请求记录，才返回未授权
     let needs_pin = has_pin && !is_verified && !has_request;
 
     if needs_pin {
@@ -347,10 +680,8 @@ async fn list_files_handler(
         );
     }
 
-    // 检查是否有访问权限（请求已被接受）
     let has_access = share_state.is_ip_allowed(&client_ip);
 
-    // 如果没有访问权限，返回等待响应状态
     if !has_access {
         return (
             StatusCode::ACCEPTED,
@@ -361,7 +692,6 @@ async fn list_files_handler(
         );
     }
 
-    // 从 hash_to_filename 和 share_info 构建文件列表，使用 hash_id 作为下载标识
     let share_info = share_state.share_info.as_ref().unwrap();
     let hash_to_filename = state.hash_to_filename.lock().await;
     let files: Vec<FileInfo> = hash_to_filename
@@ -397,13 +727,12 @@ async fn list_files_handler(
     )
 }
 
-/// PIN 验证请求
+/// PIN verification
 #[derive(Debug, Deserialize)]
 struct VerifyPinRequest {
     pin: String,
 }
 
-/// PIN 验证处理器
 async fn verify_pin_handler(
     ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
@@ -417,7 +746,6 @@ async fn verify_pin_handler(
         .map(|s| parse_user_agent(s).to_string());
     let mut share_state = state.share_state.lock().await;
 
-    // 检查是否被锁定
     if let Some(attempt) = share_state.pin_attempts.get(&client_ip) {
         if attempt.is_still_locked() {
             return (
@@ -432,7 +760,6 @@ async fn verify_pin_handler(
         }
     }
 
-    // 获取正确的 PIN 码
     let correct_pin = match &share_state.settings.pin {
         Some(pin) if !pin.is_empty() => pin,
         _ => {
@@ -448,20 +775,15 @@ async fn verify_pin_handler(
         }
     };
 
-    // 验证 PIN
     if payload.pin == *correct_pin {
-        // 验证成功，清理 PIN 尝试状态
         share_state.pin_attempts.remove(&client_ip);
 
-        // 添加到已验证 IP 列表（无论是否自动接受，PIN 验证成功都标记为已验证）
         if !share_state.verified_ips.contains(&client_ip) {
             share_state.verified_ips.push(client_ip.clone());
         }
 
-        // 创建访问请求
         let mut new_request = super::models::AccessRequest::new(client_ip.clone(), user_agent);
 
-        // 根据 auto_accept 设置决定状态
         if share_state.settings.auto_accept {
             new_request.status = super::models::AccessRequestStatus::Accepted;
         }
@@ -470,7 +792,6 @@ async fn verify_pin_handler(
             .access_requests
             .insert(new_request.id.clone(), new_request.clone());
 
-        // 发送事件通知前端
         let _ = state.app_handle.emit("access-request", new_request.clone());
         if new_request.status == super::models::AccessRequestStatus::Accepted {
             let _ = state
@@ -488,7 +809,6 @@ async fn verify_pin_handler(
             }),
         )
     } else {
-        // 验证失败，记录失败尝试
         let attempt = share_state
             .pin_attempts
             .entry(client_ip.clone())
@@ -510,88 +830,7 @@ async fn verify_pin_handler(
     }
 }
 
-/// 生成锁定页面 HTML
-fn generate_locked_html(remaining_secs: u64, is_english: bool) -> String {
-    let minutes = remaining_secs / 60;
-    let seconds = remaining_secs % 60;
-    let time_str = if is_english {
-        if minutes > 0 {
-            format!("{} min {} sec", minutes, seconds)
-        } else {
-            format!("{} sec", seconds)
-        }
-    } else {
-        if minutes > 0 {
-            format!("{} 分 {} 秒", minutes, seconds)
-        } else {
-            format!("{} 秒", seconds)
-        }
-    };
-
-    let title = if is_english { "PureSend - Locked" } else { "PureSend - 已锁定" };
-    let heading = if is_english { "Access Locked" } else { "访问已锁定" };
-    let message = if is_english {
-        "Too many PIN attempts. Please try again later."
-    } else {
-        "PIN 码验证失败次数过多，请稍后再试"
-    };
-    let timer_label = if is_english { "Time remaining:" } else { "剩余时间：" };
-    let lang = if is_english { "en" } else { "zh-CN" };
-    let min_unit = if is_english { "min " } else { "分 " };
-    let sec_unit = if is_english { "sec" } else { "秒" };
-
-    format!(
-        r#"<!DOCTYPE html>
-<html lang="{lang}">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="/favicon.ico">
-    <title>{title}</title>
-    <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 400px; margin: 100px auto; padding: 20px; text-align: center; }}
-        h1 {{ color: #d32f2f; }}
-        .lock-icon {{ font-size: 48px; margin: 20px 0; }}
-        .message {{ color: #666; margin-top: 20px; }}
-        .timer {{ font-size: 24px; color: #1976d2; margin: 20px 0; font-weight: bold; }}
-    </style>
-</head>
-<body>
-    <h1>{heading}</h1>
-    <div class="lock-icon">🔒</div>
-    <div class="message">{message}</div>
-    <div class="timer" id="timer">{timer_label} {0}</div>
-    <script>
-        let remaining = {1};
-        function updateTimer() {{
-            if (remaining <= 0) {{
-                window.location.reload();
-                return;
-            }}
-            remaining--;
-            const min = Math.floor(remaining / 60);
-            const sec = remaining % 60;
-            const timeStr = min > 0 ? min + ' {2}' + sec + ' {3}' : sec + ' {3}';
-            document.getElementById('timer').textContent = '{4}' + timeStr;
-            setTimeout(updateTimer, 1000);
-        }}
-        updateTimer();
-    </script>
-</body>
-</html>"#,
-        time_str, remaining_secs, min_unit, sec_unit, timer_label
-    )
-}
-
-/// 请求状态响应
-#[derive(Debug, Serialize)]
-struct RequestStatusResponse {
-    has_request: bool,
-    status: Option<String>,
-    waiting_response: bool,
-}
-
-/// 请求状态处理器
+/// Request status handler
 async fn request_status_handler(
     ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
@@ -605,7 +844,6 @@ async fn request_status_handler(
         .unwrap_or_default();
     let mut share_state = state.share_state.lock().await;
 
-    // 查找该 IP 的请求
     let request = share_state
         .access_requests
         .values()
@@ -613,7 +851,6 @@ async fn request_status_handler(
 
     let response = match request {
         Some(req) => {
-            // 使用小写格式返回状态，与前端期望一致
             let status_str = match req.status {
                 super::models::AccessRequestStatus::Pending => "pending",
                 super::models::AccessRequestStatus::Accepted => "accepted",
@@ -626,7 +863,6 @@ async fn request_status_handler(
             }
         }
         None => {
-            // 检查是否是自动接受模式
             let auto_accept = share_state.settings.auto_accept;
             let has_pin = share_state.settings.pin.is_some()
                 && !share_state
@@ -636,7 +872,6 @@ async fn request_status_handler(
                     .map_or(true, String::is_empty);
             let is_verified = share_state.is_ip_verified(&client_ip);
 
-            // 如果是自动接受模式且没有 PIN，自动创建已接受的请求
             if auto_accept && !has_pin && !is_verified {
                 let mut new_request = super::models::AccessRequest::new(
                     client_ip.clone(),
@@ -647,12 +882,10 @@ async fn request_status_handler(
                     .access_requests
                     .insert(new_request.id.clone(), new_request.clone());
 
-                // 添加到已验证 IP 列表
                 if !share_state.verified_ips.contains(&client_ip) {
                     share_state.verified_ips.push(client_ip.clone());
                 }
 
-                // 发送事件通知前端
                 let _ = state.app_handle.emit("access-request", new_request.clone());
                 let _ = state
                     .app_handle
@@ -664,14 +897,12 @@ async fn request_status_handler(
                     waiting_response: false,
                 }
             } else if is_verified {
-                // 如果 IP 已验证（可能是通过 PIN 验证但没有创建请求的情况）
                 RequestStatusResponse {
                     has_request: true,
                     status: Some("accepted".to_string()),
                     waiting_response: false,
                 }
             } else {
-                // 其他情况：没有请求记录
                 RequestStatusResponse {
                     has_request: false,
                     status: None,
@@ -684,7 +915,6 @@ async fn request_status_handler(
     (StatusCode::OK, Json(response))
 }
 
-/// 回退处理器 - 用于调试未匹配的路由
 async fn fallback_handler(uri: axum::http::Uri) -> impl IntoResponse {
     eprintln!("未匹配的路由: {}", uri);
     (
@@ -696,79 +926,27 @@ async fn fallback_handler(uri: axum::http::Uri) -> impl IntoResponse {
     )
 }
 
-/// 文件上传处理器（向接收者提供文件）
+/// File download handler with Range support
 async fn upload_handler(
     ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
     AxumState(state): AxumState<Arc<ServerState>>,
     Path(file_id): Path<String>,
+    headers: HeaderMap,
 ) -> Response {
     let client_ip = client_addr.ip().to_string();
 
-    // 调试：记录上传请求
-    eprintln!(
-        "上传请求开始 - client_ip: {}, file_id: {}",
-        client_ip, file_id
-    );
-
-    // 检查访问权限
-    {
-        let share_state = state.share_state.lock().await;
-
-        if share_state.share_info.is_none() {
-            eprintln!("上传失败 - 分享已结束");
-            return Html("<html><body><h1>分享已结束</h1></body></html>").into_response();
-        }
-
-        if share_state.is_ip_rejected(&client_ip) {
-            eprintln!("上传失败 - IP 被拒绝: {}", client_ip);
-            return Html("<html><body><h1>访问被拒绝</h1></body></html>").into_response();
-        }
-
-        // 检查是否需要 PIN（只要设置了 PIN 码且未验证就需要）
-        let has_pin = share_state.settings.pin.is_some()
-            && !share_state
-                .settings
-                .pin
-                .as_ref()
-                .map_or(true, String::is_empty);
-        let is_verified = share_state.is_ip_verified(&client_ip);
-        let needs_pin = has_pin && !is_verified;
-
-        // 如果需要 PIN，优先显示提示
-        if needs_pin {
-            eprintln!("上传失败 - 需要 PIN 验证: {}", client_ip);
-            return Html("<html><body><h1>需要验证 PIN</h1></body></html>").into_response();
-        }
-
-        // 检查是否有访问权限
-        let has_access = share_state.is_ip_allowed(&client_ip);
-
-        eprintln!(
-            "上传权限检查 - client_ip: {}, has_access: {}, auto_accept: {}",
-            client_ip, has_access, share_state.settings.auto_accept
-        );
-
-        // 如果没有访问权限，显示等待响应
-        if !has_access {
-            eprintln!("上传失败 - 没有访问权限: {}", client_ip);
-            return Html("<html><body><h1>等待访问授权中，请稍后重试</h1><p>请先在分享方接受您的访问请求</p></body></html>").into_response();
-        }
+    if let Err(resp) = check_download_access(&state, &client_ip).await {
+        return resp;
     }
 
-    // 获取文件路径
     let file_path = {
         let file_paths = state.file_paths.lock().await;
         file_paths.get(&file_id).cloned()
     };
 
-    // 调试：记录查找结果
-    eprintln!("下载请求 - file_id: {}, 找到路径：{:?}", file_id, file_path);
-
     match file_path {
         Some(path) => {
-            // 验证路径安全性（防止路径遍历攻击）
             if !path.exists() || !path.is_file() {
-                eprintln!("文件不存在或不是文件：{:?}", path);
                 return Html("<html><body><h1>文件不存在</h1></body></html>").into_response();
             }
 
@@ -779,15 +957,16 @@ async fn upload_handler(
                 .to_string();
 
             let file_size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-
             let mime_type = FileMetadata::infer_mime_type(&file_name);
+            let etag = generate_etag(&path, file_size);
 
-            eprintln!(
-                "开始传输文件 - file_name: {}, mime_type: {}",
-                file_name, mime_type
-            );
+            // Check If-None-Match for caching
+            if let Some(if_none_match) = headers.get(header::IF_NONE_MATCH) {
+                if if_none_match.to_str().ok() == Some(&etag) {
+                    return StatusCode::NOT_MODIFIED.into_response();
+                }
+            }
 
-            // 创建上传记录并追加到访问请求的上传记录列表
             let upload_record = ShareUploadRecord::new(file_name.clone(), file_size);
             let upload_id = upload_record.id.clone();
             {
@@ -801,7 +980,6 @@ async fn upload_handler(
                 }
             }
 
-            // 发送上传开始事件到前端
             let _ = state.app_handle.emit(
                 "upload-start",
                 UploadStartPayload {
@@ -812,7 +990,72 @@ async fn upload_handler(
                 },
             );
 
-            // 使用流式传输文件，通过 ProgressTrackingStream 跟踪进度
+            // Check for Range request (plaintext mode)
+            let range_header = headers
+                .get(header::RANGE)
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| parse_range(s, file_size));
+
+            if let Some((start, end)) = range_header {
+                // Partial content response
+                let content_length = end - start + 1;
+
+                match File::open(&path).await {
+                    Ok(mut file) => {
+                        if let Err(e) = file.seek(std::io::SeekFrom::Start(start)).await {
+                            return (
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                format!("Seek failed: {}", e),
+                            )
+                                .into_response();
+                        }
+
+                        let limited = file.take(content_length);
+                        let stream = ReaderStream::new(limited);
+                        let body = Body::from_stream(stream);
+
+                        let mut response = Response::new(body);
+                        *response.status_mut() = StatusCode::PARTIAL_CONTENT;
+                        let resp_headers = response.headers_mut();
+                        resp_headers.insert(
+                            header::CONTENT_RANGE,
+                            format!("bytes {}-{}/{}", start, end, file_size)
+                                .parse()
+                                .unwrap(),
+                        );
+                        resp_headers.insert(
+                            header::CONTENT_LENGTH,
+                            content_length.to_string().parse().unwrap(),
+                        );
+                        resp_headers.insert(
+                            header::ACCEPT_RANGES,
+                            "bytes".parse().unwrap(),
+                        );
+                        resp_headers.insert(header::ETAG, etag.parse().unwrap());
+                        if let Ok(mime_header) = mime_type.parse() {
+                            resp_headers.insert(header::CONTENT_TYPE, mime_header);
+                        }
+                        let encoded_filename = urlencoding::encode(&file_name);
+                        resp_headers.insert(
+                            header::CONTENT_DISPOSITION,
+                            format!("attachment; filename*=UTF-8''{}", encoded_filename)
+                                .parse()
+                                .unwrap(),
+                        );
+
+                        return response;
+                    }
+                    Err(e) => {
+                        return (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            format!("Open file failed: {}", e),
+                        )
+                            .into_response();
+                    }
+                }
+            }
+
+            // Full file download with progress tracking
             match File::open(&path).await {
                 Ok(file) => {
                     let reader_stream = ReaderStream::new(file);
@@ -829,28 +1072,35 @@ async fn upload_handler(
 
                     let mut response = Response::new(body);
                     *response.status_mut() = StatusCode::OK;
-                    let headers = response.headers_mut();
+                    let resp_headers = response.headers_mut();
                     if let Ok(mime_header) = mime_type.parse() {
-                        headers.insert(header::CONTENT_TYPE, mime_header);
+                        resp_headers.insert(header::CONTENT_TYPE, mime_header);
                     } else {
-                        headers.insert(
+                        resp_headers.insert(
                             header::CONTENT_TYPE,
                             "application/octet-stream".parse().unwrap(),
                         );
                     }
                     let encoded_filename = urlencoding::encode(&file_name);
-                    headers.insert(
+                    resp_headers.insert(
                         header::CONTENT_DISPOSITION,
                         format!("attachment; filename*=UTF-8''{}", encoded_filename)
                             .parse()
                             .unwrap(),
                     );
+                    resp_headers.insert(
+                        header::CONTENT_LENGTH,
+                        file_size.to_string().parse().unwrap(),
+                    );
+                    resp_headers.insert(
+                        header::ACCEPT_RANGES,
+                        "bytes".parse().unwrap(),
+                    );
+                    resp_headers.insert(header::ETAG, etag.parse().unwrap());
 
-                    eprintln!("文件传输响应已发送 - file_name: {}", file_name);
                     return response;
                 }
                 Err(e) => {
-                    // 更新上传记录状态为失败
                     {
                         let mut share_state = state.share_state.lock().await;
                         for request in share_state.access_requests.values_mut() {
@@ -864,7 +1114,6 @@ async fn upload_handler(
                             }
                         }
                     }
-                    eprintln!("打开文件失败：{:?}", e);
                     let error_html =
                         format!("<html><body><h1>打开文件失败：{}</h1></body></html>", e);
                     return Html(error_html).into_response();
@@ -872,39 +1121,75 @@ async fn upload_handler(
             }
         }
         None => {
-            eprintln!("文件 ID 不存在: {}", file_id);
             return Html("<html><body><h1>文件不存在</h1></body></html>").into_response();
         }
     }
 }
 
-/// 上传开始事件载荷
+// ─── Data types ─────────────────────────────────────────────────────────────
+
 #[derive(Debug, Clone, Serialize)]
 struct UploadStartPayload {
-    /// 上传记录 ID
     upload_id: String,
-    /// 文件名
     file_name: String,
-    /// 文件大小
     file_size: i64,
-    /// 接收者 IP
     client_ip: String,
 }
 
-/// 上传完成事件载荷
 #[derive(Debug, Clone, Serialize)]
 struct UploadCompletePayload {
-    /// 上传记录 ID
     upload_id: String,
-    /// 文件名
     file_name: String,
-    /// 文件大小
     file_size: i64,
-    /// 接收者 IP
     client_ip: String,
 }
 
-/// 进度跟踪流，包装 ReaderStream 以在传输过程中发送进度事件
+#[derive(Debug, Serialize)]
+struct ServerCapabilities {
+    encryption: bool,
+    compression: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    compression_algorithm: Option<String>,
+    chunk_size: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct DownloadMeta {
+    file_id: String,
+    file_name: String,
+    file_size: u64,
+    chunk_size: usize,
+    chunk_count: usize,
+    encryption: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    compression: Option<String>,
+    mime_type: String,
+}
+
+#[derive(Debug, Serialize)]
+struct FilesResponse {
+    files: Vec<FileInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    waiting_response: Option<bool>,
+}
+
+#[derive(Debug, Serialize)]
+struct FileInfo {
+    id: String,
+    name: String,
+    size: u64,
+    mime_type: String,
+}
+
+#[derive(Debug, Serialize)]
+struct RequestStatusResponse {
+    has_request: bool,
+    status: Option<String>,
+    waiting_response: bool,
+}
+
+// ─── Progress tracking stream ───────────────────────────────────────────────
+
 struct ProgressTrackingStream {
     inner: ReaderStream<File>,
     app_handle: AppHandle,
@@ -1021,7 +1306,6 @@ impl Stream for ProgressTrackingStream {
                 if this.should_emit_progress(progress) {
                     this.emit_progress(progress, speed);
 
-                    // 异步更新 share_state 中的上传记录
                     let share_state = this.share_state.clone();
                     let upload_id = this.upload_id.clone();
                     let transferred = this.transferred_bytes;
@@ -1048,11 +1332,9 @@ impl Stream for ProgressTrackingStream {
             }
             Poll::Ready(Some(Err(err))) => Poll::Ready(Some(Err(err))),
             Poll::Ready(None) => {
-                // 流结束，发送最终进度和完成事件
                 this.transferred_bytes = this.total_bytes;
                 this.emit_complete();
 
-                // 异步更新 share_state 中的上传记录为已完成
                 let share_state = this.share_state.clone();
                 let upload_id = this.upload_id.clone();
                 tokio::spawn(async move {
@@ -1083,24 +1365,8 @@ impl Stream for ProgressTrackingStream {
     }
 }
 
-/// 文件信息响应
-#[derive(Debug, Serialize)]
-struct FilesResponse {
-    files: Vec<FileInfo>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    waiting_response: Option<bool>,
-}
+// ─── Utility ────────────────────────────────────────────────────────────────
 
-/// 文件信息
-#[derive(Debug, Serialize)]
-struct FileInfo {
-    id: String,
-    name: String,
-    size: u64,
-    mime_type: String,
-}
-
-/// 格式化文件大小
 #[allow(dead_code)]
 fn format_size(size: u64) -> String {
     const UNITS: [&str; 5] = ["B", "KB", "MB", "GB", "TB"];
@@ -1119,12 +1385,9 @@ fn format_size(size: u64) -> String {
     }
 }
 
-/// 解析 User-Agent 为简短的浏览器/平台信息
-/// 例如: "Chrome(Android)", "Safari(iOS)", "Firefox(Windows)"
 fn parse_user_agent(ua: &str) -> &'static str {
     let ua_lower = ua.to_lowercase();
 
-    // 检测平台
     let platform = if ua_lower.contains("android") {
         "Android"
     } else if ua_lower.contains("iphone") || ua_lower.contains("ipad") || ua_lower.contains("ipod")
@@ -1140,7 +1403,6 @@ fn parse_user_agent(ua: &str) -> &'static str {
         "Unknown"
     };
 
-    // 检测浏览器
     let browser = if ua_lower.contains("edg/") || ua_lower.contains("edge") {
         "Edge"
     } else if ua_lower.contains("opr/") || ua_lower.contains("opera") {
@@ -1157,7 +1419,6 @@ fn parse_user_agent(ua: &str) -> &'static str {
         "Unknown"
     };
 
-    // 返回静态字符串，格式: "Browser(Platform)"
     match (browser, platform) {
         ("Chrome", "Android") => "Chrome(Android)",
         ("Chrome", "iOS") => "Chrome(iOS)",
@@ -1183,7 +1444,8 @@ fn parse_user_agent(ua: &str) -> &'static str {
     }
 }
 
-/// PIN 输入页面模板（内嵌，旧版保留）
+// ─── HTML templates ─────────────────────────────────────────────────────────
+
 static _PIN_INPUT_HTML_OLD: &str = r#"
 <!DOCTYPE html>
 <html>
@@ -1247,7 +1509,6 @@ static _PIN_INPUT_HTML_OLD: &str = r#"
 </html>
 "#;
 
-/// 生成分享已结束页面 HTML
 fn generate_share_ended_html(is_english: bool) -> String {
     let title = if is_english { "PureSend - Share Ended" } else { "PureSend - 分享已结束" };
     let heading = if is_english { "Share Ended" } else { "分享已结束" };
@@ -1275,7 +1536,6 @@ fn generate_share_ended_html(is_english: bool) -> String {
     )
 }
 
-/// 生成访问被拒绝页面 HTML
 fn generate_access_denied_html(is_english: bool) -> String {
     let title = if is_english { "PureSend - Access Denied" } else { "PureSend - 访问被拒绝" };
     let heading = if is_english { "Access Denied" } else { "访问被拒绝" };
@@ -1303,7 +1563,66 @@ fn generate_access_denied_html(is_english: bool) -> String {
     )
 }
 
-/// 生成 PIN 输入页面 HTML
+fn generate_locked_html(remaining_secs: u64, is_english: bool) -> String {
+    let minutes = remaining_secs / 60;
+    let seconds = remaining_secs % 60;
+    let time_str = if is_english {
+        if minutes > 0 { format!("{} min {} sec", minutes, seconds) } else { format!("{} sec", seconds) }
+    } else {
+        if minutes > 0 { format!("{} 分 {} 秒", minutes, seconds) } else { format!("{} 秒", seconds) }
+    };
+
+    let title = if is_english { "PureSend - Locked" } else { "PureSend - 已锁定" };
+    let heading = if is_english { "Access Locked" } else { "访问已锁定" };
+    let message = if is_english { "Too many PIN attempts. Please try again later." } else { "PIN 码验证失败次数过多，请稍后再试" };
+    let timer_label = if is_english { "Time remaining:" } else { "剩余时间：" };
+    let lang = if is_english { "en" } else { "zh-CN" };
+    let min_unit = if is_english { "min " } else { "分 " };
+    let sec_unit = if is_english { "sec" } else { "秒" };
+
+    format!(
+        r#"<!DOCTYPE html>
+<html lang="{lang}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/favicon.ico">
+    <title>{title}</title>
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 400px; margin: 100px auto; padding: 20px; text-align: center; }}
+        h1 {{ color: #d32f2f; }}
+        .lock-icon {{ font-size: 48px; margin: 20px 0; }}
+        .message {{ color: #666; margin-top: 20px; }}
+        .timer {{ font-size: 24px; color: #1976d2; margin: 20px 0; font-weight: bold; }}
+    </style>
+</head>
+<body>
+    <h1>{heading}</h1>
+    <div class="lock-icon">🔒</div>
+    <div class="message">{message}</div>
+    <div class="timer" id="timer">{timer_label} {0}</div>
+    <script>
+        let remaining = {1};
+        function updateTimer() {{
+            if (remaining <= 0) {{
+                window.location.reload();
+                return;
+            }}
+            remaining--;
+            const min = Math.floor(remaining / 60);
+            const sec = remaining % 60;
+            const timeStr = min > 0 ? min + ' {2}' + sec + ' {3}' : sec + ' {3}';
+            document.getElementById('timer').textContent = '{4}' + timeStr;
+            setTimeout(updateTimer, 1000);
+        }}
+        updateTimer();
+    </script>
+</body>
+</html>"#,
+        time_str, remaining_secs, min_unit, sec_unit, timer_label
+    )
+}
+
 fn generate_pin_input_html(is_english: bool) -> String {
     let title = if is_english { "PureSend - PIN Verification" } else { "PureSend - PIN 验证" };
     let heading = if is_english { "Enter PIN Code" } else { "请输入 PIN 码" };
@@ -1386,15 +1705,10 @@ fn generate_pin_input_html(is_english: bool) -> String {
     )
 }
 
-/// 生成等待响应页面 HTML
 fn generate_waiting_response_html(is_english: bool) -> String {
     let title = if is_english { "PureSend - Waiting" } else { "PureSend - 等待响应" };
     let heading = if is_english { "Waiting for Response" } else { "等待响应中" };
-    let message = if is_english {
-        "Waiting for the sharer to accept your access request..."
-    } else {
-        "等待分享方接受您的访问请求..."
-    };
+    let message = if is_english { "Waiting for the sharer to accept your access request..." } else { "等待分享方接受您的访问请求..." };
     let checking = if is_english { "Checking status..." } else { "正在检查状态..." };
     let waiting = if is_english { "Waiting for approval..." } else { "等待分享方接受..." };
     let accepted = if is_english { "✓ Accepted! Redirecting..." } else { "✓ 已接受！正在跳转..." };
@@ -1457,7 +1771,7 @@ fn generate_waiting_response_html(is_english: bool) -> String {
     )
 }
 
-/// 生成文件列表页面 HTML
+/// Enhanced file list page with encryption, compression, and resume support
 fn generate_file_list_html(is_english: bool) -> String {
     let title = if is_english { "PureSend - File Sharing" } else { "PureSend - 文件分享" };
     let heading = if is_english { "PureSend File Sharing" } else { "PureSend 文件分享" };
@@ -1470,9 +1784,14 @@ fn generate_file_list_html(is_english: bool) -> String {
     let loading = if is_english { "Loading..." } else { "加载中..." };
     let no_files = if is_english { "No files available" } else { "暂无可用文件" };
     let lang = if is_english { "en" } else { "zh-CN" };
+    let downloading = if is_english { "Downloading..." } else { "下载中..." };
+    let download_complete = if is_english { "Download complete" } else { "下载完成" };
+    let download_failed = if is_english { "Download failed" } else { "下载失败" };
+    let encrypted_label = if is_english { "Encrypted" } else { "已加密" };
+    let compressed_label = if is_english { "Compressed" } else { "已压缩" };
 
     format!(
-        r#"<!DOCTYPE html>
+        r##"<!DOCTYPE html>
 <html lang="{lang}">
 <head>
     <meta charset="UTF-8">
@@ -1483,29 +1802,182 @@ fn generate_file_list_html(is_english: bool) -> String {
         body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }}
         h1 {{ color: #333; }}
         ul {{ list-style: none; padding: 0; }}
-        li {{ padding: 10px; border-bottom: 1px solid #eee; }}
-        a {{ color: #1976d2; text-decoration: none; }}
+        li {{ padding: 12px; border-bottom: 1px solid #eee; display: flex; align-items: center; justify-content: space-between; }}
+        a {{ color: #1976d2; text-decoration: none; cursor: pointer; }}
         a:hover {{ text-decoration: underline; }}
         .warning {{ background: #fff3cd; padding: 10px; border-radius: 4px; margin-bottom: 20px; }}
         .empty {{ color: #999; text-align: center; padding: 40px 0; }}
+        .badges {{ display: flex; gap: 6px; margin-left: 10px; }}
+        .badge {{ font-size: 11px; padding: 2px 6px; border-radius: 4px; color: #fff; }}
+        .badge-enc {{ background: #2e7d32; }}
+        .badge-comp {{ background: #1565c0; }}
+        .progress-bar {{ width: 100%; height: 4px; background: #e0e0e0; border-radius: 2px; margin-top: 6px; overflow: hidden; }}
+        .progress-fill {{ height: 100%; background: #1976d2; transition: width 0.3s; }}
+        .progress-text {{ font-size: 12px; color: #666; margin-top: 4px; }}
+        .file-info {{ flex: 1; }}
+        .file-size {{ color: #888; font-size: 13px; margin-left: 8px; }}
     </style>
 </head>
 <body>
     <h1>{heading}</h1>
-    <div class="warning">
-        {warning}
-    </div>
+    <div class="warning">{warning}</div>
     <h2>{files_heading}</h2>
     <ul id="file-list">
         <li class="empty">{loading}</li>
     </ul>
     <script>
+        var caps = null;
+        var cryptoKey = null;
+        var sessionId = null;
+
         function formatSize(bytes) {{
             if (bytes === 0) return '0 B';
             var units = ['B', 'KB', 'MB', 'GB', 'TB'];
             var i = Math.floor(Math.log(bytes) / Math.log(1024));
             return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + units[i];
         }}
+
+        async function initEnhanced() {{
+            try {{
+                var resp = await fetch('/capabilities');
+                caps = await resp.json();
+                if (caps.encryption) {{
+                    await performHandshake();
+                }}
+            }} catch(e) {{
+                console.warn('Enhanced transfer init failed:', e);
+                caps = {{ encryption: false, compression: false }};
+            }}
+        }}
+
+        async function performHandshake() {{
+            try {{
+                var keyPair = await crypto.subtle.generateKey(
+                    {{ name: 'ECDH', namedCurve: 'P-256' }},
+                    true,
+                    ['deriveBits']
+                );
+                var pubRaw = await crypto.subtle.exportKey('raw', keyPair.publicKey);
+                var pubB64 = btoa(String.fromCharCode.apply(null, new Uint8Array(pubRaw)));
+
+                var resp = await fetch('/crypto/handshake', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ client_public_key: pubB64 }})
+                }});
+                var result = await resp.json();
+                if (!result.encryption) return;
+
+                sessionId = result.session_id;
+
+                var serverPubBytes = Uint8Array.from(atob(result.server_public_key), function(c) {{ return c.charCodeAt(0); }});
+                var serverPubKey = await crypto.subtle.importKey(
+                    'raw', serverPubBytes,
+                    {{ name: 'ECDH', namedCurve: 'P-256' }},
+                    false, []
+                );
+
+                var sharedBits = await crypto.subtle.deriveBits(
+                    {{ name: 'ECDH', public: serverPubKey }},
+                    keyPair.privateKey, 256
+                );
+
+                var hkdfKey = await crypto.subtle.importKey('raw', sharedBits, 'HKDF', false, ['deriveKey']);
+                cryptoKey = await crypto.subtle.deriveKey(
+                    {{
+                        name: 'HKDF', hash: 'SHA-256',
+                        salt: new Uint8Array(0),
+                        info: new TextEncoder().encode('puresend-http-encryption')
+                    }},
+                    hkdfKey,
+                    {{ name: 'AES-GCM', length: 256 }},
+                    false, ['decrypt']
+                );
+            }} catch(e) {{
+                console.warn('Handshake failed:', e);
+                caps.encryption = false;
+            }}
+        }}
+
+        async function decryptChunk(data) {{
+            var nonce = data.slice(0, 12);
+            var ciphertext = data.slice(12);
+            var decrypted = await crypto.subtle.decrypt(
+                {{ name: 'AES-GCM', iv: nonce }},
+                cryptoKey, ciphertext
+            );
+            return new Uint8Array(decrypted);
+        }}
+
+        async function downloadEnhanced(fileId, fileName, fileSize) {{
+            var li = document.getElementById('dl-' + fileId);
+            var progressBar = li.querySelector('.progress-fill');
+            var progressText = li.querySelector('.progress-text');
+            if (progressBar) progressBar.style.width = '0%';
+            if (progressText) progressText.textContent = '{downloading}';
+
+            try {{
+                var metaResp = await fetch('/download/' + fileId + '/meta');
+                var meta = await metaResp.json();
+
+                if (!meta.encryption && !meta.compression) {{
+                    window.location.href = '/download/' + fileId;
+                    if (progressText) progressText.textContent = '';
+                    return;
+                }}
+
+                var chunks = [];
+                var downloaded = 0;
+
+                for (var i = 0; i < meta.chunk_count; i++) {{
+                    var headers = {{}};
+                    if (sessionId) headers['X-Encryption-Session'] = sessionId;
+
+                    var resp = await fetch('/download/' + fileId + '/chunk/' + i, {{ headers: headers }});
+                    var data = new Uint8Array(await resp.arrayBuffer());
+
+                    var isEncrypted = resp.headers.get('x-encryption') === 'aes-256-gcm';
+                    if (isEncrypted && cryptoKey) {{
+                        data = await decryptChunk(data);
+                    }}
+
+                    chunks.push(data);
+                    downloaded += data.length;
+
+                    var pct = Math.min(100, Math.round(downloaded / meta.file_size * 100));
+                    if (progressBar) progressBar.style.width = pct + '%';
+                    if (progressText) progressText.textContent = pct + '% (' + formatSize(downloaded) + ' / ' + formatSize(meta.file_size) + ')';
+                }}
+
+                var blob = new Blob(chunks);
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                if (progressText) progressText.textContent = '{download_complete}';
+                if (progressBar) progressBar.style.background = '#4caf50';
+            }} catch(e) {{
+                console.error('Download failed:', e);
+                if (progressText) {{
+                    progressText.textContent = '{download_failed}: ' + e.message;
+                    progressText.style.color = '#d32f2f';
+                }}
+            }}
+        }}
+
+        function downloadFile(fileId, fileName, fileSize) {{
+            if (caps && (caps.encryption || caps.compression)) {{
+                downloadEnhanced(fileId, fileName, fileSize);
+            }} else {{
+                window.location.href = '/download/' + fileId;
+            }}
+        }}
+
         var lastJson = '';
         function refreshFiles() {{
             fetch('/files')
@@ -1520,15 +1992,29 @@ fn generate_file_list_html(is_english: bool) -> String {
                         return;
                     }}
                     ul.innerHTML = data.files.map(function(f) {{
-                        return '<li><a href="/download/' + f.id + '" download="' + f.name + '">' + f.name + '</a> (' + formatSize(f.size) + ')</li>';
+                        var badges = '';
+                        if (caps && caps.encryption) badges += '<span class="badge badge-enc">{encrypted_label}</span>';
+                        if (caps && caps.compression) badges += '<span class="badge badge-comp">{compressed_label}</span>';
+                        return '<li id="dl-' + f.id + '">'
+                            + '<div class="file-info">'
+                            + '<a onclick="downloadFile(\'' + f.id + '\',\'' + f.name.replace(/'/g, "\\'") + '\',' + f.size + ')">' + f.name + '</a>'
+                            + '<span class="file-size">(' + formatSize(f.size) + ')</span>'
+                            + (badges ? '<div class="badges">' + badges + '</div>' : '')
+                            + '<div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>'
+                            + '<div class="progress-text"></div>'
+                            + '</div>'
+                            + '</li>';
                     }}).join('');
                 }})
                 .catch(function() {{}});
         }}
-        refreshFiles();
-        setInterval(refreshFiles, 1000);
+
+        initEnhanced().then(function() {{
+            refreshFiles();
+            setInterval(refreshFiles, 2000);
+        }});
     </script>
 </body>
-</html>"#
+</html>"##
     )
 }

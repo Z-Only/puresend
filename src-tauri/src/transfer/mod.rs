@@ -3,8 +3,9 @@
 mod chunker;
 mod cloud;
 mod commands;
-mod compression;
-mod crypto;
+pub mod compression;
+pub mod crypto;
+pub mod http_crypto;
 mod integrity;
 mod local;
 mod resume;
