@@ -654,6 +654,7 @@ function getFileStatusColor(status: string): string {
         completed: 'success',
         failed: 'error',
         cancelled: 'warning',
+        interrupted: 'warning',
     }
     return colorMap[status] || 'grey'
 }
@@ -666,6 +667,7 @@ function getFileStatusText(status: string): string {
         completed: 'receive.task.fileStatus.completed',
         failed: 'receive.task.fileStatus.failed',
         cancelled: 'receive.task.fileStatus.cancelled',
+        interrupted: 'receive.task.fileStatus.interrupted',
     }
     return t(keyMap[status] || 'receive.task.fileStatus.pending')
 }

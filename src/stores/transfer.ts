@@ -39,6 +39,10 @@ import {
     onTransferProgress,
     onTransferError,
     onTransferComplete,
+    onTransferInterrupted,
+    getResumableTasks as getResumableTasksService,
+    resumeTransfer as resumeTransferService,
+    cleanupResumeInfo as cleanupResumeInfoService,
     startReceiving as startReceivingService,
     stopReceiving as stopReceivingService,
     getReceiveDirectory,
@@ -54,6 +58,7 @@ import {
     onWebUploadFileProgress,
     onWebUploadFileComplete,
 } from '../services'
+import type { ResumableTaskInfo } from '../services/transferService'
 import type { UnlistenFn } from '@tauri-apps/api/event'
 import { useSettingsStore } from './settings'
 
@@ -396,7 +401,8 @@ export const useTransferStore = defineStore('transfer', () => {
             unlistenFns.push(
                 await onTransferProgress(handleProgress),
                 await onTransferError(handleError),
-                await onTransferComplete(handleComplete)
+                await onTransferComplete(handleComplete),
+                await onTransferInterrupted(handleInterrupted)
             )
 
             initialized.value = true
@@ -449,6 +455,67 @@ export const useTransferStore = defineStore('transfer', () => {
                 // 自动添加到历史记录
                 addHistoryItem(task)
             }
+        }
+    }
+
+    /**
+     * 处理传输中断事件
+     */
+    function handleInterrupted(progress: TransferProgress) {
+        const task = tasks.value.get(progress.taskId)
+        if (task) {
+            task.status = 'interrupted'
+            task.resumable = true
+            task.resumeOffset = progress.transferredBytes
+            task.error = progress.error
+        }
+    }
+
+    /**
+     * 获取可恢复的传输任务列表
+     */
+    async function getResumableTasks(): Promise<ResumableTaskInfo[]> {
+        try {
+            return await getResumableTasksService()
+        } catch (e) {
+            console.error('[Transfer] 获取可恢复任务失败:', e)
+            return []
+        }
+    }
+
+    /**
+     * 恢复中断的传输任务
+     * @param taskId 任务 ID
+     */
+    async function resumeTransfer(taskId: string): Promise<void> {
+        const task = tasks.value.get(taskId)
+        if (task) {
+            task.status = 'transferring'
+            task.resumed = true
+            task.error = undefined
+        }
+
+        try {
+            await resumeTransferService(taskId)
+        } catch (e) {
+            if (task) {
+                task.status = 'failed'
+                task.error = `恢复传输失败：${e}`
+            }
+            console.error('[Transfer] 恢复传输失败:', e)
+            throw e
+        }
+    }
+
+    /**
+     * 清理断点信息
+     * @param taskId 任务 ID（可选，不传则清理所有过期的断点信息）
+     */
+    async function cleanupResumeInfo(taskId?: string): Promise<void> {
+        try {
+            await cleanupResumeInfoService(taskId)
+        } catch (e) {
+            console.error('[Transfer] 清理断点信息失败:', e)
         }
     }
 
@@ -1443,6 +1510,10 @@ export const useTransferStore = defineStore('transfer', () => {
         stopReceiving,
         updateReceiveDirectory,
         cancel,
+        // 断点续传
+        getResumableTasks,
+        resumeTransfer,
+        cleanupResumeInfo,
         cleanup,
         removeTask,
         setTransferMode,

@@ -101,6 +101,31 @@
       "currentCount": "Current records: {count}",
       "cleanupNow": "Cleanup Now"
     },
+    "transferEnhancement": {
+      "title": "Transfer Enhancement",
+      "p2pOnlyHint": "Transfer enhancement features currently only apply to local network P2P direct connections. Encryption and compression for Web Upload/Download (HTTP) will be supported in future versions.",
+      "encryption": {
+        "label": "Transfer Encryption",
+        "description": "Protect transfer data with AES-256 encryption",
+        "enabled": "Enabled",
+        "disabled": "Disabled"
+      },
+      "compression": {
+        "label": "Dynamic Compression",
+        "description": "Automatically compress data before transfer to improve efficiency",
+        "mode": {
+          "label": "Compression Mode",
+          "smart": "Smart Compression",
+          "smartDescription": "Automatically adjust compression strategy based on file type",
+          "manual": "Manual Compression Level"
+        },
+        "level": {
+          "label": "Compression Level",
+          "low": "Low",
+          "high": "High"
+        }
+      }
+    },
     "developer": {
       "title": "Developer",
       "devTools": {
@@ -154,7 +179,8 @@
       "transferring": "Transferring",
       "completed": "Completed",
       "failed": "Failed",
-      "cancelled": "Cancelled"
+      "cancelled": "Cancelled",
+      "interrupted": "Interrupted"
     },
     "progress": {
       "transferred": "Transferred",
@@ -166,7 +192,13 @@
       "cancelTransfer": "Cancel Transfer",
       "retry": "Retry",
       "remove": "Remove",
-      "unknownFile": "Unknown File"
+      "unknownFile": "Unknown File",
+      "resumed": "Transfer Resumed",
+      "encrypted": "Encrypted Transfer",
+      "compressionRatio": "Compression Ratio {ratio}%",
+      "interrupted": "Transfer interrupted, waiting to resume",
+      "degradedEncryption": "Peer does not support encryption, downgraded to plaintext",
+      "degradedCompression": "Peer does not support compression, using raw data"
     },
     "time": {
       "seconds": "{count} seconds",
@@ -341,7 +373,8 @@
         "transferring": "Transferring",
         "completed": "Completed",
         "failed": "Failed",
-        "cancelled": "Cancelled"
+        "cancelled": "Cancelled",
+        "interrupted": "Interrupted"
       }
     }
   },
@@ -423,7 +456,8 @@
         "transferring": "Transferring",
         "completed": "Completed",
         "failed": "Failed",
-        "cancelled": "Cancelled"
+        "cancelled": "Cancelled",
+        "interrupted": "Interrupted"
       }
     },
     "webUpload": {

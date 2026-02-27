@@ -375,6 +375,7 @@ function getStatusColor(status: TaskStatus): string {
         completed: 'success',
         failed: 'error',
         cancelled: 'warning',
+        interrupted: 'warning',
     }
     return colors[status]
 }

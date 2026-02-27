@@ -45,6 +45,33 @@ pub enum TransferError {
 
     #[error("内部错误: {0}")]
     Internal(String),
+
+    #[error("加密错误: {0}")]
+    Encryption(String),
+
+    #[error("解密错误: {0}")]
+    Decryption(String),
+
+    #[error("密钥交换失败: {0}")]
+    KeyExchange(String),
+
+    #[error("压缩错误: {0}")]
+    Compression(String),
+
+    #[error("解压错误: {0}")]
+    Decompression(String),
+
+    #[error("续传失败: {0}")]
+    ResumeFailed(String),
+
+    #[error("断点信息已过期")]
+    ResumeInfoExpired,
+
+    #[error("分块校验失败: {0}")]
+    ChunkVerificationFailed(String),
+
+    #[error("协议版本不兼容: {0}")]
+    ProtocolVersionMismatch(String),
 }
 
 impl From<io::Error> for TransferError {

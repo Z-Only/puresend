@@ -17,11 +17,16 @@ import {
     type DeveloperSettings,
     type PortRange,
     type PortRangeConfig,
+    type EncryptionSettings,
+    type CompressionSettings,
+    type CompressionMode,
     DEFAULT_SETTINGS,
     DEFAULT_HISTORY_SETTINGS,
     DEFAULT_RECEIVE_SETTINGS,
     DEFAULT_FONT_SIZE_SETTINGS,
     DEFAULT_DEVELOPER_SETTINGS,
+    DEFAULT_ENCRYPTION_SETTINGS,
+    DEFAULT_COMPRESSION_SETTINGS,
     SETTINGS_VERSION,
     SETTINGS_STORAGE_KEY,
 } from '@/types/settings'
@@ -33,6 +38,10 @@ import {
     loadFromTauriStore,
     setAutoReceive as setAutoReceiveBackend,
     setFileOverwrite as setFileOverwriteBackend,
+    setEncryptionEnabled as setEncryptionEnabledBackend,
+    setCompressionEnabled as setCompressionEnabledBackend,
+    setCompressionMode as setCompressionModeBackend,
+    setCompressionLevel as setCompressionLevelBackend,
 } from '@/services/settingsService'
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -47,6 +56,12 @@ export const useSettingsStore = defineStore('settings', () => {
     const fontSize = ref(DEFAULT_FONT_SIZE_SETTINGS)
     const developerSettings = ref<DeveloperSettings>(DEFAULT_DEVELOPER_SETTINGS)
     const showAdvancedSettings = ref(DEFAULT_SETTINGS.showAdvancedSettings)
+    const encryptionSettings = ref<EncryptionSettings>(
+        DEFAULT_ENCRYPTION_SETTINGS
+    )
+    const compressionSettings = ref<CompressionSettings>(
+        DEFAULT_COMPRESSION_SETTINGS
+    )
     const version = ref(SETTINGS_VERSION)
 
     // ============ 计算属性 ============
@@ -215,6 +230,16 @@ export const useSettingsStore = defineStore('settings', () => {
             migrated.showAdvancedSettings = false
         }
 
+        // 传输加密设置迁移
+        if (!('encryptionSettings' in oldSettings)) {
+            migrated.encryptionSettings = DEFAULT_ENCRYPTION_SETTINGS
+        }
+
+        // 动态压缩设置迁移
+        if (!('compressionSettings' in oldSettings)) {
+            migrated.compressionSettings = DEFAULT_COMPRESSION_SETTINGS
+        }
+
         return migrated
     }
 
@@ -233,6 +258,8 @@ export const useSettingsStore = defineStore('settings', () => {
                 fontSize: fontSize.value,
                 developerSettings: developerSettings.value,
                 showAdvancedSettings: showAdvancedSettings.value,
+                encryptionSettings: encryptionSettings.value,
+                compressionSettings: compressionSettings.value,
                 version: version.value,
             }
 
@@ -294,6 +321,14 @@ export const useSettingsStore = defineStore('settings', () => {
                 // 兼容旧版设置（没有 showAdvancedSettings 字段）
                 showAdvancedSettings.value =
                     (loadedSettings.showAdvancedSettings as boolean) ?? false
+                // 兼容旧版设置（没有 encryptionSettings 字段）
+                encryptionSettings.value =
+                    (loadedSettings.encryptionSettings as EncryptionSettings) ||
+                    DEFAULT_ENCRYPTION_SETTINGS
+                // 兼容旧版设置（没有 compressionSettings 字段）
+                compressionSettings.value =
+                    (loadedSettings.compressionSettings as CompressionSettings) ||
+                    DEFAULT_COMPRESSION_SETTINGS
 
                 // 如果没有设备名称，尝试获取本机设备名
                 if (!deviceName.value) {
@@ -495,6 +530,71 @@ export const useSettingsStore = defineStore('settings', () => {
     }
 
     /**
+     * 设置传输加密开关
+     */
+    async function setEncryptionEnabled(enabled: boolean): Promise<boolean> {
+        encryptionSettings.value = {
+            ...encryptionSettings.value,
+            enabled,
+        }
+        try {
+            await setEncryptionEnabledBackend(enabled)
+        } catch (error) {
+            console.error('[Settings] 同步加密设置到后端失败:', error)
+        }
+        return saveSettings()
+    }
+
+    /**
+     * 设置压缩开关
+     */
+    async function setCompressionEnabled(enabled: boolean): Promise<boolean> {
+        compressionSettings.value = {
+            ...compressionSettings.value,
+            enabled,
+        }
+        try {
+            await setCompressionEnabledBackend(enabled)
+        } catch (error) {
+            console.error('[Settings] 同步压缩开关到后端失败:', error)
+        }
+        return saveSettings()
+    }
+
+    /**
+     * 设置压缩模式
+     */
+    async function setCompressionMode(mode: CompressionMode): Promise<boolean> {
+        compressionSettings.value = {
+            ...compressionSettings.value,
+            mode,
+        }
+        try {
+            await setCompressionModeBackend(mode)
+        } catch (error) {
+            console.error('[Settings] 同步压缩模式到后端失败:', error)
+        }
+        return saveSettings()
+    }
+
+    /**
+     * 设置压缩级别
+     */
+    async function setCompressionLevel(level: number): Promise<boolean> {
+        const validLevel = Math.max(1, Math.min(19, Math.floor(level)))
+        compressionSettings.value = {
+            ...compressionSettings.value,
+            level: validLevel,
+        }
+        try {
+            await setCompressionLevelBackend(validLevel)
+        } catch (error) {
+            console.error('[Settings] 同步压缩级别到后端失败:', error)
+        }
+        return saveSettings()
+    }
+
+    /**
      * 监听系统主题变化
      */
     function watchSystemTheme(
@@ -535,6 +635,8 @@ export const useSettingsStore = defineStore('settings', () => {
         fontSize,
         developerSettings,
         showAdvancedSettings,
+        encryptionSettings,
+        compressionSettings,
         version,
 
         // 计算属性
@@ -556,6 +658,10 @@ export const useSettingsStore = defineStore('settings', () => {
         setDevToolsEnabled,
         setPortRange,
         setShowAdvancedSettings,
+        setEncryptionEnabled,
+        setCompressionEnabled,
+        setCompressionMode,
+        setCompressionLevel,
         setFontSizeMode,
         setFontSizePreset,
         setFontSizeCustomScale,

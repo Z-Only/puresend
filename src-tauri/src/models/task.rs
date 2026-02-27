@@ -33,6 +33,21 @@ pub struct TransferTask {
     pub error: Option<String>,
     /// 传输方向
     pub direction: TransferDirection,
+    /// 是否可恢复（断点续传）
+    #[serde(default)]
+    pub resumable: bool,
+    /// 续传偏移量（已传输字节数）
+    #[serde(default)]
+    pub resume_offset: u64,
+    /// 是否为恢复的传输
+    #[serde(default)]
+    pub resumed: bool,
+    /// 是否使用加密传输
+    #[serde(default)]
+    pub encrypted: bool,
+    /// 压缩率（百分比，0 表示未压缩）
+    #[serde(default)]
+    pub compression_ratio: f64,
 }
 
 impl TransferTask {
@@ -56,6 +71,11 @@ impl TransferTask {
             completed_at: None,
             error: None,
             direction,
+            resumable: false,
+            resume_offset: 0,
+            resumed: false,
+            encrypted: false,
+            compression_ratio: 0.0,
         }
     }
 
@@ -118,6 +138,13 @@ impl TransferTask {
         );
     }
 
+    /// 标记为中断（可恢复）
+    #[allow(dead_code)]
+    pub fn interrupt(&mut self) {
+        self.status = TaskStatus::Interrupted;
+        self.resumable = true;
+    }
+
     /// 计算预估剩余时间（秒）
     pub fn estimated_time_remaining(&self) -> Option<u64> {
         if self.speed == 0 {
@@ -158,6 +185,8 @@ pub enum TaskStatus {
     Failed,
     /// 已取消
     Cancelled,
+    /// 已中断（可恢复）
+    Interrupted,
 }
 
 impl Default for TaskStatus {

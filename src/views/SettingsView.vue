@@ -253,6 +253,38 @@ async function saveSharePortRange() {
 
 // 应用版本
 const appVersion = __APP_VERSION__
+
+// 传输增强设置
+const encryptionEnabled = computed({
+    get: () => settingsStore.encryptionSettings.enabled,
+    set: (value) => settingsStore.setEncryptionEnabled(value),
+})
+
+const compressionEnabled = computed({
+    get: () => settingsStore.compressionSettings.enabled,
+    set: (value) => settingsStore.setCompressionEnabled(value),
+})
+
+const compressionMode = computed({
+    get: () => settingsStore.compressionSettings.mode,
+    set: (value) => settingsStore.setCompressionMode(value),
+})
+
+const compressionLevel = computed({
+    get: () => settingsStore.compressionSettings.level,
+    set: (value) => settingsStore.setCompressionLevel(value),
+})
+
+const compressionModeOptions = computed(() => [
+    {
+        title: t('settings.transferEnhancement.compression.mode.smart'),
+        value: 'smart',
+    },
+    {
+        title: t('settings.transferEnhancement.compression.mode.manual'),
+        value: 'manual',
+    },
+])
 </script>
 
 <template>
@@ -571,6 +603,153 @@ const appVersion = __APP_VERSION__
                 color="primary"
             />
         </div>
+
+        <!-- 传输增强设置 -->
+        <SettingsGroup
+            v-if="showAdvancedSettings"
+            :title="t('settings.transferEnhancement.title')"
+            class="mt-2"
+        >
+            <div class="d-flex flex-column ga-4">
+                <!-- P2P 模式提示 -->
+                <v-alert
+                    type="info"
+                    variant="tonal"
+                    density="compact"
+                    class="mb-2"
+                >
+                    {{ t('settings.transferEnhancement.p2pOnlyHint') }}
+                </v-alert>
+                <!-- 传输加密 -->
+                <div class="d-flex align-center justify-space-between">
+                    <div>
+                        <div class="text-subtitle-1">
+                            {{
+                                t(
+                                    'settings.transferEnhancement.encryption.label'
+                                )
+                            }}
+                        </div>
+                        <div class="text-body-2 text-grey">
+                            {{
+                                t(
+                                    'settings.transferEnhancement.encryption.description'
+                                )
+                            }}
+                        </div>
+                    </div>
+                    <v-switch
+                        v-model="encryptionEnabled"
+                        color="primary"
+                        hide-details
+                    />
+                </div>
+                <v-divider />
+                <!-- 动态压缩 -->
+                <div class="d-flex align-center justify-space-between">
+                    <div>
+                        <div class="text-subtitle-1">
+                            {{
+                                t(
+                                    'settings.transferEnhancement.compression.label'
+                                )
+                            }}
+                        </div>
+                        <div class="text-body-2 text-grey">
+                            {{
+                                t(
+                                    'settings.transferEnhancement.compression.description'
+                                )
+                            }}
+                        </div>
+                    </div>
+                    <v-switch
+                        v-model="compressionEnabled"
+                        color="primary"
+                        hide-details
+                    />
+                </div>
+                <v-expand-transition>
+                    <div
+                        v-if="compressionEnabled"
+                        class="d-flex flex-column ga-4"
+                    >
+                        <div class="d-flex align-center justify-space-between">
+                            <div class="text-subtitle-1">
+                                {{
+                                    t(
+                                        'settings.transferEnhancement.compression.mode.label'
+                                    )
+                                }}
+                            </div>
+                            <v-select
+                                v-model="compressionMode"
+                                :items="compressionModeOptions"
+                                density="compact"
+                                variant="outlined"
+                                hide-details
+                                style="max-width: 200px"
+                            />
+                        </div>
+                        <div
+                            v-if="compressionMode === 'smart'"
+                            class="text-body-2 text-grey"
+                        >
+                            {{
+                                t(
+                                    'settings.transferEnhancement.compression.mode.smartDescription'
+                                )
+                            }}
+                        </div>
+                        <v-expand-transition>
+                            <div
+                                v-if="compressionMode === 'manual'"
+                                class="d-flex flex-column ga-2"
+                            >
+                                <div
+                                    class="d-flex align-center justify-space-between"
+                                >
+                                    <div class="text-subtitle-1">
+                                        {{
+                                            t(
+                                                'settings.transferEnhancement.compression.level.label'
+                                            )
+                                        }}
+                                    </div>
+                                    <span class="text-body-2">{{
+                                        compressionLevel
+                                    }}</span>
+                                </div>
+                                <v-slider
+                                    v-model="compressionLevel"
+                                    :min="1"
+                                    :max="19"
+                                    :step="1"
+                                    color="primary"
+                                    hide-details
+                                    density="compact"
+                                >
+                                    <template #prepend
+                                        ><span class="text-body-2 text-grey">{{
+                                            t(
+                                                'settings.transferEnhancement.compression.level.low'
+                                            )
+                                        }}</span></template
+                                    >
+                                    <template #append
+                                        ><span class="text-body-2 text-grey">{{
+                                            t(
+                                                'settings.transferEnhancement.compression.level.high'
+                                            )
+                                        }}</span></template
+                                    >
+                                </v-slider>
+                            </div>
+                        </v-expand-transition>
+                    </div>
+                </v-expand-transition>
+            </div>
+        </SettingsGroup>
 
         <!-- 开发者设置 -->
         <SettingsGroup

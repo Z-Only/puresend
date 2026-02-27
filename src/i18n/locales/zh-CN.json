@@ -101,6 +101,31 @@
       "currentCount": "当前记录数：{count} 条",
       "cleanupNow": "立即清理"
     },
+    "transferEnhancement": {
+      "title": "传输增强",
+      "p2pOnlyHint": "传输增强功能目前仅对本地网络 P2P 直连模式有效，Web 上传/下载（HTTP 协议）的加密和压缩功能将在后续版本中支持。",
+      "encryption": {
+        "label": "传输加密",
+        "description": "使用 AES-256 加密保护传输数据",
+        "enabled": "已开启",
+        "disabled": "已关闭"
+      },
+      "compression": {
+        "label": "动态压缩",
+        "description": "传输前自动压缩数据以提升效率",
+        "mode": {
+          "label": "压缩模式",
+          "smart": "智能压缩",
+          "smartDescription": "根据文件类型自动调整压缩策略",
+          "manual": "手动压缩级别"
+        },
+        "level": {
+          "label": "压缩级别",
+          "low": "低",
+          "high": "高"
+        }
+      }
+    },
     "developer": {
       "title": "开发者",
       "devTools": {
@@ -154,7 +179,8 @@
       "transferring": "传输中",
       "completed": "已完成",
       "failed": "失败",
-      "cancelled": "已取消"
+      "cancelled": "已取消",
+      "interrupted": "已中断"
     },
     "progress": {
       "transferred": "已传输",
@@ -166,7 +192,13 @@
       "cancelTransfer": "取消传输",
       "retry": "重试",
       "remove": "移除",
-      "unknownFile": "未知文件"
+      "unknownFile": "未知文件",
+      "resumed": "已恢复传输",
+      "encrypted": "已加密传输",
+      "compressionRatio": "压缩率 {ratio}%",
+      "interrupted": "传输中断，等待恢复",
+      "degradedEncryption": "对方不支持加密传输，已降级为明文传输",
+      "degradedCompression": "对方不支持压缩传输，已使用原始数据传输"
     },
     "time": {
       "seconds": "{count} 秒",
@@ -341,7 +373,8 @@
         "transferring": "传输中",
         "completed": "已完成",
         "failed": "失败",
-        "cancelled": "已取消"
+        "cancelled": "已取消",
+        "interrupted": "已中断"
       }
     }
   },
@@ -423,7 +456,8 @@
         "transferring": "传输中",
         "completed": "已完成",
         "failed": "失败",
-        "cancelled": "已取消"
+        "cancelled": "已取消",
+        "interrupted": "已中断"
       }
     },
     "webUpload": {

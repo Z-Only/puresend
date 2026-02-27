@@ -14,6 +14,7 @@ export type TaskStatus =
     | 'completed'
     | 'failed'
     | 'cancelled'
+    | 'interrupted'
 
 /** 传输方向 */
 export type TransferDirection = 'send' | 'receive'
@@ -80,6 +81,16 @@ export interface TransferTask {
     direction: TransferDirection
     /** 错误信息 */
     error?: string
+    /** 是否可恢复（断点续传） */
+    resumable?: boolean
+    /** 续传偏移量（字节） */
+    resumeOffset?: number
+    /** 是否已从断点恢复 */
+    resumed?: boolean
+    /** 是否使用加密传输 */
+    encrypted?: boolean
+    /** 压缩率（0-100，仅在启用压缩时有效） */
+    compressionRatio?: number
 }
 
 /** 传输进度事件 */
@@ -110,6 +121,7 @@ export function getStatusText(status: TaskStatus): string {
         completed: '已完成',
         failed: '失败',
         cancelled: '已取消',
+        interrupted: '已中断',
     }
     return statusTexts[status]
 }
@@ -127,6 +139,7 @@ export function getStatusColor(status: TaskStatus): string {
         completed: 'success',
         failed: 'error',
         cancelled: 'warning',
+        interrupted: 'warning',
     }
     return statusColors[status]
 }

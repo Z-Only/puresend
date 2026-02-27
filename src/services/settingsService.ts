@@ -194,3 +194,78 @@ export async function setFileOverwrite(enabled: boolean): Promise<void> {
         console.warn('[SettingsService] 设置文件覆盖失败:', error)
     }
 }
+
+// ============ 传输加密设置 ============
+
+/**
+ * 设置传输加密开关
+ */
+export async function setEncryptionEnabled(enabled: boolean): Promise<void> {
+    try {
+        if (await isTauriEnvironmentAvailable()) {
+            const { invoke } = await import('@tauri-apps/api/core')
+            await invoke('set_encryption_enabled', { enabled })
+        }
+    } catch (error) {
+        console.warn('[SettingsService] 设置传输加密失败:', error)
+    }
+}
+
+/**
+ * 获取传输加密状态
+ */
+export async function getEncryptionEnabled(): Promise<boolean> {
+    try {
+        if (await isTauriEnvironmentAvailable()) {
+            const { invoke } = await import('@tauri-apps/api/core')
+            return await invoke<boolean>('get_encryption_enabled')
+        }
+    } catch (error) {
+        console.warn('[SettingsService] 获取传输加密状态失败:', error)
+    }
+    return true
+}
+
+// ============ 动态压缩设置 ============
+
+/**
+ * 设置压缩开关
+ */
+export async function setCompressionEnabled(enabled: boolean): Promise<void> {
+    try {
+        if (await isTauriEnvironmentAvailable()) {
+            const { invoke } = await import('@tauri-apps/api/core')
+            await invoke('set_compression_enabled', { enabled })
+        }
+    } catch (error) {
+        console.warn('[SettingsService] 设置压缩开关失败:', error)
+    }
+}
+
+/**
+ * 设置压缩模式
+ */
+export async function setCompressionMode(mode: string): Promise<void> {
+    try {
+        if (await isTauriEnvironmentAvailable()) {
+            const { invoke } = await import('@tauri-apps/api/core')
+            await invoke('set_compression_mode', { mode })
+        }
+    } catch (error) {
+        console.warn('[SettingsService] 设置压缩模式失败:', error)
+    }
+}
+
+/**
+ * 设置压缩级别
+ */
+export async function setCompressionLevel(level: number): Promise<void> {
+    try {
+        if (await isTauriEnvironmentAvailable()) {
+            const { invoke } = await import('@tauri-apps/api/core')
+            await invoke('set_compression_level', { level })
+        }
+    } catch (error) {
+        console.warn('[SettingsService] 设置压缩级别失败:', error)
+    }
+}

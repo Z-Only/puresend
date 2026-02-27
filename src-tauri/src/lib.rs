@@ -236,6 +236,16 @@ pub fn run() {
             crate::transfer::set_auto_receive,
             crate::transfer::set_file_overwrite,
             crate::transfer::get_unique_file_path,
+            // Transfer enhancement commands
+            crate::transfer::get_encryption_enabled,
+            crate::transfer::set_encryption_enabled,
+            crate::transfer::get_compression_enabled,
+            crate::transfer::set_compression_enabled,
+            crate::transfer::set_compression_mode,
+            crate::transfer::set_compression_level,
+            crate::transfer::get_resumable_tasks,
+            crate::transfer::resume_transfer,
+            crate::transfer::cleanup_resume_info,
             // Share commands
             crate::share::start_share,
             crate::share::stop_share,

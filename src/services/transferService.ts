@@ -223,3 +223,60 @@ export function onTransferComplete(
         listener(event.payload)
     })
 }
+
+// ============ 断点续传相关 ============
+
+/** 可恢复任务信息 */
+export interface ResumableTaskInfo {
+    /** 任务 ID */
+    taskId: string
+    /** 文件名 */
+    fileName: string
+    /** 文件大小 */
+    fileSize: number
+    /** 已传输字节数 */
+    transferredBytes: number
+    /** 中断时间戳 */
+    interruptedAt: number
+    /** 过期时间戳 */
+    expiresAt: number
+}
+
+/**
+ * 获取可恢复的传输任务列表
+ */
+export async function getResumableTasks(): Promise<ResumableTaskInfo[]> {
+    return invoke('get_resumable_tasks')
+}
+
+/**
+ * 恢复中断的传输任务
+ * @param taskId 任务 ID
+ */
+export async function resumeTransfer(taskId: string): Promise<void> {
+    return invoke('resume_transfer', { taskId })
+}
+
+/**
+ * 清理断点信息
+ * @param taskId 任务 ID（可选，不传则清理所有过期的断点信息）
+ */
+export async function cleanupResumeInfo(taskId?: string): Promise<void> {
+    return invoke('cleanup_resume_info', { taskId })
+}
+
+/** 传输中断事件监听器类型 */
+export type TransferInterruptedListener = (progress: TransferProgress) => void
+
+/**
+ * 监听传输中断事件
+ * @param listener 监听器函数
+ * @returns 取消监听函数
+ */
+export function onTransferInterrupted(
+    listener: TransferInterruptedListener
+): Promise<UnlistenFn> {
+    return listen<TransferProgress>('transfer-interrupted', (event) => {
+        listener(event.payload)
+    })
+}

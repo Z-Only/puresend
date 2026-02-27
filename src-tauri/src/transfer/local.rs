@@ -30,7 +30,7 @@ pub struct ReceiveConfig {
 const PROTOCOL_MAGIC: &[u8; 4] = b"PSEN";
 
 /// 协议版本
-const PROTOCOL_VERSION: u8 = 1;
+const PROTOCOL_VERSION: u8 = 2;
 
 /// 消息类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -50,6 +50,10 @@ enum MessageType {
     Heartbeat = 0x06,
     /// 错误
     Error = 0x07,
+    /// 握手请求（v2）
+    Handshake = 0x08,
+    /// 握手响应（v2）
+    HandshakeAck = 0x09,
 }
 
 /// 消息头
@@ -67,28 +71,67 @@ impl MessageHeader {
         }
     }
 
-    fn to_bytes(&self) -> [u8; 8] {
-        let mut buf = [0u8; 8];
-        buf[0..4].copy_from_slice(PROTOCOL_MAGIC);
-        buf[4] = PROTOCOL_VERSION;
-        buf[5] = self.message_type as u8;
-        buf[6..8].copy_from_slice(&(self.payload_length as u16).to_be_bytes());
+    fn to_bytes(&self) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(10);
+        buf.extend_from_slice(PROTOCOL_MAGIC);
+        buf.push(PROTOCOL_VERSION);
+        buf.push(self.message_type as u8);
+        buf.extend_from_slice(&self.payload_length.to_be_bytes());
         buf
     }
 
-    fn from_bytes(bytes: &[u8; 8]) -> TransferResult<Self> {
+    /// 从 TCP 流中读取消息头（自动检测 v1/v2 版本）
+    async fn read_from_stream(stream: &mut TcpStream) -> TransferResult<Self> {
+        // 先读取 6 字节公共部分：magic(4) + version(1) + type(1)
+        let mut common_buf = [0u8; 6];
+        stream.read_exact(&mut common_buf).await?;
+
+        if &common_buf[0..4] != PROTOCOL_MAGIC {
+            return Err(TransferError::Network("无效的协议魔数".to_string()));
+        }
+
+        let version = common_buf[4];
+        let message_type = match common_buf[5] {
+            0x01 => MessageType::FileRequest,
+            0x02 => MessageType::FileResponse,
+            0x03 => MessageType::ChunkData,
+            0x04 => MessageType::ChunkAck,
+            0x05 => MessageType::Cancel,
+            0x06 => MessageType::Heartbeat,
+            0x07 => MessageType::Error,
+            0x08 => MessageType::Handshake,
+            0x09 => MessageType::HandshakeAck,
+            _ => return Err(TransferError::Network("未知的消息类型".to_string())),
+        };
+
+        let payload_length = if version >= 2 {
+            // v2: 4 字节 payload_length
+            let mut len_buf = [0u8; 4];
+            stream.read_exact(&mut len_buf).await?;
+            u32::from_be_bytes(len_buf)
+        } else {
+            // v1: 2 字节 payload_length
+            let mut len_buf = [0u8; 2];
+            stream.read_exact(&mut len_buf).await?;
+            u16::from_be_bytes(len_buf) as u32
+        };
+
+        Ok(Self {
+            message_type,
+            payload_length,
+        })
+    }
+
+    #[allow(dead_code)]
+    fn from_bytes(bytes: &[u8]) -> TransferResult<Self> {
+        if bytes.len() < 6 {
+            return Err(TransferError::Network("消息头数据不足".to_string()));
+        }
         if &bytes[0..4] != PROTOCOL_MAGIC {
             return Err(TransferError::Network("无效的协议魔数".to_string()));
         }
 
         let version = bytes[4];
-        if version != PROTOCOL_VERSION {
-            return Err(TransferError::Network(format!(
-                "不支持的协议版本: {}",
-                version
-            )));
-        }
-
         let message_type = match bytes[5] {
             0x01 => MessageType::FileRequest,
             0x02 => MessageType::FileResponse,
@@ -97,10 +140,22 @@ impl MessageHeader {
             0x05 => MessageType::Cancel,
             0x06 => MessageType::Heartbeat,
             0x07 => MessageType::Error,
+            0x08 => MessageType::Handshake,
+            0x09 => MessageType::HandshakeAck,
             _ => return Err(TransferError::Network("未知的消息类型".to_string())),
         };
 
-        let payload_length = u16::from_be_bytes([bytes[6], bytes[7]]) as u32;
+        let payload_length = if version >= 2 {
+            if bytes.len() < 10 {
+                return Err(TransferError::Network("v2 消息头数据不足".to_string()));
+            }
+            u32::from_be_bytes([bytes[6], bytes[7], bytes[8], bytes[9]])
+        } else {
+            if bytes.len() < 8 {
+                return Err(TransferError::Network("v1 消息头数据不足".to_string()));
+            }
+            u16::from_be_bytes([bytes[6], bytes[7]]) as u32
+        };
 
         Ok(Self {
             message_type,
@@ -198,6 +253,9 @@ impl LocalTransport {
     }
 
     /// 发送文件到指定地址
+    ///
+    /// 传输流程：连接 → 握手协商（v2） → 文件请求/响应 → 分块传输（可选加密+压缩） → 完成
+    /// 支持断点续传：传输中断时保存断点信息，恢复时跳过已传输的分块
     async fn send_file_to(
         &self,
         task: &TransferTask,
@@ -226,16 +284,78 @@ impl LocalTransport {
             .await
             .map_err(|e| TransferError::Network(format!("连接失败: {}", e)))?;
 
-        // 发送文件请求
+        // === 阶段 1：握手协商（v2 特性协商） ===
+        let encryption_enabled = crate::transfer::crypto::is_encryption_enabled();
+        let compression_config = crate::transfer::compression::get_compression_config();
+
+        // 创建密钥交换发起方（如果启用加密）
+        let key_exchange_initiator = if encryption_enabled {
+            Some(crate::transfer::crypto::KeyExchangeInitiator::new())
+        } else {
+            None
+        };
+
+        let handshake = HandshakePayload {
+            protocol_version: PROTOCOL_VERSION,
+            supports_encryption: encryption_enabled,
+            supports_compression: compression_config.enabled,
+            supports_resume: true,
+            public_key: key_exchange_initiator
+                .as_ref()
+                .map(|k| k.public_key_bytes()),
+        };
+
+        let handshake_json = serde_json::to_vec(&handshake)?;
+        let handshake_header =
+            MessageHeader::new(MessageType::Handshake, handshake_json.len() as u32);
+        stream.write_all(&handshake_header.to_bytes()).await?;
+        stream.write_all(&handshake_json).await?;
+
+        // 等待握手响应
+        let ack_header = MessageHeader::read_from_stream(&mut stream).await?;
+        if ack_header.message_type != MessageType::HandshakeAck {
+            return Err(TransferError::Network("未收到握手响应".to_string()));
+        }
+
+        let mut ack_buf = vec![0u8; ack_header.payload_length as usize];
+        stream.read_exact(&mut ack_buf).await?;
+        let handshake_ack: HandshakeAckPayload = serde_json::from_slice(&ack_buf)?;
+
+        // 协商最终特性
+        let negotiated = NegotiatedFeatures {
+            encryption: handshake.supports_encryption && handshake_ack.use_encryption,
+            compression: handshake.supports_compression && handshake_ack.use_compression,
+            resume: handshake_ack.use_resume,
+        };
+
+        // 完成密钥交换（如果双方都同意加密）
+        let mut crypto_session = if negotiated.encryption {
+            let initiator = key_exchange_initiator.ok_or_else(|| {
+                TransferError::KeyExchange("加密已协商但密钥交换发起方缺失".to_string())
+            })?;
+            let peer_public_key = handshake_ack.public_key.ok_or_else(|| {
+                TransferError::KeyExchange("对方未提供加密公钥".to_string())
+            })?;
+            Some(initiator.complete(&peer_public_key)?)
+        } else {
+            None
+        };
+
+        // 创建压缩器（如果双方都同意压缩）
+        let compressor = if negotiated.compression {
+            crate::transfer::compression::create_compressor_from_config()
+        } else {
+            None
+        };
+
+        // === 阶段 2：文件请求/响应 ===
         let metadata_json = serde_json::to_string(&task.file)?;
         let header = MessageHeader::new(MessageType::FileRequest, metadata_json.len() as u32);
         stream.write_all(&header.to_bytes()).await?;
         stream.write_all(metadata_json.as_bytes()).await?;
 
         // 等待响应
-        let mut response_header_buf = [0u8; 8];
-        stream.read_exact(&mut response_header_buf).await?;
-        let response_header = MessageHeader::from_bytes(&response_header_buf)?;
+        let response_header = MessageHeader::read_from_stream(&mut stream).await?;
 
         if response_header.message_type != MessageType::FileResponse {
             return Err(TransferError::Network("未收到正确的文件响应".to_string()));
@@ -252,7 +372,29 @@ impl LocalTransport {
             )));
         }
 
-        // 发送文件分块
+        // === 阶段 3：检查断点续传信息 ===
+        let resume_manager = crate::transfer::resume::ResumeManager::new(
+            crate::transfer::resume::default_resume_storage_dir(),
+        );
+        let _ = resume_manager.load().await;
+
+        let resume_from_chunk: u32 = if negotiated.resume {
+            if let Some(resume_info) = resume_manager.get_resume_info(&task.id).await {
+                if resume_info.file_name == task.file.name
+                    && resume_info.file_size == task.file.size
+                {
+                    resume_info.last_chunk_index + 1
+                } else {
+                    0
+                }
+            } else {
+                0
+            }
+        } else {
+            0
+        };
+
+        // === 阶段 4：分块传输 ===
         let chunks = self.chunker.compute_chunks(file_path)?;
         let mut task_state = TransferTaskState {
             progress: TransferProgress::from(task),
@@ -261,11 +403,39 @@ impl LocalTransport {
         task_state.progress.status = crate::models::TaskStatus::Transferring;
 
         let start_time = std::time::Instant::now();
-        let mut total_transferred: u64 = 0;
+        // 断点续传时，已传输的字节数从断点处开始计算
+        let mut total_transferred: u64 = chunks
+            .iter()
+            .filter(|c| c.index < resume_from_chunk)
+            .map(|c| c.size)
+            .sum();
+        let mut last_successful_chunk_index: u32 = if resume_from_chunk > 0 {
+            resume_from_chunk - 1
+        } else {
+            0
+        };
+
+        let mime_type = &task.file.mime_type;
 
         for chunk in &chunks {
+            // 跳过已传输的分块（断点续传）
+            if chunk.index < resume_from_chunk {
+                continue;
+            }
+
             // 检查取消信号
             if cancel_rx.try_recv().is_ok() {
+                // 保存断点信息
+                self.save_resume_info_on_interrupt(
+                    &resume_manager,
+                    task,
+                    last_successful_chunk_index,
+                    total_transferred,
+                    &addr,
+                    "send",
+                )
+                .await;
+
                 task_state.progress.status = crate::models::TaskStatus::Cancelled;
                 self.active_tasks
                     .write()
@@ -275,31 +445,114 @@ impl LocalTransport {
             }
 
             // 读取分块数据
-            let data = self.chunker.read_chunk(file_path, chunk)?;
+            let raw_data = self.chunker.read_chunk(file_path, chunk)?;
+
+            // 可选压缩
+            let (chunk_data, is_compressed) =
+                if let Some(ref comp) = compressor {
+                    if let Some(level) = comp.get_level(mime_type) {
+                        let compressed = crate::transfer::compression::Compressor::compress(
+                            &raw_data, level,
+                        )?;
+                        // 仅当压缩后更小时才使用压缩数据
+                        if compressed.len() < raw_data.len() {
+                            (compressed, true)
+                        } else {
+                            (raw_data, false)
+                        }
+                    } else {
+                        (raw_data, false)
+                    }
+                } else {
+                    (raw_data, false)
+                };
+
+            // 可选加密
+            let final_data = if let Some(ref mut session) = crypto_session {
+                session.encrypt(&chunk_data)?
+            } else {
+                chunk_data
+            };
 
             // 发送分块
             let chunk_message = ChunkMessage {
                 index: chunk.index,
-                data: data.clone(),
+                data: final_data,
+                compressed: is_compressed,
             };
             let chunk_json = serde_json::to_vec(&chunk_message)?;
             let header = MessageHeader::new(MessageType::ChunkData, chunk_json.len() as u32);
-            stream.write_all(&header.to_bytes()).await?;
-            stream.write_all(&chunk_json).await?;
+
+            let send_result = async {
+                stream.write_all(&header.to_bytes()).await?;
+                stream.write_all(&chunk_json).await?;
+                Ok::<(), std::io::Error>(())
+            }
+            .await;
+
+            if let Err(send_err) = send_result {
+                // 网络错误，保存断点信息
+                self.save_resume_info_on_interrupt(
+                    &resume_manager,
+                    task,
+                    last_successful_chunk_index,
+                    total_transferred,
+                    &addr,
+                    "send",
+                )
+                .await;
+
+                task_state.progress.status = crate::models::TaskStatus::Interrupted;
+                self.active_tasks
+                    .write()
+                    .await
+                    .insert(task.id.clone(), task_state);
+                return Err(TransferError::Network(format!("发送数据失败: {}", send_err)));
+            }
 
             // 等待确认
-            let mut ack_header_buf = [0u8; 8];
-            tokio::select! {
-                result = stream.read_exact(&mut ack_header_buf) => {
-                    result?;
+            let ack_result = tokio::select! {
+                result = MessageHeader::read_from_stream(&mut stream) => {
+                    result
                 }
                 _ = cancel_rx.recv() => {
+                    // 取消时保存断点信息
+                    self.save_resume_info_on_interrupt(
+                        &resume_manager,
+                        task,
+                        last_successful_chunk_index,
+                        total_transferred,
+                        &addr,
+                        "send",
+                    ).await;
+
                     task_state.progress.status = crate::models::TaskStatus::Cancelled;
                     self.active_tasks.write().await.insert(task.id.clone(), task_state);
                     return Err(TransferError::Cancelled);
                 }
+            };
+
+            if let Err(ack_err) = ack_result {
+                // 等待确认时网络错误，保存断点信息
+                self.save_resume_info_on_interrupt(
+                    &resume_manager,
+                    task,
+                    last_successful_chunk_index,
+                    total_transferred,
+                    &addr,
+                    "send",
+                )
+                .await;
+
+                task_state.progress.status = crate::models::TaskStatus::Interrupted;
+                self.active_tasks
+                    .write()
+                    .await
+                    .insert(task.id.clone(), task_state);
+                return Err(ack_err);
             }
 
+            last_successful_chunk_index = chunk.index;
             total_transferred += chunk.size;
             let elapsed = start_time.elapsed().as_secs_f64();
             let speed = if elapsed > 0.0 {
@@ -320,7 +573,9 @@ impl LocalTransport {
                 .insert(task.id.clone(), task_state.clone());
         }
 
-        // 传输完成
+        // 传输完成，清理断点信息
+        let _ = resume_manager.remove_resume_info(&task.id).await;
+
         task_state.progress.status = crate::models::TaskStatus::Completed;
         task_state.progress.progress = 100.0;
         self.active_tasks
@@ -331,78 +586,200 @@ impl LocalTransport {
         Ok(task_state.progress)
     }
 
+    /// 传输中断时保存断点信息
+    async fn save_resume_info_on_interrupt(
+        &self,
+        resume_manager: &crate::transfer::resume::ResumeManager,
+        task: &TransferTask,
+        last_chunk_index: u32,
+        transferred_bytes: u64,
+        addr: &SocketAddr,
+        direction: &str,
+    ) {
+        let resume_info = crate::transfer::resume::ResumeInfo::new(
+            task.id.clone(),
+            task.file.name.clone(),
+            task.file.size,
+            task.file.hash.clone(),
+            transferred_bytes,
+            last_chunk_index,
+            addr.ip().to_string(),
+            addr.port(),
+            direction.to_string(),
+        );
+        let _ = resume_manager.save_resume_info(resume_info).await;
+    }
+
     /// 处理接收连接
+    ///
+    /// 接收流程：握手协商（v2） → 文件请求/响应 → 分块接收（可选解密+解压） → 完成
     #[allow(dead_code)]
     async fn handle_connection(&self, mut stream: TcpStream) -> TransferResult<()> {
-        // 读取消息头
-        let mut header_buf = [0u8; 8];
-        stream.read_exact(&mut header_buf).await?;
-        let header = MessageHeader::from_bytes(&header_buf)?;
+        // 读取第一条消息头
+        let header = MessageHeader::read_from_stream(&mut stream).await?;
 
-        match header.message_type {
-            MessageType::FileRequest => {
-                // 读取文件元数据
-                let mut metadata_buf = vec![0u8; header.payload_length as usize];
-                stream.read_exact(&mut metadata_buf).await?;
-                let metadata: FileMetadata = serde_json::from_slice(&metadata_buf)?;
+        // === 阶段 1：握手协商（v2） ===
+        let (crypto_session, negotiated) = if header.message_type == MessageType::Handshake {
+            // 读取握手载荷
+            let mut handshake_buf = vec![0u8; header.payload_length as usize];
+            stream.read_exact(&mut handshake_buf).await?;
+            let handshake: HandshakePayload = serde_json::from_slice(&handshake_buf)?;
 
-                // 获取接收配置
-                let config = self.get_receive_config().await;
-                let auto_receive = config.as_ref().map(|c| c.auto_receive).unwrap_or(false);
-                let file_overwrite = config.as_ref().map(|c| c.file_overwrite).unwrap_or(false);
-                let receive_directory = config
+            // 接收方根据自身配置和对方能力决定是否启用特性
+            let local_encryption_enabled = crate::transfer::crypto::is_encryption_enabled();
+            let local_compression_config = crate::transfer::compression::get_compression_config();
+
+            let use_encryption = handshake.supports_encryption && local_encryption_enabled;
+            let use_compression = handshake.supports_compression && local_compression_config.enabled;
+            let use_resume = handshake.supports_resume;
+
+            // 创建密钥交换响应方（如果双方都同意加密）
+            let key_exchange_responder = if use_encryption {
+                Some(crate::transfer::crypto::KeyExchangeResponder::new())
+            } else {
+                None
+            };
+
+            // 发送握手响应
+            let ack = HandshakeAckPayload {
+                protocol_version: PROTOCOL_VERSION,
+                use_encryption,
+                use_compression,
+                use_resume,
+                public_key: key_exchange_responder
                     .as_ref()
-                    .map(|c| c.receive_directory.clone())
-                    .unwrap_or_else(std::env::temp_dir);
+                    .map(|r| r.public_key_bytes()),
+            };
 
-                // 根据 auto_receive 设置决定是否自动接受
-                let (accepted, reason) = if auto_receive {
-                    (true, None)
-                } else {
-                    // 非自动接收模式下，拒绝请求，发送方需要等待接收方手动确认
-                    // 注意：实际的文件接收确认流程需要通过事件通知前端，
-                    // 前端用户确认后再建立新的连接。这里直接拒绝当前请求。
-                    (false, Some("需要接收方确认".to_string()))
-                };
+            let ack_json = serde_json::to_vec(&ack)?;
+            let ack_header =
+                MessageHeader::new(MessageType::HandshakeAck, ack_json.len() as u32);
+            stream.write_all(&ack_header.to_bytes()).await?;
+            stream.write_all(&ack_json).await?;
 
-                // 发送响应
-                let response = FileResponse {
-                    accepted,
-                    reason: reason.clone(),
-                };
-                let response_json = serde_json::to_vec(&response)?;
-                let response_header =
-                    MessageHeader::new(MessageType::FileResponse, response_json.len() as u32);
-                stream.write_all(&response_header.to_bytes()).await?;
-                stream.write_all(&response_json).await?;
+            // 完成密钥交换
+            let session = if use_encryption {
+                let responder = key_exchange_responder.ok_or_else(|| {
+                    TransferError::KeyExchange("加密已协商但密钥交换响应方缺失".to_string())
+                })?;
+                let peer_public_key = handshake.public_key.ok_or_else(|| {
+                    TransferError::KeyExchange("对方未提供加密公钥".to_string())
+                })?;
+                Some(responder.complete(&peer_public_key)?)
+            } else {
+                None
+            };
 
-                if accepted {
-                    // 接收文件分块（使用配置）
-                    self.receive_file_chunks_with_config(
-                        &mut stream,
-                        &metadata,
-                        &receive_directory,
-                        file_overwrite,
-                    )
-                    .await?;
-                }
+            let features = NegotiatedFeatures {
+                encryption: use_encryption,
+                compression: use_compression,
+                resume: use_resume,
+            };
+
+            // 读取下一条消息（应该是 FileRequest）
+            let next_header = MessageHeader::read_from_stream(&mut stream).await?;
+            if next_header.message_type != MessageType::FileRequest {
+                return Err(TransferError::Network(
+                    "握手后期望收到文件请求".to_string(),
+                ));
             }
-            _ => {
-                return Err(TransferError::Network("未预期的消息类型".to_string()));
-            }
+
+            // 读取文件元数据
+            let mut metadata_buf = vec![0u8; next_header.payload_length as usize];
+            stream.read_exact(&mut metadata_buf).await?;
+            let metadata: FileMetadata = serde_json::from_slice(&metadata_buf)?;
+
+            self.handle_file_request_with_features(
+                &mut stream,
+                metadata,
+                session,
+                features,
+            )
+            .await?;
+
+            return Ok(());
+        } else if header.message_type == MessageType::FileRequest {
+            // v1 兼容：没有握手，直接处理文件请求
+            (None, NegotiatedFeatures::default())
+        } else {
+            return Err(TransferError::Network("未预期的消息类型".to_string()));
+        };
+
+        // v1 兼容路径：直接处理文件请求（无加密/压缩）
+        let mut metadata_buf = vec![0u8; header.payload_length as usize];
+        stream.read_exact(&mut metadata_buf).await?;
+        let metadata: FileMetadata = serde_json::from_slice(&metadata_buf)?;
+
+        self.handle_file_request_with_features(
+            &mut stream,
+            metadata,
+            crypto_session,
+            negotiated,
+        )
+        .await
+    }
+
+    /// 处理文件请求（带特性协商结果）
+    #[allow(dead_code)]
+    async fn handle_file_request_with_features(
+        &self,
+        stream: &mut TcpStream,
+        metadata: FileMetadata,
+        crypto_session: Option<crate::transfer::crypto::CryptoSession>,
+        negotiated: NegotiatedFeatures,
+    ) -> TransferResult<()> {
+        // 获取接收配置
+        let config = self.get_receive_config().await;
+        let auto_receive = config.as_ref().map(|c| c.auto_receive).unwrap_or(false);
+        let file_overwrite = config.as_ref().map(|c| c.file_overwrite).unwrap_or(false);
+        let receive_directory = config
+            .as_ref()
+            .map(|c| c.receive_directory.clone())
+            .unwrap_or_else(std::env::temp_dir);
+
+        // 根据 auto_receive 设置决定是否自动接受
+        let (accepted, reason) = if auto_receive {
+            (true, None)
+        } else {
+            (false, Some("需要接收方确认".to_string()))
+        };
+
+        // 发送响应
+        let response = FileResponse {
+            accepted,
+            reason: reason.clone(),
+        };
+        let response_json = serde_json::to_vec(&response)?;
+        let response_header =
+            MessageHeader::new(MessageType::FileResponse, response_json.len() as u32);
+        stream.write_all(&response_header.to_bytes()).await?;
+        stream.write_all(&response_json).await?;
+
+        if accepted {
+            self.receive_file_chunks_with_features(
+                stream,
+                &metadata,
+                &receive_directory,
+                file_overwrite,
+                crypto_session,
+                &negotiated,
+            )
+            .await?;
         }
 
         Ok(())
     }
 
-    /// 接收文件分块（使用指定配置）
+    /// 接收文件分块（带加密/压缩/断点续传支持）
     #[allow(dead_code)]
-    async fn receive_file_chunks_with_config(
+    async fn receive_file_chunks_with_features(
         &self,
         stream: &mut TcpStream,
         metadata: &FileMetadata,
         receive_directory: &PathBuf,
         file_overwrite: bool,
+        crypto_session: Option<crate::transfer::crypto::CryptoSession>,
+        negotiated: &NegotiatedFeatures,
     ) -> TransferResult<()> {
         // 确保接收目录存在
         if !receive_directory.exists() {
@@ -414,15 +791,48 @@ impl LocalTransport {
         let save_path = if file_overwrite {
             receive_directory.join(&metadata.name)
         } else {
-            // 生成唯一文件名避免覆盖
             self.get_unique_file_path(receive_directory, &metadata.name)?
         };
 
+        let peer_addr = stream
+            .peer_addr()
+            .map(|a| a.to_string())
+            .unwrap_or_default();
+
+        // 断点续传管理器
+        let resume_manager = crate::transfer::resume::ResumeManager::new(
+            crate::transfer::resume::default_resume_storage_dir(),
+        );
+        let _ = resume_manager.load().await;
+
+        let mut last_successful_chunk_index: u32 = 0;
+        let mut total_received: u64 = 0;
+
         for _ in 0..metadata.chunks.len() {
             // 读取分块消息头
-            let mut header_buf = [0u8; 8];
-            stream.read_exact(&mut header_buf).await?;
-            let header = MessageHeader::from_bytes(&header_buf)?;
+            let header_result = MessageHeader::read_from_stream(stream).await;
+            let header = match header_result {
+                Ok(h) => h,
+                Err(err) => {
+                    // 网络中断，保存断点信息
+                    if negotiated.resume {
+                        let mut resume_info = crate::transfer::resume::ResumeInfo::new(
+                            format!("recv-{}", metadata.hash),
+                            metadata.name.clone(),
+                            metadata.size,
+                            metadata.hash.clone(),
+                            total_received,
+                            last_successful_chunk_index,
+                            peer_addr.clone(),
+                            0,
+                            "receive".to_string(),
+                        );
+                        resume_info.save_path = Some(save_path.to_string_lossy().to_string());
+                        let _ = resume_manager.save_resume_info(resume_info).await;
+                    }
+                    return Err(err);
+                }
+            };
 
             if header.message_type != MessageType::ChunkData {
                 return Err(TransferError::Network("期望分块数据".to_string()));
@@ -433,10 +843,27 @@ impl LocalTransport {
             stream.read_exact(&mut chunk_buf).await?;
             let chunk_message: ChunkMessage = serde_json::from_slice(&chunk_buf)?;
 
+            // 可选解密
+            let decrypted_data = if let Some(ref session) = crypto_session {
+                session.decrypt(&chunk_message.data)?
+            } else {
+                chunk_message.data
+            };
+
+            // 可选解压
+            let final_data = if chunk_message.compressed {
+                crate::transfer::compression::Compressor::decompress(&decrypted_data)?
+            } else {
+                decrypted_data
+            };
+
             // 写入文件
             let chunk_info = &metadata.chunks[chunk_message.index as usize];
             self.chunker
-                .write_chunk(&save_path, chunk_info, &chunk_message.data)?;
+                .write_chunk(&save_path, chunk_info, &final_data)?;
+
+            last_successful_chunk_index = chunk_message.index;
+            total_received += chunk_info.size;
 
             // 发送确认
             let ack = ChunkAck {
@@ -456,7 +883,32 @@ impl LocalTransport {
             ));
         }
 
+        // 传输完成，清理断点信息
+        let _ = resume_manager
+            .remove_resume_info(&format!("recv-{}", metadata.hash))
+            .await;
+
         Ok(())
+    }
+
+    /// 接收文件分块（使用指定配置，v1 兼容方法）
+    #[allow(dead_code)]
+    async fn receive_file_chunks_with_config(
+        &self,
+        stream: &mut TcpStream,
+        metadata: &FileMetadata,
+        receive_directory: &PathBuf,
+        file_overwrite: bool,
+    ) -> TransferResult<()> {
+        self.receive_file_chunks_with_features(
+            stream,
+            metadata,
+            receive_directory,
+            file_overwrite,
+            None,
+            &NegotiatedFeatures::default(),
+        )
+        .await
     }
 
     /// 生成不冲突的文件路径
@@ -535,6 +987,54 @@ impl LocalTransport {
 
 /// 文件传输请求响应
 
+/// 握手请求载荷
+///
+/// 在传输开始前交换双方支持的特性标志
+#[allow(dead_code)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HandshakePayload {
+    /// 协议版本
+    protocol_version: u8,
+    /// 是否支持加密
+    supports_encryption: bool,
+    /// 是否支持压缩
+    supports_compression: bool,
+    /// 是否支持断点续传
+    supports_resume: bool,
+    /// 加密公钥（X25519，仅在支持加密时有值）
+    public_key: Option<Vec<u8>>,
+}
+
+/// 握手响应载荷
+#[allow(dead_code)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HandshakeAckPayload {
+    /// 协议版本
+    protocol_version: u8,
+    /// 是否同意使用加密
+    use_encryption: bool,
+    /// 是否同意使用压缩
+    use_compression: bool,
+    /// 是否同意使用断点续传
+    use_resume: bool,
+    /// 加密公钥（X25519，仅在同意加密时有值）
+    public_key: Option<Vec<u8>>,
+}
+
+/// 协商后的传输特性
+#[allow(dead_code)]
+#[derive(Debug, Clone, Default)]
+struct NegotiatedFeatures {
+    /// 是否使用加密
+    encryption: bool,
+    /// 是否使用压缩
+    compression: bool,
+    /// 是否使用断点续传
+    resume: bool,
+}
+
 /// 文件传输请求响应
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 struct FileResponse {
@@ -551,6 +1051,9 @@ struct ChunkMessage {
     index: u32,
     /// 分块数据
     data: Vec<u8>,
+    /// 数据是否经过压缩
+    #[serde(default)]
+    compressed: bool,
 }
 
 /// 分块确认
@@ -654,6 +1157,7 @@ mod tests {
     fn test_message_header() {
         let header = MessageHeader::new(MessageType::FileRequest, 100);
         let bytes = header.to_bytes();
+        assert_eq!(bytes.len(), 10);
         let parsed = MessageHeader::from_bytes(&bytes).unwrap();
         assert_eq!(parsed.message_type, MessageType::FileRequest);
         assert_eq!(parsed.payload_length, 100);
@@ -661,7 +1165,7 @@ mod tests {
 
     #[test]
     fn test_invalid_magic() {
-        let mut bytes = [0u8; 8];
+        let mut bytes = [0u8; 10];
         bytes[0..4].copy_from_slice(b"XXXX");
         let result = MessageHeader::from_bytes(&bytes);
         assert!(result.is_err());

@@ -32,7 +32,7 @@ export interface FontSizeSettings {
 }
 
 /** 设置存储版本，用于迁移兼容 */
-export const SETTINGS_VERSION = 7
+export const SETTINGS_VERSION = 8
 
 /** 清理策略 */
 export type CleanupStrategy = 'byTime' | 'byCount' | 'disabled'
@@ -118,6 +118,10 @@ export interface SettingsState extends AppSettings {
     receiveSettings?: ReceiveSettings
     /** 开发者设置 */
     developerSettings?: DeveloperSettings
+    /** 传输加密设置 */
+    encryptionSettings?: EncryptionSettings
+    /** 动态压缩设置 */
+    compressionSettings?: CompressionSettings
 }
 
 /** 默认隐私设置 */
@@ -194,6 +198,37 @@ export const DEFAULT_RECEIVE_SETTINGS: ReceiveSettings = {
     fileOverwrite: false,
     requestExpireTime: 300,
     maxPendingRequests: 50,
+}
+
+/** 压缩模式 */
+export type CompressionMode = 'smart' | 'manual'
+
+/** 传输加密设置 */
+export interface EncryptionSettings {
+    /** 是否启用传输加密 */
+    enabled: boolean
+}
+
+/** 动态压缩设置 */
+export interface CompressionSettings {
+    /** 是否启用动态压缩 */
+    enabled: boolean
+    /** 压缩模式（仅在 enabled=true 时有效） */
+    mode: CompressionMode
+    /** 手动压缩级别（仅在 mode='manual' 时有效，范围 1-19） */
+    level: number
+}
+
+/** 默认传输加密设置 */
+export const DEFAULT_ENCRYPTION_SETTINGS: EncryptionSettings = {
+    enabled: true,
+}
+
+/** 默认动态压缩设置 */
+export const DEFAULT_COMPRESSION_SETTINGS: CompressionSettings = {
+    enabled: true,
+    mode: 'smart',
+    level: 3,
 }
 
 /** 本地存储键名 */

@@ -847,3 +847,96 @@ pub async fn get_unique_file_path(
     let result_path = get_receive_file_path(&dir_path, &filename, file_overwrite)?;
     Ok(result_path.to_string_lossy().to_string())
 }
+
+// ============ 加密设置相关命令 ============
+
+/// 获取加密是否启用
+#[tauri::command]
+pub async fn get_encryption_enabled() -> Result<bool, String> {
+    Ok(crate::transfer::crypto::is_encryption_enabled())
+}
+
+/// 设置加密启用状态
+#[tauri::command]
+pub async fn set_encryption_enabled(enabled: bool) -> Result<(), String> {
+    crate::transfer::crypto::set_encryption_enabled_internal(enabled);
+    Ok(())
+}
+
+// ============ 压缩设置相关命令 ============
+
+/// 获取压缩是否启用
+#[tauri::command]
+pub async fn get_compression_enabled() -> Result<bool, String> {
+    let config = crate::transfer::compression::get_compression_config();
+    Ok(config.enabled)
+}
+
+/// 设置压缩启用状态
+#[tauri::command]
+pub async fn set_compression_enabled(enabled: bool) -> Result<(), String> {
+    crate::transfer::compression::set_compression_enabled_internal(enabled);
+    Ok(())
+}
+
+/// 设置压缩模式
+#[tauri::command]
+pub async fn set_compression_mode(mode: String) -> Result<(), String> {
+    if mode != "smart" && mode != "manual" {
+        return Err(format!("无效的压缩模式: {}，支持 smart 或 manual", mode));
+    }
+    crate::transfer::compression::set_compression_mode_internal(mode);
+    Ok(())
+}
+
+/// 设置压缩级别
+#[tauri::command]
+pub async fn set_compression_level(level: i32) -> Result<(), String> {
+    if !(1..=19).contains(&level) {
+        return Err(format!("无效的压缩级别: {}，范围为 1-19", level));
+    }
+    crate::transfer::compression::set_compression_level_internal(level);
+    Ok(())
+}
+
+// ============ 断点续传相关命令 ============
+
+/// 获取可恢复的任务列表
+#[tauri::command]
+pub async fn get_resumable_tasks() -> Result<Vec<crate::transfer::resume::ResumableTaskInfo>, String> {
+    let storage_dir = crate::transfer::resume::default_resume_storage_dir();
+    let manager = crate::transfer::resume::ResumeManager::new(storage_dir);
+    manager.load().await.map_err(|e| e.to_string())?;
+    Ok(manager.get_resumable_tasks().await)
+}
+
+/// 恢复传输（当前仅清除断点信息，实际续传逻辑在传输管道中处理）
+#[tauri::command]
+pub async fn resume_transfer(task_id: String) -> Result<(), String> {
+    let storage_dir = crate::transfer::resume::default_resume_storage_dir();
+    let manager = crate::transfer::resume::ResumeManager::new(storage_dir);
+    manager.load().await.map_err(|e| e.to_string())?;
+
+    let resume_info = manager.get_resume_info(&task_id).await;
+    if resume_info.is_none() {
+        return Err(format!("未找到任务 {} 的断点信息，可能已过期", task_id));
+    }
+
+    Ok(())
+}
+
+/// 清理断点信息
+#[tauri::command]
+pub async fn cleanup_resume_info(task_id: Option<String>) -> Result<(), String> {
+    let storage_dir = crate::transfer::resume::default_resume_storage_dir();
+    let manager = crate::transfer::resume::ResumeManager::new(storage_dir);
+    manager.load().await.map_err(|e| e.to_string())?;
+
+    if let Some(id) = task_id {
+        manager.remove_resume_info(&id).await.map_err(|e| e.to_string())?;
+    } else {
+        manager.cleanup_all().await.map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
