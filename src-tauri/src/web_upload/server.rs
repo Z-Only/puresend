@@ -76,8 +76,8 @@ pub struct WebUploadServer {
 }
 
 impl WebUploadServer {
-    pub fn new(upload_state: Arc<Mutex<WebUploadState>>, app_handle: AppHandle) -> Self {
-        let addr = SocketAddr::from(([0, 0, 0, 0], 0));
+    pub fn new(upload_state: Arc<Mutex<WebUploadState>>, app_handle: AppHandle, port: u16) -> Self {
+        let addr = SocketAddr::from(([0, 0, 0, 0], port));
 
         Self {
             addr,
@@ -95,6 +95,8 @@ impl WebUploadServer {
         let app = Router::new()
             .route("/", get(index_handler))
             .route("/favicon.ico", get(favicon_handler))
+            .route("/apple-touch-icon.png", get(favicon_handler))
+            .route("/apple-touch-icon-precomposed.png", get(favicon_handler))
             .route("/request-status", get(request_status_handler))
             .route("/capabilities", get(capabilities_handler))
             .route("/crypto/handshake", post(crypto_handshake_handler))
@@ -284,6 +286,46 @@ async fn upload_init_handler(
             message: Some(format!("创建临时目录失败: {}", e)),
         });
     }
+
+    let record_id = upload_id.clone();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    let record = WebUploadRecord {
+        id: record_id.clone(),
+        file_name: payload.file_name.clone(),
+        uploaded_bytes: 0,
+        total_bytes: payload.file_size,
+        progress: 0.0,
+        speed: 0,
+        status: "transferring".to_string(),
+        started_at: now,
+        completed_at: None,
+    };
+
+    {
+        let mut upload_state = state.upload_state.lock().await;
+        if let Some(req) = upload_state
+            .requests
+            .values_mut()
+            .find(|r| r.client_ip == client_ip)
+        {
+            req.upload_records.push(record);
+        }
+    }
+
+    let _ = state.app_handle.emit(
+        "web-upload-file-start",
+        FileStartEvent {
+            request_id: request_id.clone(),
+            record_id,
+            file_name: payload.file_name.clone(),
+            total_bytes: payload.file_size,
+            client_ip: client_ip.clone(),
+        },
+    );
 
     let session = ChunkedUploadSession {
         id: upload_id.clone(),
@@ -494,7 +536,7 @@ async fn upload_chunk_handler(
         // Cleanup temp directory
         let _ = tokio::fs::remove_dir_all(&temp_dir).await;
 
-        // Update upload record
+        // Update existing upload record (created at init time)
         {
             let mut upload_state = state.upload_state.lock().await;
             if let Some(req) = upload_state
@@ -502,26 +544,19 @@ async fn upload_chunk_handler(
                 .values_mut()
                 .find(|r| r.id == request_id)
             {
-                let record = WebUploadRecord {
-                    id: record_id.clone(),
-                    file_name: file_name.clone(),
-                    uploaded_bytes: file_size,
-                    total_bytes: file_size,
-                    progress: 100.0,
-                    speed: 0,
-                    status: "completed".to_string(),
-                    started_at: std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_secs(),
-                    completed_at: Some(
+                if let Some(record) = req.upload_records.iter_mut().find(|r| r.id == record_id) {
+                    record.uploaded_bytes = file_size;
+                    record.total_bytes = file_size;
+                    record.progress = 100.0;
+                    record.speed = 0;
+                    record.status = "completed".to_string();
+                    record.completed_at = Some(
                         std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
                             .unwrap_or_default()
                             .as_secs(),
-                    ),
-                };
-                req.upload_records.push(record);
+                    );
+                }
             }
         }
 
@@ -1140,6 +1175,12 @@ fn generate_upload_page(is_english: bool) -> String {
         .drop-zone-text {{ color: #666; font-size: 14px; }}
         .drop-zone-btn {{ display: inline-block; margin-top: 12px; padding: 8px 24px; background: #1976d2; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }}
         .drop-zone-btn:hover {{ background: #1565c0; }}
+        @media (pointer: coarse) {{
+            .drop-zone {{ border: none; padding: 24px 20px; }}
+            .drop-zone-icon {{ font-size: 40px; margin-bottom: 8px; }}
+            .drop-zone-text {{ display: none; }}
+            .drop-zone-btn {{ padding: 12px 32px; font-size: 16px; border-radius: 10px; }}
+        }}
         .file-list {{ margin-top: 16px; max-height: 200px; overflow-y: auto; }}
         .file-item {{ display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #f9f9f9; border-radius: 8px; margin-bottom: 8px; font-size: 13px; }}
         .file-item .name {{ flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
@@ -1329,12 +1370,14 @@ fn generate_upload_page(is_english: bool) -> String {
             updateUI();
         }}
 
-        dropZone.addEventListener("dragover", e => {{ e.preventDefault(); dropZone.classList.add("dragover"); }});
-        dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
-        dropZone.addEventListener("drop", e => {{ e.preventDefault(); dropZone.classList.remove("dragover"); addFiles(e.dataTransfer.files); }});
+        if (!("ontouchstart" in window || navigator.maxTouchPoints > 0)) {{
+            dropZone.addEventListener("dragover", e => {{ e.preventDefault(); dropZone.classList.add("dragover"); }});
+            dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+            dropZone.addEventListener("drop", e => {{ e.preventDefault(); dropZone.classList.remove("dragover"); addFiles(e.dataTransfer.files); }});
+        }}
         fileInput.addEventListener("change", () => {{ addFiles(fileInput.files); fileInput.value = ""; }});
 
-        async function uploadChunked(file) {{
+        async function uploadChunked(file, baseBytes, totalBytes) {{
             const chunkSize = (caps && caps.chunk_size) || 1048576;
             const initResp = await fetch("/upload/init", {{
                 method: "POST",
@@ -1372,9 +1415,10 @@ fn generate_upload_page(is_english: bool) -> String {
                 const result = await resp.json();
                 if (!result.success) throw new Error(result.message);
 
-                const pct = Math.round((i + 1) / totalChunks * 100);
+                const overallDone = baseBytes + end;
+                const pct = totalBytes > 0 ? Math.min(100, Math.round(overallDone / totalBytes * 100)) : 0;
                 progressFill.style.width = pct + "%";
-                progressText.textContent = pct + "% (" + formatSize(end) + " / " + formatSize(file.size) + ")";
+                progressText.textContent = pct + "% (" + formatSize(overallDone) + " / " + formatSize(totalBytes) + ")";
 
                 if (result.complete) {{
                     sessionStorage.removeItem("puresend_upload_id_" + file.name);
@@ -1384,11 +1428,26 @@ fn generate_upload_page(is_english: bool) -> String {
             return null;
         }}
 
-        async function uploadLegacy() {{
-            const formData = new FormData();
-            selectedFiles.forEach(file => formData.append("files", file));
-            const response = await fetch("/upload", {{ method: "POST", body: formData }});
-            return await response.json();
+        function uploadLegacy(totalBytes) {{
+            return new Promise((resolve, reject) => {{
+                const formData = new FormData();
+                selectedFiles.forEach(file => formData.append("files", file));
+                const xhr = new XMLHttpRequest();
+                xhr.open("POST", "/upload");
+                xhr.upload.onprogress = (e) => {{
+                    if (e.lengthComputable) {{
+                        const pct = Math.min(100, Math.round(e.loaded / e.total * 100));
+                        progressFill.style.width = pct + "%";
+                        progressText.textContent = pct + "% (" + formatSize(e.loaded) + " / " + formatSize(e.total) + ")";
+                    }}
+                }};
+                xhr.onload = () => {{
+                    try {{ resolve(JSON.parse(xhr.responseText)); }}
+                    catch(e) {{ reject(new Error("Invalid response")); }}
+                }};
+                xhr.onerror = () => reject(new Error("Network error"));
+                xhr.send(formData);
+            }});
         }}
 
         uploadBtn.addEventListener("click", async () => {{
@@ -1401,18 +1460,23 @@ fn generate_upload_page(is_english: bool) -> String {
             progressText.classList.remove("hidden");
             progressFill.style.width = "0%";
 
+            const totalBytes = selectedFiles.reduce((sum, f) => sum + f.size, 0);
+
             try {{
                 if (caps && (caps.encryption || caps.compression)) {{
+                    let baseBytes = 0;
                     for (const file of selectedFiles) {{
-                        await uploadChunked(file);
+                        await uploadChunked(file, baseBytes, totalBytes);
+                        baseBytes += file.size;
                     }}
                     statusEl.className = "status success";
                     statusEl.textContent = "{success_msg}";
+                    progressFill.style.width = "100%";
                     progressFill.style.background = "#4caf50";
                     selectedFiles = [];
                     updateUI();
                 }} else {{
-                    const result = await uploadLegacy();
+                    const result = await uploadLegacy(totalBytes);
                     if (result.success) {{
                         statusEl.className = "status success";
                         statusEl.textContent = "{success_msg}";

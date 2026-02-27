@@ -39,6 +39,7 @@ pub async fn start_share(
     state: State<'_, ShareManagerState>,
     files: Vec<FileMetadata>,
     settings: ShareSettings,
+    preferred_port: Option<u16>,
 ) -> Result<ShareLinkInfo, String> {
     // 验证文件存在性并收集路径
     let mut file_paths: Vec<(FileMetadata, PathBuf)> = Vec::new();
@@ -60,10 +61,18 @@ pub async fn start_share(
 
     // 允许空文件列表启动分享服务（Web 下载模式下可以先启动服务，后续再添加文件）
 
-    // 创建并启动服务器
-    let mut server = ShareServer::new(state.share_state.clone(), app, 0); // 自动分配端口
+    // 创建并启动服务器（优先使用首选端口，失败则自动分配）
+    let port = preferred_port.unwrap_or(0);
+    let mut server = ShareServer::new(state.share_state.clone(), app.clone(), port);
 
-    let actual_port = server.start(file_paths).await?;
+    let actual_port = match server.start(file_paths.clone()).await {
+        Ok(p) => p,
+        Err(_) if port != 0 => {
+            server = ShareServer::new(state.share_state.clone(), app, 0);
+            server.start(file_paths).await?
+        }
+        Err(e) => return Err(e),
+    };
 
     // 获取本机 IP 地址
     let local_ips = crate::network::get_local_ips();

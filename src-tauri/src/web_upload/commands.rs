@@ -50,6 +50,7 @@ pub async fn start_web_upload(
     receive_directory: String,
     auto_receive: bool,
     file_overwrite: bool,
+    preferred_port: Option<u16>,
 ) -> Result<WebUploadInfo, String> {
     // 如果已经启动，先停止
     {
@@ -68,9 +69,17 @@ pub async fn start_web_upload(
         upload_state.requests.clear();
     }
 
-    // 创建并启动服务器
-    let mut server = WebUploadServer::new(state.upload_state.clone(), app);
-    let actual_port = server.start().await?;
+    // 创建并启动服务器（优先使用首选端口，失败则自动分配）
+    let port = preferred_port.unwrap_or(0);
+    let mut server = WebUploadServer::new(state.upload_state.clone(), app.clone(), port);
+    let actual_port = match server.start().await {
+        Ok(p) => p,
+        Err(_) if port != 0 => {
+            server = WebUploadServer::new(state.upload_state.clone(), app, 0);
+            server.start().await?
+        }
+        Err(e) => return Err(e),
+    };
 
     // 获取本机 IP 地址
     let local_ips = crate::network::get_local_ips();

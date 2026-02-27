@@ -28,9 +28,14 @@ export type { UploadProgress }
  */
 export async function startShareService(
     files: FileMetadata[],
-    settings: ShareSettings
+    settings: ShareSettings,
+    preferredPort?: number
 ): Promise<ShareLinkInfo> {
-    return invoke<ShareLinkInfo>('start_share', { files, settings })
+    return invoke<ShareLinkInfo>('start_share', {
+        files,
+        settings,
+        preferredPort: preferredPort ?? null,
+    })
 }
 
 /**

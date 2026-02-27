@@ -204,7 +204,7 @@ const transferStore = useTransferStore()
 const isDarkTheme = computed(() => vuetifyTheme.global.current.value.dark)
 
 // 本地状态
-const webDownloadEnabled = ref(false)
+const webDownloadEnabled = ref(shareStore.isSharing)
 const webDownloadLoading = ref(false)
 const qrCodeDataUrls = ref<Record<string, string>>({})
 const showPinConfig = ref(false)
@@ -215,7 +215,8 @@ watch(
     () => shareStore.isSharing,
     (val) => {
         webDownloadEnabled.value = val
-    }
+    },
+    { immediate: true }
 )
 
 // 监听已选文件变化，自动同步到后端分享服务器

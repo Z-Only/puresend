@@ -102,7 +102,7 @@
                             v-if="transferStore.unifiedSendTasks.length > 0"
                             :prepend-icon="mdiDeleteSweep"
                             variant="text"
-                            size="small"
+                            size="x-small"
                             color="error"
                             @click="showClearAllDialog = true"
                         >
@@ -680,7 +680,12 @@ import {
     SelectedFileList,
     SendSettingsCard,
 } from '../components/transfer'
-import { useTransferStore, useDiscoveryStore, useShareStore } from '../stores'
+import {
+    useTransferStore,
+    useDiscoveryStore,
+    useShareStore,
+    useSettingsStore,
+} from '../stores'
 import { useSelectedFiles } from '../composables'
 import type {
     ContentType,
@@ -703,6 +708,7 @@ const { t } = useI18n()
 const transferStore = useTransferStore()
 const discoveryStore = useDiscoveryStore()
 const shareStore = useShareStore()
+const settingsStore = useSettingsStore()
 
 // 从 store 获取响应式状态（Tab 切换时保留）
 const { transferMode, selectedPeerId } = storeToRefs(transferStore)
@@ -717,8 +723,24 @@ onMounted(async () => {
     if (selectedPeerId.value) {
         const isOnline = await discoveryStore.checkOnline(selectedPeerId.value)
         if (!isOnline) {
-            // 设备已离线，清除选择
             selectedPeerId.value = ''
+        }
+    }
+
+    // 自动恢复 Web 下载服务器（应用重启后）
+    if (
+        settingsStore.webServerSettings.webDownloadEnabled &&
+        !shareStore.shareInfo
+    ) {
+        try {
+            const result = await shareStore.startShare([])
+            if (result) {
+                transferStore.webDownloadEnabled = true
+            } else {
+                await settingsStore.setWebDownloadState(false)
+            }
+        } catch {
+            await settingsStore.setWebDownloadState(false)
         }
     }
 })
@@ -987,7 +1009,7 @@ async function confirmRemoveTask() {
     const taskId = taskIdToRemove.value
     // 移除 Web 下载任务
     if (taskId.startsWith('web-')) {
-        transferStore.sendTaskItems.delete(taskId)
+        transferStore.deleteSendTaskItem(taskId)
     }
     // 移除 P2P 任务
     if (taskId.startsWith('p2p-')) {
@@ -1000,7 +1022,7 @@ async function confirmRemoveTask() {
 
 async function confirmClearAllTasks() {
     // 清理所有 Web 下载任务
-    transferStore.sendTaskItems.clear()
+    transferStore.clearSendTaskItems()
     // 清理所有发送方向的 P2P 任务
     for (const [id, task] of transferStore.tasks.entries()) {
         if (task.direction === 'send') {

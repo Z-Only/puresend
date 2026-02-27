@@ -162,7 +162,7 @@
  * - 自动接收开关（从 settingsStore 读取）
  * - 文件覆盖开关（从 settingsStore 读取）
  */
-import { ref, watch, onUnmounted, computed } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTheme } from 'vuetify'
 import { open } from '@tauri-apps/plugin-dialog'
@@ -210,7 +210,8 @@ watch(
     () => transferStore.webUploadEnabled,
     (val) => {
         webUploadEnabled.value = val
-    }
+    },
+    { immediate: true }
 )
 
 watch(
@@ -318,16 +319,6 @@ async function handleWebUploadChange(value: boolean | null) {
     }
 }
 
-// 组件卸载时停止 Web 上传
-onUnmounted(async () => {
-    if (transferStore.webUploadEnabled) {
-        try {
-            await transferStore.stopWebUpload()
-        } catch (e) {
-            console.error('停止 Web 上传失败:', e)
-        }
-    }
-})
 </script>
 
 <style scoped>

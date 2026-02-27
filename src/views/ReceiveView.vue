@@ -64,7 +64,7 @@
                             v-if="transferStore.unifiedReceiveTasks.length > 0"
                             :prepend-icon="mdiDeleteSweep"
                             variant="text"
-                            size="small"
+                            size="x-small"
                             color="error"
                             @click="showClearAllDialog = true"
                         >
@@ -600,7 +600,7 @@ import {
     ReceiveModeSelector,
     ReceiveSettingsCard,
 } from '../components/transfer'
-import { useTransferStore } from '../stores'
+import { useTransferStore, useSettingsStore } from '../stores'
 import { formatSpeed as formatSpeedUtil } from '../types'
 import {
     mdiWifiOff,
@@ -614,6 +614,7 @@ import {
 
 const { t } = useI18n()
 const transferStore = useTransferStore()
+const settingsStore = useSettingsStore()
 
 // 页面本地状态（无需持久化）
 const starting = ref(false)
@@ -729,7 +730,7 @@ function confirmRemoveTask() {
     const taskId = taskIdToRemove.value
     // 移除 Web 上传任务
     if (taskId.startsWith('web-')) {
-        transferStore.receiveTaskItems.delete(taskId)
+        transferStore.deleteReceiveTaskItem(taskId)
     }
     // 移除 P2P 任务
     if (taskId.startsWith('p2p-')) {
@@ -743,7 +744,7 @@ function confirmRemoveTask() {
 /** 确认移除全部任务 */
 function confirmClearAllTasks() {
     // 清理所有 Web 上传任务
-    transferStore.receiveTaskItems.clear()
+    transferStore.clearReceiveTaskItems()
     // 清理所有接收方向的 P2P 任务
     for (const [id, task] of transferStore.tasks.entries()) {
         if (task.direction === 'receive') {
@@ -779,14 +780,27 @@ function formatSpeed(bytesPerSecond: number): string {
 
 onMounted(async () => {
     await transferStore.initialize()
-    // 进入页面自动启动接收服务器
+    // 进入页面自动启动 P2P 接收服务器
     await autoStartReceiving()
+
+    // 自动恢复 Web 上传服务器（应用重启后）
+    if (
+        settingsStore.webServerSettings.webUploadEnabled &&
+        !transferStore.webUploadEnabled
+    ) {
+        try {
+            await transferStore.startWebUpload()
+        } catch {
+            await settingsStore.setWebUploadState(false)
+        }
+    }
 })
 
 onUnmounted(async () => {
-    // 离开页面时检查活跃任务后关闭服务器
+    // 离开页面时检查活跃的 P2P 任务后关闭 P2P 接收服务器
     await autoStopReceiving()
-    transferStore.destroy()
+    // 仅重置页面级状态，不清除 Web 服务状态和任务记录
+    transferStore.resetPageState()
 })
 
 /**

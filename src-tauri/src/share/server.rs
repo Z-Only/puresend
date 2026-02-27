@@ -14,6 +14,7 @@ use bytes::Bytes;
 use futures::Stream;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::pin::Pin;
@@ -41,12 +42,24 @@ static FAVICON_ICO: &[u8] = include_bytes!("../../icons/32x32.png");
 const HTTP_CHUNK_SIZE: usize = 1024 * 1024; // 1MB
 
 #[derive(Debug)]
+struct ChunkDownloadSession {
+    upload_id: String,
+    file_name: String,
+    file_size: u64,
+    chunk_count: usize,
+    downloaded_chunks: HashSet<usize>,
+    client_ip: String,
+    start_time: std::time::Instant,
+}
+
+#[derive(Debug)]
 pub struct ServerState {
     pub share_state: Arc<Mutex<ShareState>>,
     pub file_paths: Arc<Mutex<std::collections::HashMap<String, PathBuf>>>,
     pub hash_to_filename: Arc<Mutex<std::collections::HashMap<String, String>>>,
     pub app_handle: AppHandle,
     pub crypto_sessions: Arc<Mutex<HttpCryptoSessionManager>>,
+    chunk_download_sessions: Arc<Mutex<std::collections::HashMap<String, ChunkDownloadSession>>>,
 }
 
 pub struct ShareServer {
@@ -67,6 +80,7 @@ impl ShareServer {
                 hash_to_filename: Arc::new(Mutex::new(std::collections::HashMap::new())),
                 app_handle,
                 crypto_sessions: Arc::new(Mutex::new(HttpCryptoSessionManager::new())),
+                chunk_download_sessions: Arc::new(Mutex::new(std::collections::HashMap::new())),
             }),
             shutdown_tx: None,
         }
@@ -94,6 +108,8 @@ impl ShareServer {
         let app = Router::new()
             .route("/", get(index_handler))
             .route("/favicon.ico", get(favicon_handler))
+            .route("/apple-touch-icon.png", get(favicon_handler))
+            .route("/apple-touch-icon-precomposed.png", get(favicon_handler))
             .route("/files", get(list_files_handler))
             .route("/verify-pin", post(verify_pin_handler))
             .route("/request-status", get(request_status_handler))
@@ -360,6 +376,49 @@ async fn download_meta_handler(
 
     let chunk_count = ((file_size as f64) / (HTTP_CHUNK_SIZE as f64)).ceil() as usize;
 
+    // When encryption or compression is active, the client will download via chunks
+    // (not through upload_handler), so we need to track and emit events here.
+    if encryption || compression_active {
+        let upload_record = ShareUploadRecord::new(file_name.clone(), file_size);
+        let upload_id = upload_record.id.clone();
+
+        {
+            let mut share_state = state.share_state.lock().await;
+            if let Some(request) = share_state
+                .access_requests
+                .values_mut()
+                .find(|r| r.ip == client_ip)
+            {
+                request.upload_records.insert(0, upload_record);
+            }
+        }
+
+        let _ = state.app_handle.emit(
+            "upload-start",
+            UploadStartPayload {
+                upload_id: upload_id.clone(),
+                file_name: file_name.clone(),
+                file_size: file_size as i64,
+                client_ip: client_ip.clone(),
+            },
+        );
+
+        let session_key = format!("{}_{}", file_id, client_ip);
+        let mut sessions = state.chunk_download_sessions.lock().await;
+        sessions.insert(
+            session_key,
+            ChunkDownloadSession {
+                upload_id,
+                file_name: file_name.clone(),
+                file_size,
+                chunk_count,
+                downloaded_chunks: HashSet::new(),
+                client_ip: client_ip.clone(),
+                start_time: std::time::Instant::now(),
+            },
+        );
+    }
+
     Json(DownloadMeta {
         file_id,
         file_name,
@@ -511,6 +570,87 @@ async fn download_chunk_handler(
             HeaderName::from_static("x-encryption"),
             "aes-256-gcm".parse().unwrap(),
         );
+    }
+
+    // Track chunk download progress and emit events
+    let session_key = format!("{}_{}", file_id, client_ip);
+    let mut sessions = state.chunk_download_sessions.lock().await;
+    if let Some(session) = sessions.get_mut(&session_key) {
+        session.downloaded_chunks.insert(chunk_index);
+
+        let downloaded = session.downloaded_chunks.len();
+        let total = session.chunk_count;
+        let progress = (downloaded as f64 / total as f64) * 100.0;
+        let elapsed_secs = session.start_time.elapsed().as_secs_f64();
+        let downloaded_bytes = (downloaded as u64).min(total as u64) * HTTP_CHUNK_SIZE as u64;
+        let downloaded_bytes = downloaded_bytes.min(session.file_size);
+        let speed = if elapsed_secs > 0.0 {
+            (downloaded_bytes as f64 / elapsed_secs) as u64
+        } else {
+            0
+        };
+
+        let _ = state.app_handle.emit(
+            "upload-progress",
+            super::models::UploadProgress {
+                upload_id: session.upload_id.clone(),
+                file_name: session.file_name.clone(),
+                progress,
+                uploaded_bytes: downloaded_bytes,
+                total_bytes: session.file_size,
+                speed,
+                client_ip: session.client_ip.clone(),
+            },
+        );
+
+        // Update the upload record in share state
+        {
+            let upload_id = session.upload_id.clone();
+            let file_size = session.file_size;
+            let mut share_state = state.share_state.lock().await;
+            for request in share_state.access_requests.values_mut() {
+                if let Some(record) = request.upload_records.iter_mut().find(|r| r.id == upload_id)
+                {
+                    record.uploaded_bytes = downloaded_bytes;
+                    record.progress = progress;
+                    record.speed = speed;
+                    break;
+                }
+            }
+
+            if downloaded >= total {
+                for request in share_state.access_requests.values_mut() {
+                    if let Some(record) =
+                        request.upload_records.iter_mut().find(|r| r.id == upload_id)
+                    {
+                        record.uploaded_bytes = file_size;
+                        record.progress = 100.0;
+                        record.speed = 0;
+                        record.status = super::models::TransferStatus::Completed;
+                        record.completed_at = Some(
+                            std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap()
+                                .as_millis() as u64,
+                        );
+                        break;
+                    }
+                }
+            }
+        }
+
+        if downloaded >= total {
+            let _ = state.app_handle.emit(
+                "upload-complete",
+                UploadCompletePayload {
+                    upload_id: session.upload_id.clone(),
+                    file_name: session.file_name.clone(),
+                    file_size: session.file_size as i64,
+                    client_ip: session.client_ip.clone(),
+                },
+            );
+            sessions.remove(&session_key);
+        }
     }
 
     response
@@ -1909,6 +2049,48 @@ fn generate_file_list_html(is_english: bool) -> String {
             return new Uint8Array(decrypted);
         }}
 
+        async function downloadDirect(fileId, fileName, fileSize) {{
+            var li = document.getElementById('dl-' + fileId);
+            var progressBar = li.querySelector('.progress-fill');
+            var progressText = li.querySelector('.progress-text');
+            if (progressBar) progressBar.style.width = '0%';
+            if (progressText) progressText.textContent = '{downloading}';
+
+            try {{
+                var resp = await fetch('/download/' + fileId);
+                var contentLength = parseInt(resp.headers.get('Content-Length') || fileSize);
+                var reader = resp.body.getReader();
+                var chunks = [];
+                var received = 0;
+
+                while (true) {{
+                    var result = await reader.read();
+                    if (result.done) break;
+                    chunks.push(result.value);
+                    received += result.value.length;
+                    var pct = contentLength > 0 ? Math.min(100, Math.round(received / contentLength * 100)) : 0;
+                    if (progressBar) progressBar.style.width = pct + '%';
+                    if (progressText) progressText.textContent = pct + '% (' + formatSize(received) + ' / ' + formatSize(contentLength) + ')';
+                }}
+
+                var blob = new Blob(chunks);
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                if (progressBar) {{ progressBar.style.width = '100%'; progressBar.style.background = '#4caf50'; }}
+                if (progressText) progressText.textContent = '{download_complete}';
+            }} catch(e) {{
+                console.error('Download failed:', e);
+                if (progressText) {{ progressText.textContent = '{download_failed}: ' + e.message; progressText.style.color = '#d32f2f'; }}
+            }}
+        }}
+
         async function downloadEnhanced(fileId, fileName, fileSize) {{
             var li = document.getElementById('dl-' + fileId);
             var progressBar = li.querySelector('.progress-fill');
@@ -1921,8 +2103,7 @@ fn generate_file_list_html(is_english: bool) -> String {
                 var meta = await metaResp.json();
 
                 if (!meta.encryption && !meta.compression) {{
-                    window.location.href = '/download/' + fileId;
-                    if (progressText) progressText.textContent = '';
+                    await downloadDirect(fileId, fileName, fileSize);
                     return;
                 }}
 
@@ -1959,8 +2140,8 @@ fn generate_file_list_html(is_english: bool) -> String {
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
 
+                if (progressBar) {{ progressBar.style.width = '100%'; progressBar.style.background = '#4caf50'; }}
                 if (progressText) progressText.textContent = '{download_complete}';
-                if (progressBar) progressBar.style.background = '#4caf50';
             }} catch(e) {{
                 console.error('Download failed:', e);
                 if (progressText) {{
@@ -1974,7 +2155,7 @@ fn generate_file_list_html(is_english: bool) -> String {
             if (caps && (caps.encryption || caps.compression)) {{
                 downloadEnhanced(fileId, fileName, fileSize);
             }} else {{
-                window.location.href = '/download/' + fileId;
+                downloadDirect(fileId, fileName, fileSize);
             }}
         }}
 

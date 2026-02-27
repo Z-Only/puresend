@@ -111,6 +111,25 @@ export interface AppSettings {
     showAdvancedSettings: boolean
 }
 
+/** Web 服务器持久化状态 */
+export interface WebServerSettings {
+    /** Web 下载是否开启 */
+    webDownloadEnabled: boolean
+    /** Web 下载上次使用的端口 */
+    webDownloadLastPort: number
+    /** Web 上传是否开启 */
+    webUploadEnabled: boolean
+    /** Web 上传上次使用的端口 */
+    webUploadLastPort: number
+}
+
+export const DEFAULT_WEB_SERVER_SETTINGS: WebServerSettings = {
+    webDownloadEnabled: false,
+    webDownloadLastPort: 0,
+    webUploadEnabled: false,
+    webUploadLastPort: 0,
+}
+
 /** 扩展的设置状态，包含版本信息 */
 export interface SettingsState extends AppSettings {
     version: number
@@ -122,6 +141,8 @@ export interface SettingsState extends AppSettings {
     encryptionSettings?: EncryptionSettings
     /** 动态压缩设置 */
     compressionSettings?: CompressionSettings
+    /** Web 服务器状态 */
+    webServerSettings?: WebServerSettings
 }
 
 /** 默认隐私设置 */

@@ -3,7 +3,7 @@
  */
 
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, triggerRef } from 'vue'
 import type {
     FileMetadata,
     TransferTask,
@@ -143,6 +143,38 @@ export const useTransferStore = defineStore('transfer', () => {
         field: 'completedAt',
         order: 'desc',
     })
+
+    // ============ Map 辅助方法（确保触发 Vue 响应式更新） ============
+
+    function setSendTaskItem(key: string, value: SendTaskItem): void {
+        sendTaskItems.value.set(key, value)
+        triggerRef(sendTaskItems)
+    }
+
+    function deleteSendTaskItem(key: string): void {
+        sendTaskItems.value.delete(key)
+        triggerRef(sendTaskItems)
+    }
+
+    function clearSendTaskItems(): void {
+        sendTaskItems.value.clear()
+        triggerRef(sendTaskItems)
+    }
+
+    function setReceiveTaskItem(key: string, value: ReceiveTaskItem): void {
+        receiveTaskItems.value.set(key, value)
+        triggerRef(receiveTaskItems)
+    }
+
+    function deleteReceiveTaskItem(key: string): void {
+        receiveTaskItems.value.delete(key)
+        triggerRef(receiveTaskItems)
+    }
+
+    function clearReceiveTaskItems(): void {
+        receiveTaskItems.value.clear()
+        triggerRef(receiveTaskItems)
+    }
 
     // ============ 计算属性 ============
 
@@ -766,10 +798,13 @@ export const useTransferStore = defineStore('transfer', () => {
     async function startWebUpload(): Promise<void> {
         const settingsStore = useSettingsStore()
         try {
+            const preferredPort =
+                settingsStore.webServerSettings.webUploadLastPort || undefined
             const info = await startWebUploadService(
                 receiveDirectory.value,
                 settingsStore.receiveSettings.autoReceive,
-                settingsStore.receiveSettings.fileOverwrite
+                settingsStore.receiveSettings.fileOverwrite,
+                preferredPort
             )
             webUploadInfo.value = info
             webUploadEnabled.value = true
@@ -783,6 +818,9 @@ export const useTransferStore = defineStore('transfer', () => {
                 await onWebUploadFileProgress(handleWebUploadFileProgress),
                 await onWebUploadFileComplete(handleWebUploadFileComplete)
             )
+
+            // 持久化 Web 上传服务器状态
+            await settingsStore.setWebUploadState(true, info.port)
         } catch (e) {
             error.value = `启动 Web 上传失败：${e}`
             console.error('启动 Web 上传失败:', e)
@@ -799,6 +837,10 @@ export const useTransferStore = defineStore('transfer', () => {
             webUploadEnabled.value = false
             webUploadInfo.value = null
             webUploadRequests.value.clear()
+
+            // 持久化 Web 上传服务器关闭状态（保留端口号）
+            const settingsStore = useSettingsStore()
+            await settingsStore.setWebUploadState(false)
         } catch (e) {
             error.value = `停止 Web 上传失败：${e}`
             console.error('停止 Web 上传失败:', e)
@@ -915,7 +957,7 @@ export const useTransferStore = defineStore('transfer', () => {
             originalRequestId: request.id,
         }
 
-        receiveTaskItems.value.set(taskItem.id, taskItem)
+        setReceiveTaskItem(taskItem.id, taskItem)
     }
 
     /**
@@ -924,18 +966,26 @@ export const useTransferStore = defineStore('transfer', () => {
     function handleWebUploadStatusChanged(request: WebUploadRequest) {
         webUploadRequests.value.set(request.id, request)
 
-        const taskItem = receiveTaskItems.value.get(`web-${request.id}`)
+        const taskId = `web-${request.id}`
+        const taskItem = receiveTaskItems.value.get(taskId)
         if (taskItem) {
+            let approvalStatus = taskItem.approvalStatus
+            let transferStatus = taskItem.transferStatus
             if (request.status === 'accepted') {
-                taskItem.approvalStatus = 'accepted'
-                taskItem.transferStatus = 'transferring'
+                approvalStatus = 'accepted'
+                transferStatus = 'transferring'
             } else if (request.status === 'rejected') {
-                taskItem.approvalStatus = 'rejected'
-                taskItem.transferStatus = 'cancelled'
+                approvalStatus = 'rejected'
+                transferStatus = 'cancelled'
             } else if (request.status === 'expired') {
-                taskItem.approvalStatus = 'expired'
-                taskItem.transferStatus = 'cancelled'
+                approvalStatus = 'expired'
+                transferStatus = 'cancelled'
             }
+            setReceiveTaskItem(taskId, {
+                ...taskItem,
+                approvalStatus,
+                transferStatus,
+            })
         }
     }
 
@@ -943,7 +993,8 @@ export const useTransferStore = defineStore('transfer', () => {
      * 处理 Web 上传文件开始事件：向对应 ReceiveTaskItem 添加新文件条目
      */
     function handleWebUploadFileStart(event: WebUploadFileStartEvent) {
-        const taskItem = receiveTaskItems.value.get(`web-${event.requestId}`)
+        const taskId = `web-${event.requestId}`
+        const taskItem = receiveTaskItems.value.get(taskId)
         if (!taskItem) return
 
         const fileItem: ReceiveTaskFileItem = {
@@ -956,24 +1007,27 @@ export const useTransferStore = defineStore('transfer', () => {
             startedAt: Date.now(),
         }
 
-        taskItem.files.push(fileItem)
-        taskItem.fileCount = taskItem.files.length
-        taskItem.totalSize = taskItem.files.reduce(
-            (sum, file) => sum + file.size,
-            0
-        )
-        taskItem.transferStatus = 'transferring'
+        const updatedFiles = [...taskItem.files, fileItem]
+        setReceiveTaskItem(taskId, {
+            ...taskItem,
+            files: updatedFiles,
+            fileCount: updatedFiles.length,
+            totalSize: updatedFiles.reduce(
+                (sum, file) => sum + file.size,
+                0
+            ),
+            transferStatus: 'transferring',
+        })
     }
 
     /**
      * 处理 Web 上传文件进度事件：更新对应文件条目的进度
      */
     function handleWebUploadFileProgress(event: WebUploadFileProgressEvent) {
-        const taskItem = receiveTaskItems.value.get(`web-${event.requestId}`)
+        const taskId = `web-${event.requestId}`
+        const taskItem = receiveTaskItems.value.get(taskId)
         if (!taskItem) return
 
-        // 通过 recordId 匹配文件（recordId 存储在文件名旁，用文件名 + 顺序匹配）
-        // 由于 ReceiveTaskFileItem 没有 recordId 字段，按文件名匹配最后一个同名文件
         const fileItem = findFileByRecord(
             taskItem,
             event.recordId,
@@ -981,22 +1035,50 @@ export const useTransferStore = defineStore('transfer', () => {
         )
         if (!fileItem) return
 
-        fileItem.transferredBytes = event.uploadedBytes
-        fileItem.progress = event.progress
-        fileItem.speed = event.speed
-        if (event.totalBytes > 0 && fileItem.size === 0) {
-            fileItem.size = event.totalBytes
-        }
+        const updatedFiles = taskItem.files.map((f) =>
+            f === fileItem
+                ? {
+                      ...f,
+                      transferredBytes: event.uploadedBytes,
+                      progress: event.progress,
+                      speed: event.speed,
+                      size:
+                          event.totalBytes > 0 && f.size === 0
+                              ? event.totalBytes
+                              : f.size,
+                  }
+                : f
+        )
 
-        // 更新整体进度
-        updateTaskItemProgress(taskItem, event.speed)
+        const totalTransferredBytes = updatedFiles.reduce(
+            (sum, f) => sum + f.transferredBytes,
+            0
+        )
+        const totalSize = updatedFiles.reduce(
+            (sum, f) => sum + f.size,
+            0
+        )
+        const progress =
+            totalSize > 0
+                ? Math.round((totalTransferredBytes / totalSize) * 100)
+                : 0
+
+        setReceiveTaskItem(taskId, {
+            ...taskItem,
+            files: updatedFiles,
+            totalTransferredBytes,
+            totalSize,
+            progress,
+            speed: event.speed,
+        })
     }
 
     /**
      * 处理 Web 上传文件完成事件：标记对应文件条目为完成或失败
      */
     function handleWebUploadFileComplete(event: WebUploadFileCompleteEvent) {
-        const taskItem = receiveTaskItems.value.get(`web-${event.requestId}`)
+        const taskId = `web-${event.requestId}`
+        const taskItem = receiveTaskItems.value.get(taskId)
         if (!taskItem) return
 
         const fileItem = findFileByRecord(
@@ -1004,36 +1086,61 @@ export const useTransferStore = defineStore('transfer', () => {
             event.recordId,
             event.fileName
         )
-        if (fileItem) {
-            fileItem.status =
-                event.status === 'completed' ? 'completed' : 'failed'
-            fileItem.transferredBytes = event.totalBytes
-            if (event.totalBytes > 0) {
-                fileItem.size = event.totalBytes
-            }
-            fileItem.progress =
-                event.status === 'completed' ? 100 : fileItem.progress
-            fileItem.speed = 0
-        }
 
-        // 更新整体进度
-        updateTaskItemProgress(taskItem, 0)
+        const updatedFiles = taskItem.files.map((f) =>
+            f === fileItem
+                ? {
+                      ...f,
+                      status: (event.status === 'completed'
+                          ? 'completed'
+                          : 'failed') as ReceiveTaskFileItem['status'],
+                      transferredBytes: event.totalBytes,
+                      size:
+                          event.totalBytes > 0 ? event.totalBytes : f.size,
+                      progress:
+                          event.status === 'completed' ? 100 : f.progress,
+                      speed: 0,
+                  }
+                : f
+        )
 
-        // 检查是否所有文件都已完成
+        const totalTransferredBytes = updatedFiles.reduce(
+            (sum, f) => sum + f.transferredBytes,
+            0
+        )
+        const totalSize = updatedFiles.reduce(
+            (sum, f) => sum + f.size,
+            0
+        )
+        const progress =
+            totalSize > 0
+                ? Math.round((totalTransferredBytes / totalSize) * 100)
+                : 0
+
         const allCompleted =
-            taskItem.files.length > 0 &&
-            taskItem.files.every(
+            updatedFiles.length > 0 &&
+            updatedFiles.every(
                 (file) =>
                     file.status === 'completed' || file.status === 'failed'
             )
-        if (allCompleted) {
-            const hasFailure = taskItem.files.some(
-                (file) => file.status === 'failed'
-            )
-            taskItem.transferStatus = hasFailure ? 'failed' : 'completed'
-            taskItem.completedAt = Date.now()
-            taskItem.speed = 0
-        }
+        const hasFailure = updatedFiles.some(
+            (file) => file.status === 'failed'
+        )
+
+        setReceiveTaskItem(taskId, {
+            ...taskItem,
+            files: updatedFiles,
+            totalTransferredBytes,
+            totalSize,
+            progress,
+            speed: 0,
+            transferStatus: allCompleted
+                ? hasFailure
+                    ? 'failed'
+                    : 'completed'
+                : taskItem.transferStatus,
+            completedAt: allCompleted ? Date.now() : taskItem.completedAt,
+        })
     }
 
     /**
@@ -1090,30 +1197,6 @@ export const useTransferStore = defineStore('transfer', () => {
     }
 
     /**
-     * 更新 ReceiveTaskItem 的整体进度信息
-     */
-    function updateTaskItemProgress(
-        taskItem: ReceiveTaskItem,
-        currentSpeed: number
-    ): void {
-        const totalTransferred = taskItem.files.reduce(
-            (sum, file) => sum + file.transferredBytes,
-            0
-        )
-        taskItem.totalTransferredBytes = totalTransferred
-        taskItem.totalSize = taskItem.files.reduce(
-            (sum, file) => sum + file.size,
-            0
-        )
-        taskItem.progress =
-            taskItem.totalSize > 0
-                ? Math.round((totalTransferred / taskItem.totalSize) * 100)
-                : 0
-        taskItem.speed = currentSpeed
-        taskItem.transferStatus = 'transferring'
-    }
-
-    /**
      * 同意统一接收任务
      */
     async function acceptReceiveTask(taskId: string): Promise<void> {
@@ -1156,23 +1239,35 @@ export const useTransferStore = defineStore('transfer', () => {
             }
         }
         idsToRemove.forEach((id) => receiveTaskItems.value.delete(id))
+        if (idsToRemove.length > 0) {
+            triggerRef(receiveTaskItems)
+        }
     }
 
     /**
-     * 销毁 store，清理事件监听器
+     * 重置页面级状态（页面切换时调用，不影响 Web 服务状态和任务记录）
+     */
+    function resetPageState(): void {
+        transferMode.value = 'local'
+        selectedPeerId.value = ''
+        receiveMode.value = 'local'
+    }
+
+    /**
+     * 销毁全部服务状态（仅在应用退出时调用）
      */
     function destroy(): void {
         unlistenFns.forEach((unlisten) => unlisten())
         unlistenFns.length = 0
         tasks.value.clear()
-        receiveTaskItems.value.clear()
-        sendTaskItems.value.clear()
+        clearReceiveTaskItems()
+        clearSendTaskItems()
         webDownloadEnabled.value = false
+        webUploadEnabled.value = false
+        webUploadInfo.value = null
+        webUploadRequests.value.clear()
         initialized.value = false
-        // 重置页面状态
-        transferMode.value = 'local'
-        selectedPeerId.value = ''
-        receiveMode.value = 'local'
+        resetPageState()
     }
 
     // ============ 历史记录方法 ============
@@ -1472,8 +1567,14 @@ export const useTransferStore = defineStore('transfer', () => {
         // Web 下载
         webDownloadEnabled,
         sendTaskItems,
+        setSendTaskItem,
+        deleteSendTaskItem,
+        clearSendTaskItems,
         // 统一接收任务
         receiveTaskItems,
+        setReceiveTaskItem,
+        deleteReceiveTaskItem,
+        clearReceiveTaskItems,
         unifiedReceiveTasks,
         pendingReceiveTasks,
         acceptReceiveTask,
@@ -1519,6 +1620,7 @@ export const useTransferStore = defineStore('transfer', () => {
         setTransferMode,
         setSelectedPeerId,
         setReceiveMode,
+        resetPageState,
         destroy,
         // 历史记录方法
         loadHistory,

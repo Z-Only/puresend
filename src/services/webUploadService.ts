@@ -21,12 +21,14 @@ import type {
 export async function startWebUpload(
     receiveDirectory: string,
     autoReceive: boolean,
-    fileOverwrite: boolean
+    fileOverwrite: boolean,
+    preferredPort?: number
 ): Promise<WebUploadInfo> {
     return invoke('start_web_upload', {
         receiveDirectory,
         autoReceive,
         fileOverwrite,
+        preferredPort: preferredPort ?? null,
     })
 }
 

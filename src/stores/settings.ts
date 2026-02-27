@@ -20,6 +20,7 @@ import {
     type EncryptionSettings,
     type CompressionSettings,
     type CompressionMode,
+    type WebServerSettings,
     DEFAULT_SETTINGS,
     DEFAULT_HISTORY_SETTINGS,
     DEFAULT_RECEIVE_SETTINGS,
@@ -27,6 +28,7 @@ import {
     DEFAULT_DEVELOPER_SETTINGS,
     DEFAULT_ENCRYPTION_SETTINGS,
     DEFAULT_COMPRESSION_SETTINGS,
+    DEFAULT_WEB_SERVER_SETTINGS,
     SETTINGS_VERSION,
     SETTINGS_STORAGE_KEY,
 } from '@/types/settings'
@@ -61,6 +63,9 @@ export const useSettingsStore = defineStore('settings', () => {
     )
     const compressionSettings = ref<CompressionSettings>(
         DEFAULT_COMPRESSION_SETTINGS
+    )
+    const webServerSettings = ref<WebServerSettings>(
+        DEFAULT_WEB_SERVER_SETTINGS
     )
     const version = ref(SETTINGS_VERSION)
 
@@ -240,6 +245,11 @@ export const useSettingsStore = defineStore('settings', () => {
             migrated.compressionSettings = DEFAULT_COMPRESSION_SETTINGS
         }
 
+        // Web 服务器设置迁移
+        if (!('webServerSettings' in oldSettings)) {
+            migrated.webServerSettings = DEFAULT_WEB_SERVER_SETTINGS
+        }
+
         return migrated
     }
 
@@ -260,6 +270,7 @@ export const useSettingsStore = defineStore('settings', () => {
                 showAdvancedSettings: showAdvancedSettings.value,
                 encryptionSettings: encryptionSettings.value,
                 compressionSettings: compressionSettings.value,
+                webServerSettings: webServerSettings.value,
                 version: version.value,
             }
 
@@ -329,6 +340,10 @@ export const useSettingsStore = defineStore('settings', () => {
                 compressionSettings.value =
                     (loadedSettings.compressionSettings as CompressionSettings) ||
                     DEFAULT_COMPRESSION_SETTINGS
+                // 兼容旧版设置（没有 webServerSettings 字段）
+                webServerSettings.value =
+                    (loadedSettings.webServerSettings as WebServerSettings) ||
+                    DEFAULT_WEB_SERVER_SETTINGS
 
                 // 如果没有设备名称，尝试获取本机设备名
                 if (!deviceName.value) {
@@ -595,6 +610,36 @@ export const useSettingsStore = defineStore('settings', () => {
     }
 
     /**
+     * 设置 Web 下载服务器状态
+     */
+    async function setWebDownloadState(
+        enabled: boolean,
+        port?: number
+    ): Promise<boolean> {
+        webServerSettings.value = {
+            ...webServerSettings.value,
+            webDownloadEnabled: enabled,
+            ...(port !== undefined && { webDownloadLastPort: port }),
+        }
+        return saveSettings()
+    }
+
+    /**
+     * 设置 Web 上传服务器状态
+     */
+    async function setWebUploadState(
+        enabled: boolean,
+        port?: number
+    ): Promise<boolean> {
+        webServerSettings.value = {
+            ...webServerSettings.value,
+            webUploadEnabled: enabled,
+            ...(port !== undefined && { webUploadLastPort: port }),
+        }
+        return saveSettings()
+    }
+
+    /**
      * 监听系统主题变化
      */
     function watchSystemTheme(
@@ -637,6 +682,7 @@ export const useSettingsStore = defineStore('settings', () => {
         showAdvancedSettings,
         encryptionSettings,
         compressionSettings,
+        webServerSettings,
         version,
 
         // 计算属性
@@ -665,6 +711,8 @@ export const useSettingsStore = defineStore('settings', () => {
         setFontSizeMode,
         setFontSizePreset,
         setFontSizeCustomScale,
+        setWebDownloadState,
+        setWebUploadState,
         saveSettings,
         loadSettings,
         watchSystemTheme,

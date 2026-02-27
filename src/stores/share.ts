@@ -117,14 +117,12 @@ export const useShareStore = defineStore('share', () => {
 
         const existingTask = transferStore.sendTaskItems.get(taskId)
         if (existingTask) {
-            // 更新已有任务的审批状态
-            transferStore.sendTaskItems.set(taskId, {
+            transferStore.setSendTaskItem(taskId, {
                 ...existingTask,
                 approvalStatus,
             })
         } else {
-            // 创建新的发送任务
-            transferStore.sendTaskItems.set(taskId, {
+            transferStore.setSendTaskItem(taskId, {
                 id: taskId,
                 source: 'webDownload',
                 receiverLabel: request.userAgent || '',
@@ -271,7 +269,7 @@ export const useShareStore = defineStore('share', () => {
         )
         const allCompleted = updatedFiles.every((f) => f.status === 'completed')
 
-        transferStore.sendTaskItems.set(taskId, {
+        transferStore.setSendTaskItem(taskId, {
             ...task,
             files: updatedFiles,
             fileCount: updatedFiles.length,
@@ -323,7 +321,7 @@ export const useShareStore = defineStore('share', () => {
                     startedAt: Date.now(),
                     uploadId: payload.upload_id,
                 }
-                transferStore.sendTaskItems.set(taskId, {
+                transferStore.setSendTaskItem(taskId, {
                     ...task,
                     files: [newFileItem, ...task.files],
                     fileCount: task.files.length + 1,
@@ -448,11 +446,21 @@ export const useShareStore = defineStore('share', () => {
         error.value = ''
 
         try {
-            const result = await startShareService(files, settings.value)
+            const settingsStore = useSettingsStore()
+            const preferredPort =
+                settingsStore.webServerSettings.webDownloadLastPort || undefined
+            const result = await startShareService(
+                files,
+                settings.value,
+                preferredPort
+            )
             shareInfo.value = result
 
             // 设置事件监听
             await setupEventListeners()
+
+            // 持久化 Web 下载服务器状态
+            await settingsStore.setWebDownloadState(true, result.port)
 
             return result
         } catch (e) {
@@ -481,6 +489,10 @@ export const useShareStore = defineStore('share', () => {
             // 重置状态
             shareInfo.value = null
             accessRequests.value.clear()
+
+            // 持久化 Web 下载服务器关闭状态（保留端口号）
+            const settingsStore = useSettingsStore()
+            await settingsStore.setWebDownloadState(false)
         } catch (e) {
             error.value = `停止分享失败：${e}`
             console.error('停止分享失败:', e)
