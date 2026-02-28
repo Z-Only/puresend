@@ -60,16 +60,17 @@
                                 {{ transferStore.pendingReceiveTasks.length }}
                             </v-chip>
                         </div>
-                        <v-btn
-                            v-if="transferStore.unifiedReceiveTasks.length > 0"
-                            :prepend-icon="mdiDeleteSweep"
-                            variant="text"
-                            size="x-small"
-                            color="error"
-                            @click="showClearAllDialog = true"
-                        >
-                            {{ t('receive.task.clearAll') }}
-                        </v-btn>
+                        <div class="header-actions">
+                            <v-btn
+                                v-if="transferStore.unifiedReceiveTasks.length > 0"
+                                variant="text"
+                                size="x-small"
+                                color="error"
+                                @click="showClearAllDialog = true"
+                            >
+                                {{ t('receive.task.clearAll') }}
+                            </v-btn>
+                        </div>
                     </v-card-title>
                     <v-card-text>
                         <!-- 空状态 -->
@@ -601,7 +602,7 @@ import {
     ReceiveSettingsCard,
 } from '../components/transfer'
 import { useTransferStore, useSettingsStore } from '../stores'
-import { formatSpeed as formatSpeedUtil } from '../types'
+import { formatFileSize, formatSpeed, formatTime, getFileStatusColor } from '../utils/format'
 import {
     mdiWifiOff,
     mdiWifiPlus,
@@ -609,7 +610,6 @@ import {
     mdiCheck,
     mdiClose,
     mdiDelete,
-    mdiDeleteSweep,
 } from '@mdi/js'
 
 const { t } = useI18n()
@@ -647,18 +647,6 @@ function isTaskExpanded(taskId: string): boolean {
     return expandedTasks.has(taskId)
 }
 
-/** 获取文件状态颜色 */
-function getFileStatusColor(status: string): string {
-    const colorMap: Record<string, string> = {
-        pending: 'grey',
-        transferring: 'primary',
-        completed: 'success',
-        failed: 'error',
-        cancelled: 'warning',
-        interrupted: 'warning',
-    }
-    return colorMap[status] || 'grey'
-}
 
 /** 获取文件状态文本 */
 function getFileStatusText(status: string): string {
@@ -762,21 +750,6 @@ function toggleFileList(taskId: string) {
     }
 }
 
-function formatTime(timestamp: number): string {
-    return new Date(timestamp).toLocaleTimeString()
-}
-
-function formatFileSize(bytes: number): string {
-    if (bytes === 0) return '0 B'
-    const k = 1024
-    const sizes = ['B', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-}
-
-function formatSpeed(bytesPerSecond: number): string {
-    return formatSpeedUtil(bytesPerSecond)
-}
 
 onMounted(async () => {
     await transferStore.initialize()
@@ -857,6 +830,17 @@ async function autoStopReceiving() {
 <style scoped>
 .receive-view {
     min-height: calc(100vh - 64px);
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+
+.header-actions :deep(.v-btn__content) {
+    font-size: 14px;
 }
 
 /* 左侧设置列的卡片间距 */

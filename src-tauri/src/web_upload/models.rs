@@ -60,25 +60,6 @@ pub struct WebUploadRecord {
     pub completed_at: Option<u64>,
 }
 
-#[allow(dead_code)]
-impl WebUploadRecord {
-    /// 创建新的上传记录
-    pub fn new(file_name: String, total_bytes: u64) -> Self {
-        let now = current_timestamp_millis();
-
-        Self {
-            id: Uuid::new_v4().to_string(),
-            file_name,
-            uploaded_bytes: 0,
-            total_bytes,
-            progress: 0.0,
-            speed: 0,
-            status: "transferring".to_string(),
-            started_at: now,
-            completed_at: None,
-        }
-    }
-}
 
 /// Web 上传请求（按 IP 审批的接收任务）
 ///

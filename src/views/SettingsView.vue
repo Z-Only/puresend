@@ -77,6 +77,11 @@ const hidePeerName = computed({
     set: (value) => settingsStore.setHistoryPrivacy({ hidePeerName: value }),
 })
 
+const hideIp = computed({
+    get: () => settingsStore.history.privacy.hideIp,
+    set: (value) => settingsStore.setHistoryPrivacy({ hideIp: value }),
+})
+
 // 自动清理设置
 const cleanupStrategy = computed({
     get: () => settingsStore.history.autoCleanup.strategy,
@@ -526,6 +531,12 @@ const compressionModeOptions = computed(() => [
                                 density="compact"
                                 hide-details
                             />
+                            <v-checkbox
+                                v-model="hideIp"
+                                :label="t('settings.history.privacy.hideIp')"
+                                density="compact"
+                                hide-details
+                            />
                         </div>
                     </v-expand-transition>
                 </div>
@@ -900,6 +911,7 @@ const compressionModeOptions = computed(() => [
                                 :label="
                                     t('settings.developer.portRange.maxPort')
                                 "
+                                ler
                                 density="compact"
                                 variant="outlined"
                                 hide-details

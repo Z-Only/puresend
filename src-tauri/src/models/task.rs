@@ -85,27 +85,14 @@ impl TransferTask {
         self
     }
 
-    /// 更新进度
-    #[allow(dead_code)]
-    pub fn update_progress(&mut self, transferred_bytes: u64, speed: u64) {
-        self.transferred_bytes = transferred_bytes;
-        self.speed = speed;
-        if self.file.size > 0 {
-            self.progress = (transferred_bytes as f64 / self.file.size as f64) * 100.0;
-        }
-    }
-
     /// 标记为传输中
     pub fn start(&mut self) {
         self.status = TaskStatus::Transferring;
     }
 
-    /// 标记为完成
-    #[allow(dead_code)]
-    pub fn complete(&mut self) {
-        self.status = TaskStatus::Completed;
-        self.progress = 100.0;
-        self.transferred_bytes = self.file.size;
+    /// 标记为已取消
+    pub fn cancel(&mut self) {
+        self.status = TaskStatus::Cancelled;
         self.completed_at = Some(
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -124,25 +111,6 @@ impl TransferTask {
                 .unwrap()
                 .as_millis() as u64,
         );
-    }
-
-    /// 标记为取消
-    #[allow(dead_code)]
-    pub fn cancel(&mut self) {
-        self.status = TaskStatus::Cancelled;
-        self.completed_at = Some(
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64,
-        );
-    }
-
-    /// 标记为中断（可恢复）
-    #[allow(dead_code)]
-    pub fn interrupt(&mut self) {
-        self.status = TaskStatus::Interrupted;
-        self.resumable = true;
     }
 
     /// 计算预估剩余时间（秒）

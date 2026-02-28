@@ -98,16 +98,17 @@
                                 {{ transferStore.pendingSendTasks.length }}
                             </v-chip>
                         </div>
-                        <v-btn
-                            v-if="transferStore.unifiedSendTasks.length > 0"
-                            :prepend-icon="mdiDeleteSweep"
-                            variant="text"
-                            size="x-small"
-                            color="error"
-                            @click="showClearAllDialog = true"
-                        >
-                            {{ t('send.task.clearAll') }}
-                        </v-btn>
+                        <div class="header-actions">
+                            <v-btn
+                                v-if="transferStore.unifiedSendTasks.length > 0"
+                                variant="text"
+                                size="x-small"
+                                color="error"
+                                @click="showClearAllDialog = true"
+                            >
+                                {{ t('send.task.clearAll') }}
+                            </v-btn>
+                        </div>
                     </v-card-title>
                     <v-card-text>
                         <!-- 空状态 -->
@@ -694,14 +695,13 @@ import type {
     FileSourceType,
 } from '../types'
 import { FILE_COUNT_LIMIT } from '../types/content'
-import { formatSpeed as formatSpeedUtil } from '../types'
+import { formatFileSize, formatSpeed, formatTime, getFileStatusColor } from '../utils/format'
 import {
     mdiInboxArrowUp,
     mdiSend,
     mdiCheck,
     mdiClose,
     mdiDelete,
-    mdiDeleteSweep,
 } from '@mdi/js'
 
 const { t } = useI18n()
@@ -1054,33 +1054,6 @@ async function handleRejectTask(taskId: string) {
     }
 }
 
-function formatTime(timestamp: number): string {
-    return new Date(timestamp).toLocaleTimeString()
-}
-
-function formatFileSize(bytes: number): string {
-    if (bytes === 0) return '0 B'
-    const k = 1024
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
-}
-
-function formatSpeed(bytesPerSecond: number): string {
-    return formatSpeedUtil(bytesPerSecond)
-}
-
-function getFileStatusColor(status: string): string {
-    const colorMap: Record<string, string> = {
-        pending: 'grey',
-        transferring: 'primary',
-        completed: 'success',
-        failed: 'error',
-        cancelled: 'warning',
-        interrupted: 'warning',
-    }
-    return colorMap[status] || 'grey'
-}
 
 function getFileStatusText(status: string): string {
     const keyMap: Record<string, string> = {
@@ -1099,6 +1072,17 @@ function getFileStatusText(status: string): string {
 .send-view {
     max-width: 1400px;
     margin: 0 auto;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+
+.header-actions :deep(.v-btn__content) {
+    font-size: 14px;
 }
 
 .upload-records-container {

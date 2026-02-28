@@ -15,15 +15,17 @@
                     {{ t('selectedFiles.count', { count: stats.count }) }}
                 </v-chip>
             </div>
-            <v-btn
-                v-if="files.length > 0"
-                variant="text"
-                color="error"
-                size="small"
-                @click="handleClearAll"
-            >
-                {{ t('selectedFiles.clearAll') }}
-            </v-btn>
+            <div class="header-actions">
+                <v-btn
+                    v-if="files.length > 0"
+                    variant="text"
+                    color="error"
+                    size="x-small"
+                    @click="handleClearAll"
+                >
+                    {{ t('selectedFiles.clearAll') }}
+                </v-btn>
+            </div>
         </v-card-title>
 
         <!-- 文件统计信息 -->
@@ -194,6 +196,17 @@ function handleThumbnailError(path: string, error: string) {
     max-height: 400px;
     display: flex;
     flex-direction: column;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+
+.header-actions :deep(.v-btn__content) {
+    font-size: 14px;
 }
 
 .file-list-container {

@@ -83,7 +83,8 @@
         "label": "Privacy Mode",
         "description": "Hide sensitive information in history",
         "hideFileName": "Hide File Names",
-        "hidePeerName": "Hide Device Names"
+        "hidePeerName": "Hide Device Names",
+        "hideIp": "Hide IP Addresses"
       },
       "autoCleanup": {
         "label": "Auto Cleanup",
@@ -251,7 +252,8 @@
     },
     "privacy": {
       "hiddenFileName": "****",
-      "hiddenPeerName": "***"
+      "hiddenPeerName": "***",
+      "hiddenPeerIp": "***"
     }
   },
   "peer": {

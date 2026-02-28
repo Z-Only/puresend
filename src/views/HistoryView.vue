@@ -175,6 +175,8 @@
                                 formatSize(item.fileSize)
                             }}</span>
                             <span class="mr-2">•</span>
+                            <span class="mr-2">{{ displayPeerIp(item) }}</span>
+                            <span class="mr-2">•</span>
                             <span class="mr-2">{{
                                 displayPeerName(item)
                             }}</span>
@@ -300,7 +302,8 @@ import {
 } from '@mdi/js'
 import { useTransferStore } from '@/stores/transfer'
 import { useSettingsStore } from '@/stores/settings'
-import { getStatusKey, formatFileSize } from '@/types'
+import { getStatusKey } from '@/types'
+import { formatFileSize, getStatusColor } from '@/utils/format'
 import type {
     TransferHistoryItem,
     HistorySortField,
@@ -368,18 +371,6 @@ watch([sortField, sortOrder], ([field, order]) => {
     transferStore.setHistorySort({ field, order })
 })
 
-function getStatusColor(status: TaskStatus): string {
-    const colors: Record<TaskStatus, string> = {
-        pending: 'grey',
-        transferring: 'primary',
-        completed: 'success',
-        failed: 'error',
-        cancelled: 'warning',
-        interrupted: 'warning',
-    }
-    return colors[status]
-}
-
 function getDirectionIcon(direction: TransferDirection): string {
     return direction === 'send' ? mdiArrowUp : mdiArrowDown
 }
@@ -409,6 +400,17 @@ function displayPeerName(item: TransferHistoryItem): string {
         return t('history.privacy.hiddenPeerName')
     }
     return item.peerName || t('history.unknownDevice')
+}
+
+function displayPeerIp(item: TransferHistoryItem): string {
+    const privacy = settingsStore.history.privacy
+    if (privacy.enabled && privacy.hideIp) {
+        return t('history.privacy.hiddenPeerIp')
+    }
+    if (item.peerIp && item.peerIp !== item.peerName) {
+        return item.peerIp
+    }
+    return ''
 }
 
 // 选择操作

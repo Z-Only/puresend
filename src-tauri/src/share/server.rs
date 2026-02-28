@@ -25,21 +25,16 @@ use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tokio::sync::Mutex;
 use tokio_util::io::ReaderStream;
-use tower_http::cors::{Any, CorsLayer};
-
 use super::models::{ShareState, ShareUploadRecord};
+use crate::http_common::{
+    self, HasCryptoSessions, ServerCapabilities, HTTP_CHUNK_SIZE,
+};
 use crate::models::FileMetadata;
 use crate::transfer::compression::{
     create_compressor_from_config, get_compression_config, Compressor,
 };
 use crate::transfer::crypto::is_encryption_enabled;
-use crate::transfer::http_crypto::{
-    HandshakeRequest, HandshakeResponse, HttpCryptoSessionManager,
-};
-
-static FAVICON_ICO: &[u8] = include_bytes!("../../icons/32x32.png");
-
-const HTTP_CHUNK_SIZE: usize = 1024 * 1024; // 1MB
+use crate::transfer::http_crypto::HttpCryptoSessionManager;
 
 #[derive(Debug)]
 struct ChunkDownloadSession {
@@ -60,6 +55,12 @@ pub struct ServerState {
     pub app_handle: AppHandle,
     pub crypto_sessions: Arc<Mutex<HttpCryptoSessionManager>>,
     chunk_download_sessions: Arc<Mutex<std::collections::HashMap<String, ChunkDownloadSession>>>,
+}
+
+impl HasCryptoSessions for ServerState {
+    fn crypto_sessions(&self) -> &Arc<Mutex<HttpCryptoSessionManager>> {
+        &self.crypto_sessions
+    }
 }
 
 pub struct ShareServer {
@@ -107,64 +108,37 @@ impl ShareServer {
 
         let app = Router::new()
             .route("/", get(index_handler))
-            .route("/favicon.ico", get(favicon_handler))
-            .route("/apple-touch-icon.png", get(favicon_handler))
-            .route("/apple-touch-icon-precomposed.png", get(favicon_handler))
+            .route("/favicon.ico", get(http_common::favicon_handler))
+            .route("/apple-touch-icon.png", get(http_common::favicon_handler))
+            .route("/apple-touch-icon-precomposed.png", get(http_common::favicon_handler))
             .route("/files", get(list_files_handler))
             .route("/verify-pin", post(verify_pin_handler))
             .route("/request-status", get(request_status_handler))
-            .route("/capabilities", get(capabilities_handler))
-            .route("/crypto/handshake", post(crypto_handshake_handler))
+            .route("/capabilities", get(share_capabilities_handler))
+            .route("/crypto/handshake", post(http_common::crypto_handshake_handler::<ServerState>))
             .route("/download/{file_id}/meta", get(download_meta_handler))
             .route(
                 "/download/{file_id}/chunk/{chunk_index}",
                 get(download_chunk_handler),
             )
-            .route("/download/{file_id}", get(upload_handler))
-            .fallback(fallback_handler)
-            .layer(
-                CorsLayer::new()
-                    .allow_origin(Any)
-                    .allow_methods([axum::http::Method::GET, axum::http::Method::POST])
-                    .allow_headers([
-                        header::CONTENT_TYPE,
-                        header::ACCEPT,
-                        header::RANGE,
-                        HeaderName::from_static("x-encryption-session"),
-                    ])
-                    .expose_headers([
-                        header::CONTENT_RANGE,
-                        header::ACCEPT_RANGES,
-                        header::ETAG,
-                        HeaderName::from_static("x-chunk-index"),
-                        HeaderName::from_static("x-original-size"),
-                        HeaderName::from_static("x-compression"),
-                        HeaderName::from_static("x-encryption"),
-                    ]),
-            )
+            .route("/download/{file_id}", get(file_download_handler))
+            .fallback(http_common::fallback_handler)
+            .layer(http_common::share_cors_layer())
             .with_state(self.state.clone());
 
         let listener = tokio::net::TcpListener::bind(self.addr)
             .await
-            .map_err(|e| format!("绑定端口失败: {}", e))?;
+            .map_err(|e| format!("Failed to bind port: {}", e))?;
 
         let actual_port = listener
             .local_addr()
-            .map_err(|e| format!("获取端口失败: {}", e))?
+            .map_err(|e| format!("Failed to get port: {}", e))?
             .port();
 
         let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
         self.shutdown_tx = Some(shutdown_tx);
 
-        // Spawn periodic cleanup for expired crypto sessions
-        let crypto_sessions = self.state.crypto_sessions.clone();
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(std::time::Duration::from_secs(300));
-            loop {
-                interval.tick().await;
-                crypto_sessions.lock().await.cleanup_expired();
-            }
-        });
+        http_common::spawn_crypto_session_cleanup(self.state.crypto_sessions.clone());
 
         tokio::spawn(async move {
             axum::serve(
@@ -272,69 +246,8 @@ async fn check_download_access(
 
 // ─── Handlers ───────────────────────────────────────────────────────────────
 
-async fn favicon_handler() -> impl IntoResponse {
-    let mut response = Response::new(Body::from(FAVICON_ICO));
-    *response.status_mut() = StatusCode::OK;
-    let headers = response.headers_mut();
-    headers.insert(
-        header::CONTENT_TYPE,
-        axum::http::HeaderValue::from_static("image/png"),
-    );
-    headers.insert(
-        header::CACHE_CONTROL,
-        axum::http::HeaderValue::from_static("max-age=86400"),
-    );
-    response
-}
-
-/// Server capabilities endpoint
-async fn capabilities_handler() -> Json<ServerCapabilities> {
-    let encryption = is_encryption_enabled();
-    let compression_config = get_compression_config();
-    Json(ServerCapabilities {
-        encryption,
-        compression: compression_config.enabled,
-        compression_algorithm: if compression_config.enabled {
-            Some("zstd".to_string())
-        } else {
-            None
-        },
-        chunk_size: HTTP_CHUNK_SIZE,
-    })
-}
-
-/// Crypto handshake endpoint (P-256 ECDH)
-async fn crypto_handshake_handler(
-    ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
-    AxumState(state): AxumState<Arc<ServerState>>,
-    Json(payload): Json<HandshakeRequest>,
-) -> Json<HandshakeResponse> {
-    if !is_encryption_enabled() {
-        return Json(HandshakeResponse {
-            encryption: false,
-            server_public_key: None,
-            session_id: None,
-        });
-    }
-
-    let client_ip = client_addr.ip().to_string();
-    let mut crypto_sessions = state.crypto_sessions.lock().await;
-
-    match crypto_sessions.handshake(&payload.client_public_key, client_ip) {
-        Ok((session_id, server_pub_key)) => Json(HandshakeResponse {
-            encryption: true,
-            server_public_key: Some(server_pub_key),
-            session_id: Some(session_id),
-        }),
-        Err(e) => {
-            eprintln!("加密握手失败: {}", e);
-            Json(HandshakeResponse {
-                encryption: false,
-                server_public_key: None,
-                session_id: None,
-            })
-        }
-    }
+async fn share_capabilities_handler() -> Json<ServerCapabilities> {
+    Json(ServerCapabilities::for_share())
 }
 
 /// Download metadata (chunk info for encrypted/compressed mode)
@@ -470,83 +383,16 @@ async fn download_chunk_handler(
     let mime_type = FileMetadata::infer_mime_type(&file_name);
 
     // Read the chunk
-    let offset = chunk_index as u64 * HTTP_CHUNK_SIZE as u64;
-    if offset >= file_size {
-        return (StatusCode::BAD_REQUEST, "Chunk index out of range").into_response();
-    }
-    let remaining = file_size - offset;
-    let read_size = (remaining as usize).min(HTTP_CHUNK_SIZE);
-
-    let mut file = match File::open(&path).await {
-        Ok(f) => f,
-        Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Open file failed: {}", e),
-            )
-                .into_response()
-        }
+    let buffer = match read_file_chunk(&path, chunk_index, file_size).await {
+        Ok(data) => data,
+        Err(resp) => return resp,
     };
-    if let Err(e) = file.seek(std::io::SeekFrom::Start(offset)).await {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Seek failed: {}", e),
-        )
-            .into_response();
-    }
-    let mut buffer = vec![0u8; read_size];
-    if let Err(e) = file.read_exact(&mut buffer).await {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Read failed: {}", e),
-        )
-            .into_response();
-    }
 
     let original_size = buffer.len();
 
     // Pipeline: compress (optional) → encrypt (optional)
-    let compression_config = get_compression_config();
-    let mut data = buffer;
-    let mut compressed = false;
-
-    if compression_config.enabled {
-        if let Some(compressor) = create_compressor_from_config() {
-            if let Some(level) = compressor.get_level(&mime_type) {
-                if let Ok(compressed_data) = Compressor::compress(&data, level) {
-                    if compressed_data.len() < data.len() {
-                        data = compressed_data;
-                        compressed = true;
-                    }
-                }
-            }
-        }
-    }
-
-    let encryption_enabled = is_encryption_enabled();
-    let mut encrypted = false;
-
-    if encryption_enabled {
-        let session_id = headers
-            .get("x-encryption-session")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("");
-
-        if !session_id.is_empty() {
-            let mut crypto_sessions = state.crypto_sessions.lock().await;
-            if let Some(session) = crypto_sessions.get_session_mut(session_id) {
-                match session.encrypt(&data) {
-                    Ok(encrypted_data) => {
-                        data = encrypted_data;
-                        encrypted = true;
-                    }
-                    Err(e) => {
-                        eprintln!("分块加密失败: {}", e);
-                    }
-                }
-            }
-        }
-    }
+    let (data, compressed) = apply_compression_pipeline(buffer, &mime_type);
+    let (data, encrypted) = apply_encryption_pipeline(data, &headers, &state.crypto_sessions).await;
 
     let mut response = Response::new(Body::from(data));
     *response.status_mut() = StatusCode::OK;
@@ -656,6 +502,46 @@ async fn download_chunk_handler(
     response
 }
 
+/// Handle new visitor access request creation and auto-accept logic
+/// Returns whether the visitor has been granted access
+fn handle_new_visitor(
+    share_state: &mut super::models::ShareState,
+    client_ip: &str,
+    user_agent: &str,
+    app_handle: &AppHandle,
+) -> bool {
+    let has_request = share_state
+        .access_requests
+        .values()
+        .any(|r| r.ip == client_ip);
+
+    if !has_request {
+        let mut new_request =
+            super::models::AccessRequest::new(client_ip.to_string(), Some(user_agent.to_string()));
+
+        if share_state.settings.auto_accept {
+            new_request.status = super::models::AccessRequestStatus::Accepted;
+        }
+
+        share_state
+            .access_requests
+            .insert(new_request.id.clone(), new_request.clone());
+
+        let _ = app_handle.emit("access-request", new_request.clone());
+
+        if new_request.status == super::models::AccessRequestStatus::Accepted {
+            if !share_state.verified_ips.contains(&client_ip.to_string()) {
+                share_state.verified_ips.push(client_ip.to_string());
+            }
+
+            let _ = app_handle.emit("access-request-accepted", new_request);
+            return true;
+        }
+    }
+
+    false
+}
+
 /// Index handler
 async fn index_handler(
     ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
@@ -666,7 +552,7 @@ async fn index_handler(
     let user_agent = headers
         .get(header::USER_AGENT)
         .and_then(|v| v.to_str().ok())
-        .map(|s| parse_user_agent(s))
+        .map(|s| http_common::parse_user_agent(s))
         .unwrap_or_default();
 
     let accept_language = headers
@@ -716,43 +602,14 @@ async fn index_handler(
             return Html(generate_pin_input_html(is_english)).into_response();
         }
 
-        let has_request = share_state
-            .access_requests
-            .values()
-            .any(|r| r.ip == client_ip);
-        if !has_pin && share_state.settings.auto_accept && !has_request {
-            let mut new_request =
-                super::models::AccessRequest::new(client_ip.clone(), Some(user_agent.to_string()));
-            new_request.status = super::models::AccessRequestStatus::Accepted;
-            share_state
-                .access_requests
-                .insert(new_request.id.clone(), new_request.clone());
-
-            if !share_state.verified_ips.contains(&client_ip) {
-                share_state.verified_ips.push(client_ip.clone());
+        if !has_pin {
+            let granted_access = handle_new_visitor(&mut share_state, &client_ip, &user_agent, &state.app_handle);
+            if !granted_access && !share_state.is_ip_allowed(&client_ip) {
+                return Html(generate_waiting_response_html(is_english)).into_response();
             }
-
-            let _ = state.app_handle.emit("access-request", new_request);
-            let _ = state.app_handle.emit(
-                "access-request-accepted",
-                share_state
-                    .access_requests
-                    .values()
-                    .find(|r| r.ip == client_ip)
-                    .cloned(),
-            );
         }
 
-        if !has_pin && !share_state.settings.auto_accept && !has_request {
-            let new_request =
-                super::models::AccessRequest::new(client_ip.clone(), Some(user_agent.to_string()));
-            share_state
-                .access_requests
-                .insert(new_request.id.clone(), new_request.clone());
-            let _ = state.app_handle.emit("access-request", new_request);
-        }
-
-        if !has_access && !share_state.settings.auto_accept {
+        if !share_state.is_ip_allowed(&client_ip) {
             return Html(generate_waiting_response_html(is_english)).into_response();
         }
     }
@@ -883,7 +740,7 @@ async fn verify_pin_handler(
     let user_agent = headers
         .get(header::USER_AGENT)
         .and_then(|v| v.to_str().ok())
-        .map(|s| parse_user_agent(s).to_string());
+        .map(|s| http_common::parse_user_agent(s).to_string());
     let mut share_state = state.share_state.lock().await;
 
     if let Some(attempt) = share_state.pin_attempts.get(&client_ip) {
@@ -980,7 +837,7 @@ async fn request_status_handler(
     let user_agent = headers
         .get(header::USER_AGENT)
         .and_then(|v| v.to_str().ok())
-        .map(|s| parse_user_agent(s))
+        .map(|s| http_common::parse_user_agent(s))
         .unwrap_or_default();
     let mut share_state = state.share_state.lock().await;
 
@@ -1055,19 +912,147 @@ async fn request_status_handler(
     (StatusCode::OK, Json(response))
 }
 
-async fn fallback_handler(uri: axum::http::Uri) -> impl IntoResponse {
-    eprintln!("未匹配的路由: {}", uri);
-    (
-        StatusCode::NOT_FOUND,
-        Html(format!(
-            "<html><body><h1>404 - 路由未找到</h1><p>请求的路径: {}</p></body></html>",
-            uri
-        )),
-    )
+/// Build a Range partial content response
+async fn build_range_response(
+    path: &std::path::Path,
+    file_name: &str,
+    file_size: u64,
+    start: u64,
+    end: u64,
+    mime_type: &str,
+    etag: &str,
+) -> Response {
+    let content_length = end - start + 1;
+
+    match File::open(path).await {
+        Ok(mut file) => {
+            if let Err(e) = file.seek(std::io::SeekFrom::Start(start)).await {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Seek failed: {}", e),
+                )
+                    .into_response();
+            }
+
+            let limited = file.take(content_length);
+            let stream = ReaderStream::new(limited);
+            let body = Body::from_stream(stream);
+
+            let mut response = Response::new(body);
+            *response.status_mut() = StatusCode::PARTIAL_CONTENT;
+            let resp_headers = response.headers_mut();
+            resp_headers.insert(
+                header::CONTENT_RANGE,
+                format!("bytes {}-{}/{}", start, end, file_size)
+                    .parse()
+                    .unwrap(),
+            );
+            resp_headers.insert(
+                header::CONTENT_LENGTH,
+                content_length.to_string().parse().unwrap(),
+            );
+            resp_headers.insert(
+                header::ACCEPT_RANGES,
+                "bytes".parse().unwrap(),
+            );
+            resp_headers.insert(header::ETAG, etag.parse().unwrap());
+            if let Ok(mime_header) = mime_type.parse() {
+                resp_headers.insert(header::CONTENT_TYPE, mime_header);
+            }
+            let encoded_filename = urlencoding::encode(file_name);
+            resp_headers.insert(
+                header::CONTENT_DISPOSITION,
+                format!("attachment; filename*=UTF-8''{}", encoded_filename)
+                    .parse()
+                    .unwrap(),
+            );
+
+            response
+        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Open file failed: {}", e),
+        )
+            .into_response(),
+    }
+}
+
+/// Build a full file download response with progress tracking stream
+async fn build_full_download_response(
+    path: &std::path::Path,
+    file_name: &str,
+    file_size: u64,
+    mime_type: &str,
+    etag: &str,
+    state: &Arc<ServerState>,
+    upload_id: String,
+    client_ip: String,
+) -> Response {
+    match File::open(path).await {
+        Ok(file) => {
+            let reader_stream = ReaderStream::new(file);
+            let progress_stream = ProgressTrackingStream::new(
+                reader_stream,
+                state.app_handle.clone(),
+                state.share_state.clone(),
+                upload_id.clone(),
+                file_name.to_string(),
+                client_ip,
+                file_size,
+            );
+            let body = Body::from_stream(progress_stream);
+
+            let mut response = Response::new(body);
+            *response.status_mut() = StatusCode::OK;
+            let resp_headers = response.headers_mut();
+            if let Ok(mime_header) = mime_type.parse() {
+                resp_headers.insert(header::CONTENT_TYPE, mime_header);
+            } else {
+                resp_headers.insert(
+                    header::CONTENT_TYPE,
+                    "application/octet-stream".parse().unwrap(),
+                );
+            }
+            let encoded_filename = urlencoding::encode(file_name);
+            resp_headers.insert(
+                header::CONTENT_DISPOSITION,
+                format!("attachment; filename*=UTF-8''{}", encoded_filename)
+                    .parse()
+                    .unwrap(),
+            );
+            resp_headers.insert(
+                header::CONTENT_LENGTH,
+                file_size.to_string().parse().unwrap(),
+            );
+            resp_headers.insert(
+                header::ACCEPT_RANGES,
+                "bytes".parse().unwrap(),
+            );
+            resp_headers.insert(header::ETAG, etag.parse().unwrap());
+
+            response
+        }
+        Err(e) => {
+            let mut share_state = state.share_state.lock().await;
+            for request in share_state.access_requests.values_mut() {
+                if let Some(record) = request
+                    .upload_records
+                    .iter_mut()
+                    .find(|r| r.id == upload_id)
+                {
+                    record.status = super::models::TransferStatus::Failed;
+                    break;
+                }
+            }
+            let error_html =
+                format!("<html><body><h1>Failed to open file: {}</h1></body></html>", e);
+            Html(error_html).into_response()
+        }
+    }
 }
 
 /// File download handler with Range support
-async fn upload_handler(
+async fn file_download_handler(
     ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
     AxumState(state): AxumState<Arc<ServerState>>,
     Path(file_id): Path<String>,
@@ -1137,133 +1122,134 @@ async fn upload_handler(
                 .and_then(|s| parse_range(s, file_size));
 
             if let Some((start, end)) = range_header {
-                // Partial content response
-                let content_length = end - start + 1;
-
-                match File::open(&path).await {
-                    Ok(mut file) => {
-                        if let Err(e) = file.seek(std::io::SeekFrom::Start(start)).await {
-                            return (
-                                StatusCode::INTERNAL_SERVER_ERROR,
-                                format!("Seek failed: {}", e),
-                            )
-                                .into_response();
-                        }
-
-                        let limited = file.take(content_length);
-                        let stream = ReaderStream::new(limited);
-                        let body = Body::from_stream(stream);
-
-                        let mut response = Response::new(body);
-                        *response.status_mut() = StatusCode::PARTIAL_CONTENT;
-                        let resp_headers = response.headers_mut();
-                        resp_headers.insert(
-                            header::CONTENT_RANGE,
-                            format!("bytes {}-{}/{}", start, end, file_size)
-                                .parse()
-                                .unwrap(),
-                        );
-                        resp_headers.insert(
-                            header::CONTENT_LENGTH,
-                            content_length.to_string().parse().unwrap(),
-                        );
-                        resp_headers.insert(
-                            header::ACCEPT_RANGES,
-                            "bytes".parse().unwrap(),
-                        );
-                        resp_headers.insert(header::ETAG, etag.parse().unwrap());
-                        if let Ok(mime_header) = mime_type.parse() {
-                            resp_headers.insert(header::CONTENT_TYPE, mime_header);
-                        }
-                        let encoded_filename = urlencoding::encode(&file_name);
-                        resp_headers.insert(
-                            header::CONTENT_DISPOSITION,
-                            format!("attachment; filename*=UTF-8''{}", encoded_filename)
-                                .parse()
-                                .unwrap(),
-                        );
-
-                        return response;
-                    }
-                    Err(e) => {
-                        return (
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            format!("Open file failed: {}", e),
-                        )
-                            .into_response();
-                    }
-                }
+                return build_range_response(&path, &file_name, file_size, start, end, &mime_type, &etag).await;
             }
 
             // Full file download with progress tracking
-            match File::open(&path).await {
-                Ok(file) => {
-                    let reader_stream = ReaderStream::new(file);
-                    let progress_stream = ProgressTrackingStream::new(
-                        reader_stream,
-                        state.app_handle.clone(),
-                        state.share_state.clone(),
-                        upload_id,
-                        file_name.clone(),
-                        client_ip.clone(),
-                        file_size,
-                    );
-                    let body = Body::from_stream(progress_stream);
+            build_full_download_response(
+                &path,
+                &file_name,
+                file_size,
+                &mime_type,
+                &etag,
+                &state,
+                upload_id,
+                client_ip,
+            )
+            .await
+        }
+        None => {
+            Html("<html><body><h1>文件不存在</h1></body></html>").into_response()
+        }
+    }
+}
 
-                    let mut response = Response::new(body);
-                    *response.status_mut() = StatusCode::OK;
-                    let resp_headers = response.headers_mut();
-                    if let Ok(mime_header) = mime_type.parse() {
-                        resp_headers.insert(header::CONTENT_TYPE, mime_header);
-                    } else {
-                        resp_headers.insert(
-                            header::CONTENT_TYPE,
-                            "application/octet-stream".parse().unwrap(),
-                        );
-                    }
-                    let encoded_filename = urlencoding::encode(&file_name);
-                    resp_headers.insert(
-                        header::CONTENT_DISPOSITION,
-                        format!("attachment; filename*=UTF-8''{}", encoded_filename)
-                            .parse()
-                            .unwrap(),
-                    );
-                    resp_headers.insert(
-                        header::CONTENT_LENGTH,
-                        file_size.to_string().parse().unwrap(),
-                    );
-                    resp_headers.insert(
-                        header::ACCEPT_RANGES,
-                        "bytes".parse().unwrap(),
-                    );
-                    resp_headers.insert(header::ETAG, etag.parse().unwrap());
+// ─── Helper functions for download_chunk_handler ─────────────────────────────
 
-                    return response;
-                }
-                Err(e) => {
-                    {
-                        let mut share_state = state.share_state.lock().await;
-                        for request in share_state.access_requests.values_mut() {
-                            if let Some(record) = request
-                                .upload_records
-                                .iter_mut()
-                                .find(|r| r.id == upload_id)
-                            {
-                                record.status = super::models::TransferStatus::Failed;
-                                break;
-                            }
-                        }
+async fn read_file_chunk(
+    path: &std::path::Path,
+    chunk_index: usize,
+    file_size: u64,
+) -> Result<Vec<u8>, Response> {
+    let offset = chunk_index as u64 * HTTP_CHUNK_SIZE as u64;
+    if offset >= file_size {
+        return Err(
+            (StatusCode::BAD_REQUEST, "Chunk index out of range").into_response()
+        );
+    }
+    let remaining = file_size - offset;
+    let read_size = (remaining as usize).min(HTTP_CHUNK_SIZE);
+
+    let mut file = match File::open(path).await {
+        Ok(f) => f,
+        Err(e) => {
+            return Err(
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Open file failed: {}", e),
+                )
+                    .into_response()
+            )
+        }
+    };
+
+    if let Err(e) = file.seek(std::io::SeekFrom::Start(offset)).await {
+        return Err(
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Seek failed: {}", e),
+            )
+                .into_response()
+        );
+    }
+
+    let mut buffer = vec![0u8; read_size];
+    if let Err(e) = file.read_exact(&mut buffer).await {
+        return Err(
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Read failed: {}", e),
+            )
+                .into_response()
+        );
+    }
+
+    Ok(buffer)
+}
+
+fn apply_compression_pipeline(data: Vec<u8>, mime_type: &str) -> (Vec<u8>, bool) {
+    let compression_config = get_compression_config();
+    let mut compressed = false;
+    let mut result_data = data;
+
+    if compression_config.enabled {
+        if let Some(compressor) = create_compressor_from_config() {
+            if let Some(level) = compressor.get_level(mime_type) {
+                if let Ok(compressed_data) = Compressor::compress(&result_data, level) {
+                    if compressed_data.len() < result_data.len() {
+                        result_data = compressed_data;
+                        compressed = true;
                     }
-                    let error_html =
-                        format!("<html><body><h1>打开文件失败：{}</h1></body></html>", e);
-                    return Html(error_html).into_response();
                 }
             }
         }
-        None => {
-            return Html("<html><body><h1>文件不存在</h1></body></html>").into_response();
+    }
+
+    (result_data, compressed)
+}
+
+async fn apply_encryption_pipeline(
+    data: Vec<u8>,
+    headers: &HeaderMap,
+    crypto_sessions: &Arc<Mutex<HttpCryptoSessionManager>>,
+) -> (Vec<u8>, bool) {
+    let encryption_enabled = is_encryption_enabled();
+    let mut encrypted = false;
+    let mut result_data = data;
+
+    if encryption_enabled {
+        let session_id = headers
+            .get("x-encryption-session")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+
+        if !session_id.is_empty() {
+            let mut crypto_sessions = crypto_sessions.lock().await;
+            if let Some(session) = crypto_sessions.get_session_mut(session_id) {
+                match session.encrypt(&result_data) {
+                    Ok(encrypted_data) => {
+                        result_data = encrypted_data;
+                        encrypted = true;
+                    }
+                    Err(e) => {
+                        eprintln!("Chunk encryption failed: {}", e);
+                    }
+                }
+            }
         }
     }
+
+    (result_data, encrypted)
 }
 
 // ─── Data types ─────────────────────────────────────────────────────────────
@@ -1284,14 +1270,6 @@ struct UploadCompletePayload {
     client_ip: String,
 }
 
-#[derive(Debug, Serialize)]
-struct ServerCapabilities {
-    encryption: bool,
-    compression: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    compression_algorithm: Option<String>,
-    chunk_size: usize,
-}
 
 #[derive(Debug, Serialize)]
 struct DownloadMeta {
@@ -1505,149 +1483,291 @@ impl Stream for ProgressTrackingStream {
     }
 }
 
-// ─── Utility ────────────────────────────────────────────────────────────────
 
-#[allow(dead_code)]
-fn format_size(size: u64) -> String {
-    const UNITS: [&str; 5] = ["B", "KB", "MB", "GB", "TB"];
-    let mut size = size as f64;
-    let mut unit_index = 0;
-
-    while size >= 1024.0 && unit_index < UNITS.len() - 1 {
-        size /= 1024.0;
-        unit_index += 1;
-    }
-
-    if unit_index == 0 {
-        format!("{} {}", size as u64, UNITS[unit_index])
-    } else {
-        format!("{:.2} {}", size, UNITS[unit_index])
-    }
+/// Structure to hold internationalized labels for the file list page
+#[derive(Debug, Clone)]
+struct FileListPageLabels {
+    /// Label for downloading status
+    pub downloading: String,
+    /// Label for download complete status
+    pub download_complete: String,
+    /// Label for download failed status
+    pub download_failed: String,
+    /// Label for encrypted files
+    pub encrypted_label: String,
+    /// Label for compressed files
+    pub compressed_label: String,
+    /// Label when no files are available
+    pub no_files: String,
 }
 
-fn parse_user_agent(ua: &str) -> &'static str {
-    let ua_lower = ua.to_lowercase();
+/// Returns the CSS styles for the file list page
+fn file_list_page_css() -> &'static str {
+    r#"        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        h1 { color: #333; }
+        ul { list-style: none; padding: 0; }
+        li { padding: 12px; border-bottom: 1px solid #eee; display: flex; align-items: center; justify-content: space-between; }
+        a { color: #1976d2; text-decoration: none; cursor: pointer; }
+        a:hover { text-decoration: underline; }
+        .warning { background: #fff3cd; padding: 10px; border-radius: 4px; margin-bottom: 20px; }
+        .empty { color: #999; text-align: center; padding: 40px 0; }
+        .badges { display: flex; gap: 6px; margin-left: 10px; }
+        .badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; color: #fff; }
+        .badge-enc { background: #2e7d32; }
+        .badge-comp { background: #1565c0; }
+        .progress-bar { width: 100%; height: 4px; background: #e0e0e0; border-radius: 2px; margin-top: 6px; overflow: hidden; }
+        .progress-fill { height: 100%; background: #1976d2; transition: width 0.3s; }
+        .progress-text { font-size: 12px; color: #666; margin-top: 4px; }
+        .file-info { flex: 1; }
+        .file-size { color: #888; font-size: 13px; margin-left: 8px; }"#
+}
 
-    let platform = if ua_lower.contains("android") {
-        "Android"
-    } else if ua_lower.contains("iphone") || ua_lower.contains("ipad") || ua_lower.contains("ipod")
-    {
-        "iOS"
-    } else if ua_lower.contains("mac") || ua_lower.contains("macos") {
-        "macOS"
-    } else if ua_lower.contains("windows") || ua_lower.contains("win") {
-        "Windows"
-    } else if ua_lower.contains("linux") {
-        "Linux"
-    } else {
-        "Unknown"
-    };
+/// Returns the JavaScript code for the file list page with internationalized labels
+fn file_list_page_javascript(labels: &FileListPageLabels) -> String {
+    format!(
+        r#"
+        var caps = null;
+        var cryptoKey = null;
+        var sessionId = null;
 
-    let browser = if ua_lower.contains("edg/") || ua_lower.contains("edge") {
-        "Edge"
-    } else if ua_lower.contains("opr/") || ua_lower.contains("opera") {
-        "Opera"
-    } else if ua_lower.contains("firefox") || ua_lower.contains("fxios") {
-        "Firefox"
-    } else if ua_lower.contains("chrome") || ua_lower.contains("crios") {
-        "Chrome"
-    } else if ua_lower.contains("safari") && !ua_lower.contains("chrome") {
-        "Safari"
-    } else if ua_lower.contains("msie") || ua_lower.contains("trident") {
-        "IE"
-    } else {
-        "Unknown"
-    };
+        function formatSize(bytes) {{
+            if (bytes === 0) return '0 B';
+            var units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            var i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + units[i];
+        }}
 
-    match (browser, platform) {
-        ("Chrome", "Android") => "Chrome(Android)",
-        ("Chrome", "iOS") => "Chrome(iOS)",
-        ("Chrome", "macOS") => "Chrome(macOS)",
-        ("Chrome", "Windows") => "Chrome(Windows)",
-        ("Chrome", "Linux") => "Chrome(Linux)",
-        ("Chrome", _) => "Chrome",
-        ("Safari", "iOS") => "Safari(iOS)",
-        ("Safari", "macOS") => "Safari(macOS)",
-        ("Safari", _) => "Safari",
-        ("Firefox", "Android") => "Firefox(Android)",
-        ("Firefox", "iOS") => "Firefox(iOS)",
-        ("Firefox", _) => "Firefox",
-        ("Edge", "Windows") => "Edge(Windows)",
-        ("Edge", "macOS") => "Edge(macOS)",
-        ("Edge", _) => "Edge",
-        ("Opera", "Android") => "Opera(Android)",
-        ("Opera", _) => "Opera",
-        ("IE", _) => "IE",
-        (_, "Android") => "Browser(Android)",
-        (_, "iOS") => "Browser(iOS)",
-        (_, _) => "Browser",
-    }
+        async function initEnhanced() {{
+            try {{
+                var resp = await fetch('/capabilities');
+                caps = await resp.json();
+                if (caps.encryption) {{
+                    await performHandshake();
+                }}
+            }} catch(e) {{
+                console.warn('Enhanced transfer init failed:', e);
+                caps = {{ encryption: false, compression: false }};
+            }}
+        }}
+
+        async function performHandshake() {{
+            try {{
+                var keyPair = await crypto.subtle.generateKey(
+                    {{ name: 'ECDH', namedCurve: 'P-256' }},
+                    true,
+                    ['deriveBits']
+                );
+                var pubRaw = await crypto.subtle.exportKey('raw', keyPair.publicKey);
+                var pubB64 = btoa(String.fromCharCode.apply(null, new Uint8Array(pubRaw)));
+
+                var resp = await fetch('/crypto/handshake', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ client_public_key: pubB64 }})
+                }});
+                var result = await resp.json();
+                if (!result.encryption) return;
+
+                sessionId = result.session_id;
+
+                var serverPubBytes = Uint8Array.from(atob(result.server_public_key), function(c) {{ return c.charCodeAt(0); }});
+                var serverPubKey = await crypto.subtle.importKey(
+                    'raw', serverPubBytes,
+                    {{ name: 'ECDH', namedCurve: 'P-256' }},
+                    false, []
+                );
+
+                var sharedBits = await crypto.subtle.deriveBits(
+                    {{ name: 'ECDH', public: serverPubKey }},
+                    keyPair.privateKey, 256
+                );
+
+                var hkdfKey = await crypto.subtle.importKey('raw', sharedBits, 'HKDF', false, ['deriveKey']);
+                cryptoKey = await crypto.subtle.deriveKey(
+                    {{
+                        name: 'HKDF', hash: 'SHA-256',
+                        salt: new Uint8Array(0),
+                        info: new TextEncoder().encode('puresend-http-encryption')
+                    }},
+                    hkdfKey,
+                    {{ name: 'AES-GCM', length: 256 }},
+                    false, ['decrypt']
+                );
+            }} catch(e) {{
+                console.warn('Handshake failed:', e);
+                caps.encryption = false;
+            }}
+        }}
+
+        async function decryptChunk(data) {{
+            var nonce = data.slice(0, 12);
+            var ciphertext = data.slice(12);
+            var decrypted = await crypto.subtle.decrypt(
+                {{ name: 'AES-GCM', iv: nonce }},
+                cryptoKey, ciphertext
+            );
+            return new Uint8Array(decrypted);
+        }}
+
+        async function downloadDirect(fileId, fileName, fileSize) {{
+            var li = document.getElementById('dl-' + fileId);
+            var progressBar = li.querySelector('.progress-fill');
+            var progressText = li.querySelector('.progress-text');
+            if (progressBar) progressBar.style.width = '0%';
+            if (progressText) progressText.textContent = '{}';
+
+            try {{
+                var resp = await fetch('/download/' + fileId);
+                var contentLength = parseInt(resp.headers.get('Content-Length') || fileSize);
+                var reader = resp.body.getReader();
+                var chunks = [];
+                var received = 0;
+
+                while (true) {{
+                    var result = await reader.read();
+                    if (result.done) break;
+                    chunks.push(result.value);
+                    received += result.value.length;
+                    var pct = contentLength > 0 ? Math.min(100, Math.round(received / contentLength * 100)) : 0;
+                    if (progressBar) progressBar.style.width = pct + '%';
+                    if (progressText) progressText.textContent = pct + '% (' + formatSize(received) + ' / ' + formatSize(contentLength) + ')';
+                }}
+
+                var blob = new Blob(chunks);
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                if (progressBar) {{ progressBar.style.width = '100%'; progressBar.style.background = '#4caf50'; }}
+                if (progressText) progressText.textContent = '{}';
+            }} catch(e) {{
+                console.error('Download failed:', e);
+                if (progressText) {{ progressText.textContent = '{}: ' + e.message; progressText.style.color = '#d32f2f'; }}
+            }}
+        }}
+
+        async function downloadEnhanced(fileId, fileName, fileSize) {{
+            var li = document.getElementById('dl-' + fileId);
+            var progressBar = li.querySelector('.progress-fill');
+            var progressText = li.querySelector('.progress-text');
+            if (progressBar) progressBar.style.width = '0%';
+            if (progressText) progressText.textContent = '{}';
+
+            try {{
+                var metaResp = await fetch('/download/' + fileId + '/meta');
+                var meta = await metaResp.json();
+
+                if (!meta.encryption && !meta.compression) {{
+                    await downloadDirect(fileId, fileName, fileSize);
+                    return;
+                }}
+
+                var chunks = [];
+                var downloaded = 0;
+
+                for (var i = 0; i < meta.chunk_count; i++) {{
+                    var headers = {{}};
+                    if (sessionId) headers['X-Encryption-Session'] = sessionId;
+
+                    var resp = await fetch('/download/' + fileId + '/chunk/' + i, {{ headers: headers }});
+                    var data = new Uint8Array(await resp.arrayBuffer());
+
+                    var isEncrypted = resp.headers.get('x-encryption') === 'aes-256-gcm';
+                    if (isEncrypted && cryptoKey) {{
+                        data = await decryptChunk(data);
+                    }}
+
+                    chunks.push(data);
+                    downloaded += data.length;
+
+                    var pct = Math.min(100, Math.round(downloaded / meta.file_size * 100));
+                    if (progressBar) progressBar.style.width = pct + '%';
+                    if (progressText) progressText.textContent = pct + '% (' + formatSize(downloaded) + ' / ' + formatSize(meta.file_size) + ')';
+                }}
+
+                var blob = new Blob(chunks);
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                if (progressBar) {{ progressBar.style.width = '100%'; progressBar.style.background = '#4caf50'; }}
+                if (progressText) progressText.textContent = '{}';
+            }} catch(e) {{
+                console.error('Download failed:', e);
+                if (progressText) {{
+                    progressText.textContent = '{}: ' + e.message;
+                    progressText.style.color = '#d32f2f';
+                }}
+            }}
+        }}
+
+        function downloadFile(fileId, fileName, fileSize) {{
+            if (caps && (caps.encryption || caps.compression)) {{
+                downloadEnhanced(fileId, fileName, fileSize);
+            }} else {{
+                downloadDirect(fileId, fileName, fileSize);
+            }}
+        }}
+
+        var lastJson = '';
+        function refreshFiles() {{
+            fetch('/files')
+                .then(function(r) {{ return r.json(); }})
+                .then(function(data) {{
+                    var json = JSON.stringify(data.files);
+                    if (json === lastJson) return;
+                    lastJson = json;
+                    var ul = document.getElementById('file-list');
+                    if (!data.files || data.files.length === 0) {{
+                        ul.innerHTML = '<li class="empty">{}</li>';
+                        return;
+                    }}
+                    ul.innerHTML = data.files.map(function(f) {{
+                        var badges = '';
+                        if (caps && caps.encryption) badges += '<span class="badge badge-enc">{}</span>';
+                        if (caps && caps.compression) badges += '<span class="badge badge-comp">{}</span>';
+                        return '<li id="dl-' + f.id + '">'
+                            + '<div class="file-info">'
+                            + '<a onclick="downloadFile(\'' + f.id + '\',\'' + f.name.replace(/'/g, "\\'") + '\',' + f.size + ')">' + f.name + '</a>'
+                            + '<span class="file-size">(' + formatSize(f.size) + ')</span>'
+                            + (badges ? '<div class="badges">' + badges + '</div>' : '')
+                            + '<div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>'
+                            + '<div class="progress-text"></div>'
+                            + '</div>'
+                            + '</li>';
+                    }}).join('');
+                }})
+                .catch(function() {{}});
+        }}
+
+        initEnhanced().then(function() {{
+            refreshFiles();
+            setInterval(refreshFiles, 2000);
+        }});
+"#,
+        labels.downloading,
+        labels.download_complete,
+        labels.download_failed,
+        labels.downloading,
+        labels.download_complete,
+        labels.download_failed,
+        labels.no_files,
+        labels.encrypted_label,
+        labels.compressed_label
+    )
 }
 
 // ─── HTML templates ─────────────────────────────────────────────────────────
-
-static _PIN_INPUT_HTML_OLD: &str = r#"
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PureSend - PIN 验证</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 400px; margin: 100px auto; padding: 20px; text-align: center; }
-        h1 { color: #333; }
-        input { width: 100%; padding: 12px; font-size: 18px; text-align: center; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; }
-        button { width: 100%; padding: 12px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
-        button:hover { background: #1565c0; }
-        .error { color: #d32f2f; margin-top: 10px; }
-    </style>
-</head>"
-<body>
-    <h1>请输入 PIN 码</h1>
-    <input type="text" id="pin" maxlength="6" pattern="[0-9]*" inputmode="numeric" placeholder="输入 PIN 码">
-    <button onclick="verify()">验证</button>
-    <div id="error" class="error"></div>
-    
-    <script>
-        async function verify() {
-            const pin = document.getElementById('pin').value;
-            const errorDiv = document.getElementById('error');
-            
-            if (!pin) {
-                errorDiv.textContent = '请输入 PIN 码';
-                return;
-            }
-            
-            try {
-                const response = await fetch('/verify-pin', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ pin })
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    window.location.reload();
-                } else {
-                    if (result.locked) {
-                        errorDiv.textContent = '尝试次数过多，已锁定 5 分钟';
-                    } else {
-                        errorDiv.textContent = 'PIN 码错误，剩余 ' + result.remainingAttempts + ' 次尝试';
-                    }
-                }
-            } catch (e) {
-                errorDiv.textContent = '验证失败，请重试';
-            }
-        }
-        
-        document.getElementById('pin').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') verify();
-        });
-    </script>
-</body>
-</html>
-"#;
 
 fn generate_share_ended_html(is_english: bool) -> String {
     let title = if is_english { "PureSend - Share Ended" } else { "PureSend - 分享已结束" };
@@ -1922,13 +2042,19 @@ fn generate_file_list_html(is_english: bool) -> String {
     };
     let files_heading = if is_english { "Available Files" } else { "可用文件" };
     let loading = if is_english { "Loading..." } else { "加载中..." };
-    let no_files = if is_english { "No files available" } else { "暂无可用文件" };
     let lang = if is_english { "en" } else { "zh-CN" };
-    let downloading = if is_english { "Downloading..." } else { "下载中..." };
-    let download_complete = if is_english { "Download complete" } else { "下载完成" };
-    let download_failed = if is_english { "Download failed" } else { "下载失败" };
-    let encrypted_label = if is_english { "Encrypted" } else { "已加密" };
-    let compressed_label = if is_english { "Compressed" } else { "已压缩" };
+
+    let labels = FileListPageLabels {
+        downloading: if is_english { "Downloading...".to_string() } else { "下载中...".to_string() },
+        download_complete: if is_english { "Download complete".to_string() } else { "下载完成".to_string() },
+        download_failed: if is_english { "Download failed".to_string() } else { "下载失败".to_string() },
+        encrypted_label: if is_english { "Encrypted".to_string() } else { "已加密".to_string() },
+        compressed_label: if is_english { "Compressed".to_string() } else { "已压缩".to_string() },
+        no_files: if is_english { "No files available".to_string() } else { "暂无可用文件".to_string() },
+    };
+
+    let css = file_list_page_css().to_string();
+    let javascript = file_list_page_javascript(&labels);
 
     format!(
         r##"<!DOCTYPE html>
@@ -1939,23 +2065,7 @@ fn generate_file_list_html(is_english: bool) -> String {
     <link rel="icon" type="image/png" href="/favicon.ico">
     <title>{title}</title>
     <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }}
-        h1 {{ color: #333; }}
-        ul {{ list-style: none; padding: 0; }}
-        li {{ padding: 12px; border-bottom: 1px solid #eee; display: flex; align-items: center; justify-content: space-between; }}
-        a {{ color: #1976d2; text-decoration: none; cursor: pointer; }}
-        a:hover {{ text-decoration: underline; }}
-        .warning {{ background: #fff3cd; padding: 10px; border-radius: 4px; margin-bottom: 20px; }}
-        .empty {{ color: #999; text-align: center; padding: 40px 0; }}
-        .badges {{ display: flex; gap: 6px; margin-left: 10px; }}
-        .badge {{ font-size: 11px; padding: 2px 6px; border-radius: 4px; color: #fff; }}
-        .badge-enc {{ background: #2e7d32; }}
-        .badge-comp {{ background: #1565c0; }}
-        .progress-bar {{ width: 100%; height: 4px; background: #e0e0e0; border-radius: 2px; margin-top: 6px; overflow: hidden; }}
-        .progress-fill {{ height: 100%; background: #1976d2; transition: width 0.3s; }}
-        .progress-text {{ font-size: 12px; color: #666; margin-top: 4px; }}
-        .file-info {{ flex: 1; }}
-        .file-size {{ color: #888; font-size: 13px; margin-left: 8px; }}
+{css}
     </style>
 </head>
 <body>
@@ -1966,234 +2076,7 @@ fn generate_file_list_html(is_english: bool) -> String {
         <li class="empty">{loading}</li>
     </ul>
     <script>
-        var caps = null;
-        var cryptoKey = null;
-        var sessionId = null;
-
-        function formatSize(bytes) {{
-            if (bytes === 0) return '0 B';
-            var units = ['B', 'KB', 'MB', 'GB', 'TB'];
-            var i = Math.floor(Math.log(bytes) / Math.log(1024));
-            return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + units[i];
-        }}
-
-        async function initEnhanced() {{
-            try {{
-                var resp = await fetch('/capabilities');
-                caps = await resp.json();
-                if (caps.encryption) {{
-                    await performHandshake();
-                }}
-            }} catch(e) {{
-                console.warn('Enhanced transfer init failed:', e);
-                caps = {{ encryption: false, compression: false }};
-            }}
-        }}
-
-        async function performHandshake() {{
-            try {{
-                var keyPair = await crypto.subtle.generateKey(
-                    {{ name: 'ECDH', namedCurve: 'P-256' }},
-                    true,
-                    ['deriveBits']
-                );
-                var pubRaw = await crypto.subtle.exportKey('raw', keyPair.publicKey);
-                var pubB64 = btoa(String.fromCharCode.apply(null, new Uint8Array(pubRaw)));
-
-                var resp = await fetch('/crypto/handshake', {{
-                    method: 'POST',
-                    headers: {{ 'Content-Type': 'application/json' }},
-                    body: JSON.stringify({{ client_public_key: pubB64 }})
-                }});
-                var result = await resp.json();
-                if (!result.encryption) return;
-
-                sessionId = result.session_id;
-
-                var serverPubBytes = Uint8Array.from(atob(result.server_public_key), function(c) {{ return c.charCodeAt(0); }});
-                var serverPubKey = await crypto.subtle.importKey(
-                    'raw', serverPubBytes,
-                    {{ name: 'ECDH', namedCurve: 'P-256' }},
-                    false, []
-                );
-
-                var sharedBits = await crypto.subtle.deriveBits(
-                    {{ name: 'ECDH', public: serverPubKey }},
-                    keyPair.privateKey, 256
-                );
-
-                var hkdfKey = await crypto.subtle.importKey('raw', sharedBits, 'HKDF', false, ['deriveKey']);
-                cryptoKey = await crypto.subtle.deriveKey(
-                    {{
-                        name: 'HKDF', hash: 'SHA-256',
-                        salt: new Uint8Array(0),
-                        info: new TextEncoder().encode('puresend-http-encryption')
-                    }},
-                    hkdfKey,
-                    {{ name: 'AES-GCM', length: 256 }},
-                    false, ['decrypt']
-                );
-            }} catch(e) {{
-                console.warn('Handshake failed:', e);
-                caps.encryption = false;
-            }}
-        }}
-
-        async function decryptChunk(data) {{
-            var nonce = data.slice(0, 12);
-            var ciphertext = data.slice(12);
-            var decrypted = await crypto.subtle.decrypt(
-                {{ name: 'AES-GCM', iv: nonce }},
-                cryptoKey, ciphertext
-            );
-            return new Uint8Array(decrypted);
-        }}
-
-        async function downloadDirect(fileId, fileName, fileSize) {{
-            var li = document.getElementById('dl-' + fileId);
-            var progressBar = li.querySelector('.progress-fill');
-            var progressText = li.querySelector('.progress-text');
-            if (progressBar) progressBar.style.width = '0%';
-            if (progressText) progressText.textContent = '{downloading}';
-
-            try {{
-                var resp = await fetch('/download/' + fileId);
-                var contentLength = parseInt(resp.headers.get('Content-Length') || fileSize);
-                var reader = resp.body.getReader();
-                var chunks = [];
-                var received = 0;
-
-                while (true) {{
-                    var result = await reader.read();
-                    if (result.done) break;
-                    chunks.push(result.value);
-                    received += result.value.length;
-                    var pct = contentLength > 0 ? Math.min(100, Math.round(received / contentLength * 100)) : 0;
-                    if (progressBar) progressBar.style.width = pct + '%';
-                    if (progressText) progressText.textContent = pct + '% (' + formatSize(received) + ' / ' + formatSize(contentLength) + ')';
-                }}
-
-                var blob = new Blob(chunks);
-                var url = URL.createObjectURL(blob);
-                var a = document.createElement('a');
-                a.href = url;
-                a.download = fileName;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-
-                if (progressBar) {{ progressBar.style.width = '100%'; progressBar.style.background = '#4caf50'; }}
-                if (progressText) progressText.textContent = '{download_complete}';
-            }} catch(e) {{
-                console.error('Download failed:', e);
-                if (progressText) {{ progressText.textContent = '{download_failed}: ' + e.message; progressText.style.color = '#d32f2f'; }}
-            }}
-        }}
-
-        async function downloadEnhanced(fileId, fileName, fileSize) {{
-            var li = document.getElementById('dl-' + fileId);
-            var progressBar = li.querySelector('.progress-fill');
-            var progressText = li.querySelector('.progress-text');
-            if (progressBar) progressBar.style.width = '0%';
-            if (progressText) progressText.textContent = '{downloading}';
-
-            try {{
-                var metaResp = await fetch('/download/' + fileId + '/meta');
-                var meta = await metaResp.json();
-
-                if (!meta.encryption && !meta.compression) {{
-                    await downloadDirect(fileId, fileName, fileSize);
-                    return;
-                }}
-
-                var chunks = [];
-                var downloaded = 0;
-
-                for (var i = 0; i < meta.chunk_count; i++) {{
-                    var headers = {{}};
-                    if (sessionId) headers['X-Encryption-Session'] = sessionId;
-
-                    var resp = await fetch('/download/' + fileId + '/chunk/' + i, {{ headers: headers }});
-                    var data = new Uint8Array(await resp.arrayBuffer());
-
-                    var isEncrypted = resp.headers.get('x-encryption') === 'aes-256-gcm';
-                    if (isEncrypted && cryptoKey) {{
-                        data = await decryptChunk(data);
-                    }}
-
-                    chunks.push(data);
-                    downloaded += data.length;
-
-                    var pct = Math.min(100, Math.round(downloaded / meta.file_size * 100));
-                    if (progressBar) progressBar.style.width = pct + '%';
-                    if (progressText) progressText.textContent = pct + '% (' + formatSize(downloaded) + ' / ' + formatSize(meta.file_size) + ')';
-                }}
-
-                var blob = new Blob(chunks);
-                var url = URL.createObjectURL(blob);
-                var a = document.createElement('a');
-                a.href = url;
-                a.download = fileName;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-
-                if (progressBar) {{ progressBar.style.width = '100%'; progressBar.style.background = '#4caf50'; }}
-                if (progressText) progressText.textContent = '{download_complete}';
-            }} catch(e) {{
-                console.error('Download failed:', e);
-                if (progressText) {{
-                    progressText.textContent = '{download_failed}: ' + e.message;
-                    progressText.style.color = '#d32f2f';
-                }}
-            }}
-        }}
-
-        function downloadFile(fileId, fileName, fileSize) {{
-            if (caps && (caps.encryption || caps.compression)) {{
-                downloadEnhanced(fileId, fileName, fileSize);
-            }} else {{
-                downloadDirect(fileId, fileName, fileSize);
-            }}
-        }}
-
-        var lastJson = '';
-        function refreshFiles() {{
-            fetch('/files')
-                .then(function(r) {{ return r.json(); }})
-                .then(function(data) {{
-                    var json = JSON.stringify(data.files);
-                    if (json === lastJson) return;
-                    lastJson = json;
-                    var ul = document.getElementById('file-list');
-                    if (!data.files || data.files.length === 0) {{
-                        ul.innerHTML = '<li class="empty">{no_files}</li>';
-                        return;
-                    }}
-                    ul.innerHTML = data.files.map(function(f) {{
-                        var badges = '';
-                        if (caps && caps.encryption) badges += '<span class="badge badge-enc">{encrypted_label}</span>';
-                        if (caps && caps.compression) badges += '<span class="badge badge-comp">{compressed_label}</span>';
-                        return '<li id="dl-' + f.id + '">'
-                            + '<div class="file-info">'
-                            + '<a onclick="downloadFile(\'' + f.id + '\',\'' + f.name.replace(/'/g, "\\'") + '\',' + f.size + ')">' + f.name + '</a>'
-                            + '<span class="file-size">(' + formatSize(f.size) + ')</span>'
-                            + (badges ? '<div class="badges">' + badges + '</div>' : '')
-                            + '<div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>'
-                            + '<div class="progress-text"></div>'
-                            + '</div>'
-                            + '</li>';
-                    }}).join('');
-                }})
-                .catch(function() {{}});
-        }}
-
-        initEnhanced().then(function() {{
-            refreshFiles();
-            setInterval(refreshFiles, 2000);
-        }});
+{javascript}
     </script>
 </body>
 </html>"##

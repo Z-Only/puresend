@@ -45,6 +45,8 @@ export interface HistoryPrivacySettings {
     hideFileName: boolean
     /** 隐藏对端设备名 */
     hidePeerName: boolean
+    /** 隐藏对端 IP 地址 */
+    hideIp: boolean
 }
 
 /** 自动清理设置 */
@@ -150,6 +152,7 @@ export const DEFAULT_PRIVACY_SETTINGS: HistoryPrivacySettings = {
     enabled: false,
     hideFileName: true,
     hidePeerName: false,
+    hideIp: false,
 }
 
 /** 默认自动清理设置 */

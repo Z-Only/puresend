@@ -131,29 +131,11 @@ export function getStatusKey(status: TaskStatus): string {
     return `transfer.status.${status}`
 }
 
-/** 获取状态颜色 */
-export function getStatusColor(status: TaskStatus): string {
-    const statusColors: Record<TaskStatus, string> = {
-        pending: 'grey',
-        transferring: 'primary',
-        completed: 'success',
-        failed: 'error',
-        cancelled: 'warning',
-        interrupted: 'warning',
-    }
-    return statusColors[status]
-}
+/** 获取状态颜色（re-export from utils/format） */
+export { getStatusColor } from '@/utils/format'
 
-/** 格式化传输速度 */
-export function formatSpeed(bytesPerSecond: number): string {
-    if (bytesPerSecond === 0) return '0 B/s'
-
-    const units = ['B/s', 'KB/s', 'MB/s', 'GB/s']
-    const k = 1024
-    const i = Math.floor(Math.log(bytesPerSecond) / Math.log(k))
-
-    return `${parseFloat((bytesPerSecond / Math.pow(k, i)).toFixed(2))} ${units[i]}`
-}
+/** 格式化传输速度（re-export from utils/format） */
+export { formatSpeed } from '@/utils/format'
 
 /** 格式化剩余时间 */
 export function formatTimeRemaining(seconds?: number): string {
@@ -589,6 +571,8 @@ export interface TransferHistoryItem {
     fileSize: number
     /** 对端设备名称 */
     peerName: string
+    /** 对端 IP 地址 */
+    peerIp?: string
     /** 传输状态 */
     status: TaskStatus
     /** 传输方向 */

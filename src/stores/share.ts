@@ -14,7 +14,6 @@ import type {
     UploadProgress,
     SendTaskFileItem,
 } from '../types'
-import { DEFAULT_MAX_HISTORY_COUNT } from '../types/transfer'
 import type { SelectedFileItem } from '../types/content'
 import type { UnlistenFn } from '@tauri-apps/api/event'
 import {
@@ -68,7 +67,7 @@ export const useShareStore = defineStore('share', () => {
     const contentType = ref<ContentType>('file')
 
     /** 事件监听器清理函数 */
-    let unlistenFns: UnlistenFn[] = []
+    const unlistenFns: UnlistenFn[] = []
 
     // ============ 计算属性 ============
 
@@ -111,7 +110,7 @@ export const useShareStore = defineStore('share', () => {
         request: AccessRequest,
         approvalStatus: 'pending' | 'accepted' | 'rejected'
     ) {
-        const { useTransferStore } = await import('./transfer')
+        const { useTransferStore } = await import('./transfer/index')
         const transferStore = useTransferStore()
         const taskId = `web-${request.id}`
 
@@ -227,7 +226,7 @@ export const useShareStore = defineStore('share', () => {
             startedAt?: number
         }
     ) {
-        const { useTransferStore } = await import('./transfer')
+        const { useTransferStore } = await import('./transfer/index')
         const transferStore = useTransferStore()
         const taskId = `web-${requestId}`
         const task = transferStore.sendTaskItems.get(taskId)
@@ -306,7 +305,7 @@ export const useShareStore = defineStore('share', () => {
             })
 
             // 同步到 sendTaskItems 的 files 数组
-            const { useTransferStore } = await import('./transfer')
+            const { useTransferStore } = await import('./transfer/index')
             const transferStore = useTransferStore()
             const taskId = `web-${request.id}`
             const task = transferStore.sendTaskItems.get(taskId)
@@ -383,34 +382,29 @@ export const useShareStore = defineStore('share', () => {
             return
         }
 
+        // 从匹配的 AccessRequest 中获取设备名称
+        // userAgent 已由后端 parse_user_agent 解析为简短标识（如 "Chrome(Android)"），无需再次解析
+        const matchedRequest = matchedRequestId
+            ? accessRequests.value.get(matchedRequestId)
+            : null
+        const deviceLabel = matchedRequest?.userAgent || payload.client_ip
+
         // 添加到传输历史记录
         const historyItem = {
             id: crypto.randomUUID(),
             fileName: payload.file_name,
             fileSize: payload.file_size,
-            peerName: payload.client_ip,
+            peerName: deviceLabel,
+            peerIp: payload.client_ip,
             status: 'completed' as const,
             direction: 'send' as const,
             completedAt: Date.now(),
             mode: 'local' as const,
         }
 
-        // 使用 transferStore 添加历史记录
-        const { useTransferStore } = await import('./transfer')
-        const transferStore = useTransferStore()
-
-        // 直接添加到历史记录列表
-        if (!transferStore.historyItems.some((h) => h.id === historyItem.id)) {
-            transferStore.historyItems.unshift(historyItem)
-            // 超出上限时移除最旧的记录
-            if (transferStore.historyItems.length > DEFAULT_MAX_HISTORY_COUNT) {
-                transferStore.historyItems = transferStore.historyItems.slice(
-                    0,
-                    DEFAULT_MAX_HISTORY_COUNT
-                )
-            }
-            await transferStore.saveHistory()
-        }
+        // 直接调用 history 模块的公共方法添加历史记录
+        const { addHistoryItem } = await import('./transfer/history')
+        await addHistoryItem(historyItem)
     }
 
     /**
@@ -484,7 +478,7 @@ export const useShareStore = defineStore('share', () => {
 
             // 清理事件监听
             unlistenFns.forEach((unlisten) => unlisten())
-            unlistenFns = []
+            unlistenFns.length = 0
 
             // 重置状态
             shareInfo.value = null
@@ -623,7 +617,7 @@ export const useShareStore = defineStore('share', () => {
         qrCodeDataUrl.value = ''
         selectedFiles.value = []
         contentType.value = 'file'
-        unlistenFns = []
+        unlistenFns.length = 0
     }
 
     /**
@@ -691,7 +685,7 @@ export const useShareStore = defineStore('share', () => {
      */
     function destroy(): void {
         unlistenFns.forEach((unlisten) => unlisten())
-        unlistenFns = []
+        unlistenFns.length = 0
         shareInfo.value = null
         accessRequests.value.clear()
         qrCodeDataUrl.value = ''

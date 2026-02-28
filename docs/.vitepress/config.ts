@@ -19,7 +19,14 @@ export default defineConfig({
           { text: '快速开始', link: '/getting-started' },
           {
             text: '功能',
-            items: [{ text: '文件传输', link: '/features/file-transfer' }]
+            items: [
+              { text: '文件传输', link: '/features/file-transfer' },
+              { text: 'Web 下载', link: '/features/web-download' },
+              { text: 'Web 上传', link: '/features/web-upload' },
+              { text: '传输安全', link: '/features/security' },
+              { text: '传输历史', link: '/features/history' },
+              { text: '应用设置', link: '/features/settings' },
+            ]
           },
           {
             text: '开发',
@@ -39,7 +46,14 @@ export default defineConfig({
             {
               text: '功能',
               collapsed: false,
-              items: [{ text: '文件传输', link: '/features/file-transfer' }]
+              items: [
+                { text: '文件传输', link: '/features/file-transfer' },
+                { text: 'Web 下载', link: '/features/web-download' },
+                { text: 'Web 上传', link: '/features/web-upload' },
+                { text: '传输安全', link: '/features/security' },
+                { text: '传输历史', link: '/features/history' },
+                { text: '应用设置', link: '/features/settings' },
+              ]
             },
             {
               text: '开发指南',
@@ -67,7 +81,14 @@ export default defineConfig({
           { text: 'Getting Started', link: '/en/getting-started' },
           {
             text: 'Features',
-            items: [{ text: 'File Transfer', link: '/en/features/file-transfer' }]
+            items: [
+              { text: 'File Transfer', link: '/en/features/file-transfer' },
+              { text: 'Web Download', link: '/en/features/web-download' },
+              { text: 'Web Upload', link: '/en/features/web-upload' },
+              { text: 'Transfer Security', link: '/en/features/security' },
+              { text: 'Transfer History', link: '/en/features/history' },
+              { text: 'App Settings', link: '/en/features/settings' },
+            ]
           },
           {
             text: 'Development',
@@ -87,7 +108,14 @@ export default defineConfig({
             {
               text: 'Features',
               collapsed: false,
-              items: [{ text: 'File Transfer', link: '/en/features/file-transfer' }]
+              items: [
+                { text: 'File Transfer', link: '/en/features/file-transfer' },
+                { text: 'Web Download', link: '/en/features/web-download' },
+                { text: 'Web Upload', link: '/en/features/web-upload' },
+                { text: 'Transfer Security', link: '/en/features/security' },
+                { text: 'Transfer History', link: '/en/features/history' },
+                { text: 'App Settings', link: '/en/features/settings' },
+              ]
             },
             {
               text: 'Development',

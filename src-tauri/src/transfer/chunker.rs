@@ -82,6 +82,7 @@ impl FileChunker {
     ///
     /// # Returns
     /// * `TransferResult<()>` - 操作结果
+    #[allow(dead_code)]
     pub fn write_chunk(
         &self,
         file_path: &Path,
@@ -169,12 +170,6 @@ impl FileChunker {
         }
 
         Ok(metadata)
-    }
-
-    /// 获取分块大小
-    #[allow(dead_code)]
-    pub fn chunk_size(&self) -> u64 {
-        self.chunk_size
     }
 }
 

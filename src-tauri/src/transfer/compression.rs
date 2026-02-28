@@ -152,22 +152,6 @@ impl Compressor {
         zstd::decode_all(std::io::Cursor::new(compressed_data))
             .map_err(|e| TransferError::Decompression(format!("zstd 解压失败: {}", e)))
     }
-
-    /// 压缩数据并返回压缩率
-    ///
-    /// # Returns
-    /// (压缩后数据, 压缩率百分比)
-    /// 压缩率 = (1 - 压缩后大小/原始大小) * 100
-    #[allow(dead_code)]
-    pub fn compress_with_ratio(data: &[u8], level: i32) -> TransferResult<(Vec<u8>, f64)> {
-        let compressed = Self::compress(data, level)?;
-        let ratio = if data.is_empty() {
-            0.0
-        } else {
-            (1.0 - compressed.len() as f64 / data.len() as f64) * 100.0
-        };
-        Ok((compressed, ratio))
-    }
 }
 
 /// 压缩设置状态（由前端同步到后端）
@@ -253,15 +237,6 @@ mod tests {
         let decompressed = Compressor::decompress(&compressed).unwrap();
         assert_eq!(data, decompressed);
         assert!(compressed.len() < data.len());
-    }
-
-    #[test]
-    fn test_compress_with_ratio() {
-        let data = b"AAAAAAAAAA".repeat(1000);
-        let (compressed, ratio) = Compressor::compress_with_ratio(&data, 3).unwrap();
-        assert!(ratio > 0.0);
-        let decompressed = Compressor::decompress(&compressed).unwrap();
-        assert_eq!(data, decompressed);
     }
 
     #[test]

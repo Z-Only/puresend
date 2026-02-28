@@ -7,21 +7,12 @@ use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Nonce};
 use rand::rngs::OsRng;
 use rand::RngCore;
-use serde::{Deserialize, Serialize};
 use x25519_dalek::{EphemeralSecret, PublicKey, SharedSecret};
 
 use crate::error::{TransferError, TransferResult};
 
 /// AES-256-GCM nonce 大小（12 字节）
 const NONCE_SIZE: usize = 12;
-
-/// 密钥交换公钥载荷（用于握手阶段传输）
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct KeyExchangePayload {
-    /// X25519 公钥（32 字节，base64 编码）
-    pub public_key: Vec<u8>,
-}
 
 /// 加密会话
 ///
@@ -70,11 +61,13 @@ impl KeyExchangeInitiator {
 /// 密钥交换响应方
 ///
 /// 接收对方公钥后生成自己的临时密钥对，派生共享密钥。
+#[allow(dead_code)]
 pub struct KeyExchangeResponder {
     secret: EphemeralSecret,
     public_key: PublicKey,
 }
 
+#[allow(dead_code)]
 impl KeyExchangeResponder {
     /// 创建新的密钥交换响应方
     pub fn new() -> Self {
@@ -137,6 +130,7 @@ impl CryptoSession {
     /// 解密数据
     ///
     /// 输入格式：[12 字节 nonce][密文 + 16 字节 tag]
+    #[allow(dead_code)]
     pub fn decrypt(&self, encrypted_data: &[u8]) -> TransferResult<Vec<u8>> {
         if encrypted_data.len() < NONCE_SIZE {
             return Err(TransferError::Decryption(

@@ -113,34 +113,6 @@ impl Default for TransferStatus {
     }
 }
 
-/// 传输进度信息（保留用于兼容）
-#[allow(dead_code)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TransferProgress {
-    /// 当前上传的文件名
-    pub file_name: String,
-    /// 已上传字节数
-    pub uploaded_bytes: u64,
-    /// 总字节数
-    pub total_bytes: u64,
-    /// 进度百分比（0-100）
-    pub progress: f64,
-    /// 上传速度（字节/秒）
-    pub speed: u64,
-    /// 已完成文件数
-    pub completed_files: u32,
-    /// 总文件数
-    pub total_files: u32,
-    /// 传输状态
-    pub status: TransferStatus,
-    /// 开始时间（毫秒）
-    pub started_at: Option<u64>,
-    /// 完成时间（毫秒）
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub completed_at: Option<u64>,
-}
-
 /// 上传记录
 ///
 /// 从分享者（应用）视角来看，接收者通过链接获取文件时，
@@ -373,7 +345,6 @@ pub struct PinVerifyResult {
 /// 从分享者视角，文件被接收者获取时的传输进度。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
 pub struct UploadProgress {
     /// 上传 ID
     pub upload_id: String,
@@ -442,12 +413,6 @@ impl ShareState {
         self.pin_attempts.clear();
     }
 
-    /// 添加访问请求
-    #[allow(dead_code)]
-    pub fn add_access_request(&mut self, request: AccessRequest) {
-        self.access_requests.insert(request.id.clone(), request);
-    }
-
     /// 接受访问请求
     pub fn accept_request(&mut self, request_id: &str) -> Option<&AccessRequest> {
         if let Some(request) = self.access_requests.get_mut(request_id) {
@@ -494,12 +459,6 @@ impl ShareState {
         self.access_requests
             .values()
             .any(|r| r.ip == ip && r.status == AccessRequestStatus::Accepted)
-    }
-
-    /// 根据 IP 获取访问请求
-    #[allow(dead_code)]
-    pub fn get_request_by_ip(&mut self, ip: &str) -> Option<&mut AccessRequest> {
-        self.access_requests.values_mut().find(|r| r.ip == ip)
     }
 
     /// 移除单个访问请求

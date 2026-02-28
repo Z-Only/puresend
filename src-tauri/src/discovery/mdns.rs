@@ -10,20 +10,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{broadcast, Mutex};
 
-/// mDNS 服务名称
-#[allow(dead_code)]
-pub const SERVICE_NAME: &str = "_puresend._tcp.local.";
-
-/// mDNS 多播地址
-#[allow(dead_code)]
-pub const MDNS_MULTICAST_ADDR: Ipv4Addr = Ipv4Addr::new(224, 0, 0, 251);
-
 /// mDNS 端口
 pub const MDNS_PORT: u16 = 5353;
-
-/// 发现超时时间
-#[allow(dead_code)]
-pub const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// 设备过期时间（10秒无响应视为离线）
 pub const PEER_EXPIRE_TIMEOUT: Duration = Duration::from_secs(10);
@@ -268,7 +256,6 @@ impl MdnsDiscovery {
     }
 
     /// 手动添加设备（用于手动连接）
-    #[allow(dead_code)]
     pub async fn add_peer_manual(&self, ip: String, port: u16) -> PeerInfo {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -324,11 +311,6 @@ impl Default for MdnsDiscovery {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_service_name() {
-        assert!(SERVICE_NAME.contains("puresend"));
-    }
 
     #[tokio::test]
     async fn test_create_discovery() {

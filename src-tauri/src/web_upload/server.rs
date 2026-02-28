@@ -4,9 +4,8 @@
 
 use axum::extract::DefaultBodyLimit;
 use axum::{
-    body::Body,
     extract::{connect_info::ConnectInfo, Multipart, Path, State as AxumState},
-    http::{header, HeaderMap, HeaderName, StatusCode},
+    http::{header, HeaderMap},
     response::{Html, IntoResponse, Json, Response},
     routing::{get, post},
     Router,
@@ -22,18 +21,13 @@ use std::time::Instant;
 use tauri::{AppHandle, Emitter};
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
-use tower_http::cors::{Any, CorsLayer};
 
 use super::models::{UploadRequest, UploadRequestStatus, WebUploadRecord, WebUploadState};
-use crate::transfer::compression::Compressor;
-use crate::transfer::crypto::is_encryption_enabled;
-use crate::transfer::http_crypto::{
-    HandshakeRequest, HandshakeResponse, HttpCryptoSessionManager,
+use crate::http_common::{
+    self, HasCryptoSessions, ServerCapabilities, HTTP_CHUNK_SIZE,
 };
-
-static FAVICON_ICO: &[u8] = include_bytes!("../../icons/32x32.png");
-
-const HTTP_CHUNK_SIZE: usize = 1024 * 1024; // 1MB
+use crate::transfer::compression::Compressor;
+use crate::transfer::http_crypto::HttpCryptoSessionManager;
 const UPLOAD_SESSION_EXPIRY_SECS: u64 = 24 * 3600; // 24h
 
 /// Chunked upload session
@@ -69,6 +63,12 @@ pub struct UploadServerState {
     pub upload_sessions: Arc<Mutex<HashMap<String, ChunkedUploadSession>>>,
 }
 
+impl HasCryptoSessions for UploadServerState {
+    fn crypto_sessions(&self) -> &Arc<Mutex<HttpCryptoSessionManager>> {
+        &self.crypto_sessions
+    }
+}
+
 pub struct WebUploadServer {
     pub addr: SocketAddr,
     pub state: Arc<UploadServerState>,
@@ -94,12 +94,12 @@ impl WebUploadServer {
     pub async fn start(&mut self) -> Result<u16, String> {
         let app = Router::new()
             .route("/", get(index_handler))
-            .route("/favicon.ico", get(favicon_handler))
-            .route("/apple-touch-icon.png", get(favicon_handler))
-            .route("/apple-touch-icon-precomposed.png", get(favicon_handler))
+            .route("/favicon.ico", get(http_common::favicon_handler))
+            .route("/apple-touch-icon.png", get(http_common::favicon_handler))
+            .route("/apple-touch-icon-precomposed.png", get(http_common::favicon_handler))
             .route("/request-status", get(request_status_handler))
-            .route("/capabilities", get(capabilities_handler))
-            .route("/crypto/handshake", post(crypto_handshake_handler))
+            .route("/capabilities", get(upload_capabilities_handler))
+            .route("/crypto/handshake", post(http_common::crypto_handshake_handler::<UploadServerState>))
             .route("/upload/init", post(upload_init_handler))
             .route(
                 "/upload/chunk",
@@ -110,42 +110,28 @@ impl WebUploadServer {
                 "/upload",
                 post(upload_handler).layer(DefaultBodyLimit::max(10 * 1024 * 1024 * 1024)),
             )
-            .fallback(fallback_handler)
-            .layer(
-                CorsLayer::new()
-                    .allow_origin(Any)
-                    .allow_methods([axum::http::Method::GET, axum::http::Method::POST])
-                    .allow_headers([
-                        header::CONTENT_TYPE,
-                        header::ACCEPT,
-                        HeaderName::from_static("x-upload-id"),
-                        HeaderName::from_static("x-chunk-index"),
-                        HeaderName::from_static("x-encryption-session"),
-                        HeaderName::from_static("x-compression"),
-                    ])
-                    .expose_headers([
-                        HeaderName::from_static("x-file-hash"),
-                    ]),
-            )
+            .fallback(http_common::fallback_handler)
+            .layer(http_common::web_upload_cors_layer())
             .with_state(self.state.clone());
 
         let listener = tokio::net::TcpListener::bind(self.addr)
             .await
-            .map_err(|e| format!("绑定端口失败: {}", e))?;
+            .map_err(|e| format!("Failed to bind port: {}", e))?;
 
         let actual_port = listener
             .local_addr()
-            .map_err(|e| format!("获取端口失败: {}", e))?
+            .map_err(|e| format!("Failed to get port: {}", e))?
             .port();
 
         let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
         self.shutdown_tx = Some(shutdown_tx);
 
-        // Periodic cleanup of expired sessions
         let crypto_sessions = self.state.crypto_sessions.clone();
         let upload_sessions = self.state.upload_sessions.clone();
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(std::time::Duration::from_secs(300));
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(
+                http_common::SESSION_CLEANUP_INTERVAL_SECS,
+            ));
             loop {
                 interval.tick().await;
                 crypto_sessions.lock().await.cleanup_expired();
@@ -177,62 +163,8 @@ impl WebUploadServer {
 
 // ─── Handlers ───────────────────────────────────────────────────────────────
 
-async fn favicon_handler() -> impl IntoResponse {
-    let mut response = Response::new(Body::from(FAVICON_ICO));
-    *response.status_mut() = StatusCode::OK;
-    let headers = response.headers_mut();
-    headers.insert(
-        header::CONTENT_TYPE,
-        axum::http::HeaderValue::from_static("image/png"),
-    );
-    headers.insert(
-        header::CACHE_CONTROL,
-        axum::http::HeaderValue::from_static("max-age=86400"),
-    );
-    response
-}
-
-async fn capabilities_handler() -> Json<ServerCapabilities> {
-    let encryption = is_encryption_enabled();
-    let compression_config = crate::transfer::compression::get_compression_config();
-    Json(ServerCapabilities {
-        encryption,
-        compression: compression_config.enabled,
-        chunk_size: HTTP_CHUNK_SIZE,
-    })
-}
-
-async fn crypto_handshake_handler(
-    ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
-    AxumState(state): AxumState<Arc<UploadServerState>>,
-    Json(payload): Json<HandshakeRequest>,
-) -> Json<HandshakeResponse> {
-    if !is_encryption_enabled() {
-        return Json(HandshakeResponse {
-            encryption: false,
-            server_public_key: None,
-            session_id: None,
-        });
-    }
-
-    let client_ip = client_addr.ip().to_string();
-    let mut crypto_sessions = state.crypto_sessions.lock().await;
-
-    match crypto_sessions.handshake(&payload.client_public_key, client_ip) {
-        Ok((session_id, server_pub_key)) => Json(HandshakeResponse {
-            encryption: true,
-            server_public_key: Some(server_pub_key),
-            session_id: Some(session_id),
-        }),
-        Err(e) => {
-            eprintln!("加密握手失败: {}", e);
-            Json(HandshakeResponse {
-                encryption: false,
-                server_public_key: None,
-                session_id: None,
-            })
-        }
-    }
+async fn upload_capabilities_handler() -> Json<ServerCapabilities> {
+    Json(ServerCapabilities::for_web_upload())
 }
 
 /// Initialize chunked upload session
@@ -261,7 +193,7 @@ async fn upload_init_handler(
             upload_id: String::new(),
             chunk_size: 0,
             chunk_count: 0,
-            message: Some("未授权上传".to_string()),
+            message: Some("Unauthorized upload".to_string()),
         });
     }
 
@@ -283,7 +215,7 @@ async fn upload_init_handler(
             upload_id: String::new(),
             chunk_size: 0,
             chunk_count: 0,
-            message: Some(format!("创建临时目录失败: {}", e)),
+            message: Some(format!("Failed to create temp directory: {}", e)),
         });
     }
 
@@ -378,7 +310,7 @@ async fn upload_chunk_handler(
     if upload_id.is_empty() {
         return Json(UploadChunkResponse {
             success: false,
-            message: "缺少 X-Upload-Id".to_string(),
+            message: "Missing X-Upload-Id header".to_string(),
             complete: false,
             file_hash: None,
         });
@@ -400,7 +332,7 @@ async fn upload_chunk_handler(
                 Err(e) => {
                     return Json(UploadChunkResponse {
                         success: false,
-                        message: format!("解密失败: {}", e),
+                        message: format!("Decryption failed: {}", e),
                         complete: false,
                         file_hash: None,
                     });
@@ -420,7 +352,7 @@ async fn upload_chunk_handler(
             Err(e) => {
                 return Json(UploadChunkResponse {
                     success: false,
-                    message: format!("解压失败: {}", e),
+                    message: format!("Decompression failed: {}", e),
                     complete: false,
                     file_hash: None,
                 });
@@ -435,7 +367,7 @@ async fn upload_chunk_handler(
         _ => {
             return Json(UploadChunkResponse {
                 success: false,
-                message: "上传会话不存在".to_string(),
+                message: "Upload session not found".to_string(),
                 complete: false,
                 file_hash: None,
             });
@@ -446,7 +378,7 @@ async fn upload_chunk_handler(
     if let Err(e) = tokio::fs::write(&chunk_path, &data).await {
         return Json(UploadChunkResponse {
             success: false,
-            message: format!("写入分块失败: {}", e),
+            message: format!("Failed to write chunk: {}", e),
             complete: false,
             file_hash: None,
         });
@@ -504,7 +436,7 @@ async fn upload_chunk_handler(
                             if let Err(e) = output.write_all(&chunk_data).await {
                                 return Json(UploadChunkResponse {
                                     success: false,
-                                    message: format!("合并分块失败: {}", e),
+                                    message: format!("Failed to merge chunks: {}", e),
                                     complete: false,
                                     file_hash: None,
                                 });
@@ -513,7 +445,7 @@ async fn upload_chunk_handler(
                         Err(e) => {
                             return Json(UploadChunkResponse {
                                 success: false,
-                                message: format!("读取分块失败: {}", e),
+                                message: format!("Failed to read chunk: {}", e),
                                 complete: false,
                                 file_hash: None,
                             });
@@ -524,7 +456,7 @@ async fn upload_chunk_handler(
             Err(e) => {
                 return Json(UploadChunkResponse {
                     success: false,
-                    message: format!("创建目标文件失败: {}", e),
+                    message: format!("Failed to create target file: {}", e),
                     complete: false,
                     file_hash: None,
                 });
@@ -576,7 +508,7 @@ async fn upload_chunk_handler(
 
         return Json(UploadChunkResponse {
             success: true,
-            message: "上传完成".to_string(),
+            message: "Upload complete".to_string(),
             complete: true,
             file_hash: Some(file_hash),
         });
@@ -584,7 +516,7 @@ async fn upload_chunk_handler(
 
     Json(UploadChunkResponse {
         success: true,
-        message: format!("分块 {} 已接收", chunk_index),
+        message: format!("Chunk {} received", chunk_index),
         complete: false,
         file_hash: None,
     })
@@ -633,7 +565,7 @@ async fn index_handler(
     let user_agent = headers
         .get(header::USER_AGENT)
         .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string());
+        .map(|s| http_common::parse_user_agent(s).to_string());
 
     let accept_language = headers
         .get(header::ACCEPT_LANGUAGE)
@@ -724,6 +656,123 @@ async fn request_status_handler(
     }
 }
 
+/// Mark an upload record as failed in the upload state
+async fn mark_upload_record_failed(
+    state: &Arc<UploadServerState>,
+    client_ip: &str,
+    record_id: &str,
+) {
+    let mut upload_state = state.upload_state.lock().await;
+    if let Some(req) = upload_state
+        .requests
+        .values_mut()
+        .find(|r| r.client_ip == client_ip)
+    {
+        if let Some(rec) = req.upload_records.iter_mut().find(|r| r.id == record_id) {
+            rec.status = "failed".to_string();
+            rec.completed_at = Some(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs(),
+            );
+        }
+    }
+}
+
+/// Create an upload record for tracking
+fn create_upload_record(file_name: &str, content_length: u64) -> WebUploadRecord {
+    let record_id = uuid::Uuid::new_v4().to_string();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    WebUploadRecord {
+        id: record_id.clone(),
+        file_name: file_name.to_string(),
+        uploaded_bytes: 0,
+        total_bytes: content_length,
+        progress: 0.0,
+        speed: 0,
+        status: "transferring".to_string(),
+        started_at: now,
+        completed_at: None,
+    }
+}
+
+/// Process a single file upload with progress tracking
+async fn process_single_file_upload(
+    state: &Arc<UploadServerState>,
+    file_path: &std::path::Path,
+    data: &[u8],
+    request_id: &str,
+    record_id: &str,
+    file_name: &str,
+    client_ip: &str,
+    content_length: u64,
+    start_time: std::time::Instant,
+) -> Result<u64, String> {
+    match tokio::fs::File::create(file_path).await {
+        Ok(mut output_file) => {
+            if let Err(err) = output_file.write_all(data).await {
+                let _ = state.app_handle.emit(
+                    "web-upload-file-complete",
+                    FileCompleteEvent {
+                        request_id: request_id.to_string(),
+                        record_id: record_id.to_string(),
+                        file_name: file_name.to_string(),
+                        total_bytes: data.len() as u64,
+                        status: "failed".to_string(),
+                    },
+                );
+
+                mark_upload_record_failed(state, client_ip, record_id).await;
+
+                return Err(format!("Failed to write file: {}", err));
+            }
+
+            let total_written = data.len() as u64;
+
+            let elapsed = start_time.elapsed().as_secs_f64();
+            let speed = if elapsed > 0.0 {
+                (total_written as f64 / elapsed) as u64
+            } else {
+                0
+            };
+            let actual_total = if content_length > 0 {
+                content_length
+            } else {
+                total_written
+            };
+            let progress = if actual_total > 0 {
+                (total_written as f64 / actual_total as f64) * 100.0
+            } else {
+                100.0
+            };
+
+            let _ = state.app_handle.emit(
+                "web-upload-file-progress",
+                FileProgressEvent {
+                    request_id: request_id.to_string(),
+                    record_id: record_id.to_string(),
+                    file_name: file_name.to_string(),
+                    uploaded_bytes: total_written,
+                    total_bytes: actual_total,
+                    progress,
+                    speed,
+                },
+            );
+
+            Ok(total_written)
+        }
+        Err(err) => {
+            mark_upload_record_failed(state, client_ip, record_id).await;
+            Err(format!("Failed to create file: {}", err))
+        }
+    }
+}
+
 /// Legacy multipart upload handler (backward compatible)
 async fn upload_handler(
     ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
@@ -752,14 +801,14 @@ async fn upload_handler(
     if !is_allowed {
         return Json(UploadResponse {
             success: false,
-            message: "未授权上传".to_string(),
+            message: "Unauthorized upload".to_string(),
         });
     }
 
     if request_id.is_empty() {
         return Json(UploadResponse {
             success: false,
-            message: "未找到对应的上传请求".to_string(),
+            message: "Upload request not found".to_string(),
         });
     }
 
@@ -768,7 +817,7 @@ async fn upload_handler(
         if let Err(err) = tokio::fs::create_dir_all(&receive_dir).await {
             return Json(UploadResponse {
                 success: false,
-                message: format!("创建接收目录失败: {}", err),
+                message: format!("Failed to create receive directory: {}", err),
             });
         }
     }
@@ -784,23 +833,8 @@ async fn upload_handler(
             .and_then(|s| s.parse::<u64>().ok())
             .unwrap_or(0);
 
-        let record_id = uuid::Uuid::new_v4().to_string();
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-
-        let record = WebUploadRecord {
-            id: record_id.clone(),
-            file_name: file_name.clone(),
-            uploaded_bytes: 0,
-            total_bytes: content_length,
-            progress: 0.0,
-            speed: 0,
-            status: "transferring".to_string(),
-            started_at: now,
-            completed_at: None,
-        };
+        let record = create_upload_record(&file_name, content_length);
+        let record_id = record.id.clone();
 
         {
             let mut upload_state = state.upload_state.lock().await;
@@ -832,139 +866,47 @@ async fn upload_handler(
         let start_time = std::time::Instant::now();
         let total_written: u64;
 
-        match tokio::fs::File::create(&file_path).await {
-            Ok(mut output_file) => {
-                match field.bytes().await {
-                    Ok(data) => {
-                        let data_len = data.len() as u64;
-                        if let Err(err) = output_file.write_all(&data).await {
-                            let _ = state.app_handle.emit(
-                                "web-upload-file-complete",
-                                FileCompleteEvent {
-                                    request_id: request_id.clone(),
-                                    record_id: record_id.clone(),
-                                    file_name: file_name.clone(),
-                                    total_bytes: data_len,
-                                    status: "failed".to_string(),
-                                },
-                            );
-
-                            let mut upload_state = state.upload_state.lock().await;
-                            if let Some(req) = upload_state
-                                .requests
-                                .values_mut()
-                                .find(|r| r.client_ip == client_ip)
-                            {
-                                if let Some(rec) =
-                                    req.upload_records.iter_mut().find(|r| r.id == record_id)
-                                {
-                                    rec.status = "failed".to_string();
-                                    rec.completed_at = Some(
-                                        std::time::SystemTime::now()
-                                            .duration_since(std::time::UNIX_EPOCH)
-                                            .unwrap_or_default()
-                                            .as_secs(),
-                                    );
-                                }
-                            }
-
-                            return Json(UploadResponse {
-                                success: false,
-                                message: format!("写入文件失败: {}", err),
-                            });
-                        }
-
-                        total_written = data_len;
-
-                        let elapsed = start_time.elapsed().as_secs_f64();
-                        let speed = if elapsed > 0.0 {
-                            (total_written as f64 / elapsed) as u64
-                        } else {
-                            0
-                        };
-                        let actual_total = if content_length > 0 {
-                            content_length
-                        } else {
-                            total_written
-                        };
-                        let progress = if actual_total > 0 {
-                            (total_written as f64 / actual_total as f64) * 100.0
-                        } else {
-                            100.0
-                        };
-
-                        let _ = state.app_handle.emit(
-                            "web-upload-file-progress",
-                            FileProgressEvent {
-                                request_id: request_id.clone(),
-                                record_id: record_id.clone(),
-                                file_name: file_name.clone(),
-                                uploaded_bytes: total_written,
-                                total_bytes: actual_total,
-                                progress,
-                                speed,
-                            },
-                        );
-                    }
+        match field.bytes().await {
+            Ok(data) => {
+                match process_single_file_upload(
+                    &state,
+                    &file_path,
+                    &data,
+                    &request_id,
+                    &record_id,
+                    &file_name,
+                    &client_ip,
+                    content_length,
+                    start_time,
+                )
+                .await
+                {
+                    Ok(written) => total_written = written,
                     Err(err) => {
-                        let mut upload_state = state.upload_state.lock().await;
-                        if let Some(req) = upload_state
-                            .requests
-                            .values_mut()
-                            .find(|r| r.client_ip == client_ip)
-                        {
-                            if let Some(rec) =
-                                req.upload_records.iter_mut().find(|r| r.id == record_id)
-                            {
-                                rec.status = "failed".to_string();
-                                rec.completed_at = Some(
-                                    std::time::SystemTime::now()
-                                        .duration_since(std::time::UNIX_EPOCH)
-                                        .unwrap_or_default()
-                                        .as_secs(),
-                                );
-                            }
-                        }
-
-                        let _ = state.app_handle.emit(
-                            "web-upload-file-complete",
-                            FileCompleteEvent {
-                                request_id: request_id.clone(),
-                                record_id: record_id.clone(),
-                                file_name: file_name.clone(),
-                                total_bytes: 0,
-                                status: "failed".to_string(),
-                            },
-                        );
-
                         return Json(UploadResponse {
                             success: false,
-                            message: format!("读取文件数据失败: {}", err),
+                            message: err,
                         });
                     }
                 }
             }
             Err(err) => {
-                let mut upload_state = state.upload_state.lock().await;
-                if let Some(req) = upload_state
-                    .requests
-                    .values_mut()
-                    .find(|r| r.client_ip == client_ip)
-                {
-                    if let Some(rec) = req.upload_records.iter_mut().find(|r| r.id == record_id) {
-                        rec.status = "failed".to_string();
-                        rec.completed_at = Some(
-                            std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .unwrap_or_default()
-                                .as_secs(),
-                        );
-                    }
-                }
+                mark_upload_record_failed(&state, &client_ip, &record_id).await;
+
+                let _ = state.app_handle.emit(
+                    "web-upload-file-complete",
+                    FileCompleteEvent {
+                        request_id: request_id.clone(),
+                        record_id: record_id.clone(),
+                        file_name: file_name.clone(),
+                        total_bytes: 0,
+                        status: "failed".to_string(),
+                    },
+                );
 
                 return Json(UploadResponse {
                     success: false,
-                    message: format!("创建文件失败: {}", err),
+                    message: format!("Failed to read file data: {}", err),
                 });
             }
         }
@@ -1015,13 +957,13 @@ async fn upload_handler(
     if uploaded_count == 0 {
         return Json(UploadResponse {
             success: false,
-            message: "未接收到任何文件数据".to_string(),
+            message: "No file data received".to_string(),
         });
     }
 
     Json(UploadResponse {
         success: true,
-        message: format!("成功上传 {} 个文件", uploaded_count),
+        message: format!("{} file(s) uploaded successfully", uploaded_count),
     })
 }
 
@@ -1045,18 +987,8 @@ fn get_unique_path(path: &PathBuf) -> PathBuf {
     }
 }
 
-async fn fallback_handler() -> impl IntoResponse {
-    (StatusCode::NOT_FOUND, "404 Not Found")
-}
-
 // ─── Data types ─────────────────────────────────────────────────────────────
 
-#[derive(Debug, Serialize)]
-struct ServerCapabilities {
-    encryption: bool,
-    compression: bool,
-    chunk_size: usize,
-}
 
 #[derive(Debug, Deserialize)]
 struct UploadInitRequest {
@@ -1137,110 +1069,80 @@ struct FileCompleteEvent {
 
 // ─── HTML Templates ─────────────────────────────────────────────────────────
 
-/// Enhanced upload page with chunked upload, encryption, compression, and resume
-fn generate_upload_page(is_english: bool) -> String {
-    let title = if is_english { "PureSend - Upload Files" } else { "PureSend - 文件上传" };
-    let select_files = if is_english { "Select Files" } else { "选择文件" };
-    let drag_hint = if is_english { "or drag and drop files here" } else { "或将文件拖拽到此处" };
-    let upload_btn = if is_english { "Upload" } else { "上传" };
-    let transferring = if is_english { "Uploading files..." } else { "正在上传文件..." };
-    let success_msg = if is_english { "Files uploaded successfully!" } else { "文件上传成功！" };
-    let failed_msg = if is_english { "Upload failed" } else { "上传失败" };
-    let file_label = if is_english { "file(s)" } else { "个文件" };
-    let total_size_label = if is_english { "Total size" } else { "总大小" };
-    let remove_label = if is_english { "Remove" } else { "移除" };
-    let encrypted_label = if is_english { "Encrypted" } else { "已加密" };
-    let lang = if is_english { "en" } else { "zh-CN" };
+struct UploadPageLabels {
+    title: &'static str,
+    select_files: &'static str,
+    drag_hint: &'static str,
+    upload_btn: &'static str,
+    transferring: &'static str,
+    success_msg: &'static str,
+    failed_msg: &'static str,
+    file_label: &'static str,
+    total_size_label: &'static str,
+    remove_label: &'static str,
+    encrypted_label: &'static str,
+    lang: &'static str,
+}
 
+fn upload_page_css() -> &'static str {
+    r##"
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; color: #333; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .container { max-width: 520px; width: 100%; padding: 20px; }
+        .card { background: #fff; border-radius: 16px; padding: 32px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+        h1 { font-size: 24px; font-weight: 600; margin-bottom: 8px; text-align: center; }
+        .subtitle { color: #666; text-align: center; margin-bottom: 24px; font-size: 14px; }
+        .badges { display: flex; gap: 6px; justify-content: center; margin-bottom: 16px; }
+        .badge { font-size: 11px; padding: 2px 8px; border-radius: 4px; color: #fff; background: #2e7d32; }
+        .drop-zone { border: 2px dashed #ddd; border-radius: 12px; padding: 40px 20px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .drop-zone:hover, .drop-zone.dragover { border-color: #1976d2; background: #e3f2fd; }
+        .drop-zone-icon { font-size: 48px; margin-bottom: 12px; }
+        .drop-zone-text { color: #666; font-size: 14px; }
+        .drop-zone-btn { display: inline-block; margin-top: 12px; padding: 8px 24px; background: #1976d2; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }
+        .drop-zone-btn:hover { background: #1565c0; }
+        @media (pointer: coarse) {
+            .drop-zone { border: none; padding: 24px 20px; }
+            .drop-zone-icon { font-size: 40px; margin-bottom: 8px; }
+            .drop-zone-text { display: none; }
+            .drop-zone-btn { padding: 12px 32px; font-size: 16px; border-radius: 10px; }
+        }
+        .file-list { margin-top: 16px; max-height: 200px; overflow-y: auto; }
+        .file-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #f9f9f9; border-radius: 8px; margin-bottom: 8px; font-size: 13px; }
+        .file-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .file-item .size { color: #999; margin: 0 12px; white-space: nowrap; }
+        .file-item .remove { color: #f44336; cursor: pointer; border: none; background: none; font-size: 12px; }
+        .stats { margin-top: 8px; font-size: 13px; color: #666; }
+        .upload-btn { display: block; width: 100%; margin-top: 20px; padding: 14px; background: #4caf50; color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
+        .upload-btn:hover { background: #43a047; }
+        .upload-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .status { margin-top: 20px; padding: 16px; border-radius: 10px; text-align: center; font-size: 14px; display: none; }
+        .status.uploading { display: block; background: #e3f2fd; color: #1565c0; }
+        .status.success { display: block; background: #e8f5e9; color: #2e7d32; }
+        .status.error { display: block; background: #ffebee; color: #c62828; }
+        .hidden { display: none !important; }
+        .progress-bar { width: 100%; height: 6px; background: #e0e0e0; border-radius: 3px; margin-top: 8px; overflow: hidden; }
+        .progress-fill { height: 100%; background: #1976d2; transition: width 0.3s; width: 0%; }
+        .progress-text { font-size: 12px; color: #666; margin-top: 4px; text-align: center; }
+        .resume-prompt { margin-top: 16px; padding: 12px; background: #fff3e0; border-radius: 8px; text-align: center; font-size: 13px; }
+        .resume-prompt button { margin: 8px 4px 0; padding: 6px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+        .resume-btn { background: #1976d2; color: #fff; }
+        .restart-btn { background: #e0e0e0; color: #333; }
+        @media (prefers-color-scheme: dark) {
+            body { background: #121212; color: #e0e0e0; }
+            .card { background: #1e1e1e; box-shadow: 0 2px 12px rgba(0,0,0,0.3); }
+            .drop-zone { border-color: #444; }
+            .drop-zone:hover, .drop-zone.dragover { border-color: #42a5f5; background: #1a237e33; }
+            .drop-zone-text { color: #aaa; }
+            .file-item { background: #2a2a2a; }
+            .file-item .size { color: #888; }
+            .stats { color: #aaa; }
+        }
+    "##
+}
+
+fn upload_page_javascript(labels: &UploadPageLabels) -> String {
     format!(
-        r##"<!DOCTYPE html>
-<html lang="{lang}">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title}</title>
-    <link rel="icon" type="image/png" href="/favicon.ico">
-    <style>
-        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; color: #333; min-height: 100vh; display: flex; align-items: center; justify-content: center; }}
-        .container {{ max-width: 520px; width: 100%; padding: 20px; }}
-        .card {{ background: #fff; border-radius: 16px; padding: 32px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }}
-        h1 {{ font-size: 24px; font-weight: 600; margin-bottom: 8px; text-align: center; }}
-        .subtitle {{ color: #666; text-align: center; margin-bottom: 24px; font-size: 14px; }}
-        .badges {{ display: flex; gap: 6px; justify-content: center; margin-bottom: 16px; }}
-        .badge {{ font-size: 11px; padding: 2px 8px; border-radius: 4px; color: #fff; background: #2e7d32; }}
-        .drop-zone {{ border: 2px dashed #ddd; border-radius: 12px; padding: 40px 20px; text-align: center; cursor: pointer; transition: all 0.2s; }}
-        .drop-zone:hover, .drop-zone.dragover {{ border-color: #1976d2; background: #e3f2fd; }}
-        .drop-zone-icon {{ font-size: 48px; margin-bottom: 12px; }}
-        .drop-zone-text {{ color: #666; font-size: 14px; }}
-        .drop-zone-btn {{ display: inline-block; margin-top: 12px; padding: 8px 24px; background: #1976d2; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }}
-        .drop-zone-btn:hover {{ background: #1565c0; }}
-        @media (pointer: coarse) {{
-            .drop-zone {{ border: none; padding: 24px 20px; }}
-            .drop-zone-icon {{ font-size: 40px; margin-bottom: 8px; }}
-            .drop-zone-text {{ display: none; }}
-            .drop-zone-btn {{ padding: 12px 32px; font-size: 16px; border-radius: 10px; }}
-        }}
-        .file-list {{ margin-top: 16px; max-height: 200px; overflow-y: auto; }}
-        .file-item {{ display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #f9f9f9; border-radius: 8px; margin-bottom: 8px; font-size: 13px; }}
-        .file-item .name {{ flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
-        .file-item .size {{ color: #999; margin: 0 12px; white-space: nowrap; }}
-        .file-item .remove {{ color: #f44336; cursor: pointer; border: none; background: none; font-size: 12px; }}
-        .stats {{ margin-top: 8px; font-size: 13px; color: #666; }}
-        .upload-btn {{ display: block; width: 100%; margin-top: 20px; padding: 14px; background: #4caf50; color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 500; cursor: pointer; transition: background 0.2s; }}
-        .upload-btn:hover {{ background: #43a047; }}
-        .upload-btn:disabled {{ background: #ccc; cursor: not-allowed; }}
-        .status {{ margin-top: 20px; padding: 16px; border-radius: 10px; text-align: center; font-size: 14px; display: none; }}
-        .status.uploading {{ display: block; background: #e3f2fd; color: #1565c0; }}
-        .status.success {{ display: block; background: #e8f5e9; color: #2e7d32; }}
-        .status.error {{ display: block; background: #ffebee; color: #c62828; }}
-        .hidden {{ display: none !important; }}
-        .progress-bar {{ width: 100%; height: 6px; background: #e0e0e0; border-radius: 3px; margin-top: 8px; overflow: hidden; }}
-        .progress-fill {{ height: 100%; background: #1976d2; transition: width 0.3s; width: 0%; }}
-        .progress-text {{ font-size: 12px; color: #666; margin-top: 4px; text-align: center; }}
-        .resume-prompt {{ margin-top: 16px; padding: 12px; background: #fff3e0; border-radius: 8px; text-align: center; font-size: 13px; }}
-        .resume-prompt button {{ margin: 8px 4px 0; padding: 6px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }}
-        .resume-btn {{ background: #1976d2; color: #fff; }}
-        .restart-btn {{ background: #e0e0e0; color: #333; }}
-        @media (prefers-color-scheme: dark) {{
-            body {{ background: #121212; color: #e0e0e0; }}
-            .card {{ background: #1e1e1e; box-shadow: 0 2px 12px rgba(0,0,0,0.3); }}
-            .drop-zone {{ border-color: #444; }}
-            .drop-zone:hover, .drop-zone.dragover {{ border-color: #42a5f5; background: #1a237e33; }}
-            .drop-zone-text {{ color: #aaa; }}
-            .file-item {{ background: #2a2a2a; }}
-            .file-item .size {{ color: #888; }}
-            .stats {{ color: #aaa; }}
-        }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="card">
-            <h1>📤 {title}</h1>
-            <p class="subtitle">PureSend</p>
-            <div class="badges" id="capBadges"></div>
-
-            <div class="drop-zone" id="dropZone">
-                <div class="drop-zone-icon">📁</div>
-                <div class="drop-zone-text">{drag_hint}</div>
-                <button class="drop-zone-btn" onclick="document.getElementById('fileInput').click()">{select_files}</button>
-                <input type="file" id="fileInput" multiple style="display:none" />
-            </div>
-
-            <div class="file-list hidden" id="fileList"></div>
-            <div class="stats hidden" id="stats"></div>
-            <div id="resumePrompt" class="resume-prompt hidden"></div>
-
-            <button class="upload-btn" id="uploadBtn" disabled>{upload_btn}</button>
-
-            <div class="progress-bar hidden" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
-            <div class="progress-text hidden" id="progressText"></div>
-            <div class="status" id="status"></div>
-        </div>
-    </div>
-
-    <script>
+        r##"
         const dropZone = document.getElementById("dropZone");
         const fileInput = document.getElementById("fileInput");
         const fileListEl = document.getElementById("fileList");
@@ -1498,21 +1400,100 @@ fn generate_upload_page(is_english: bool) -> String {
         }});
 
         initEnhanced();
-    </script>
+    "##,
+        encrypted_label = labels.encrypted_label,
+        remove_label = labels.remove_label,
+        file_label = labels.file_label,
+        total_size_label = labels.total_size_label,
+        transferring = labels.transferring,
+        success_msg = labels.success_msg,
+        failed_msg = labels.failed_msg,
+    )
+}
+
+/// Enhanced upload page with chunked upload, encryption, compression, and resume
+fn generate_upload_page(is_english: bool) -> String {
+    let labels = if is_english {
+        UploadPageLabels {
+            title: "PureSend - Upload Files",
+            select_files: "Select Files",
+            drag_hint: "or drag and drop files here",
+            upload_btn: "Upload",
+            transferring: "Uploading files...",
+            success_msg: "Files uploaded successfully!",
+            failed_msg: "Upload failed",
+            file_label: "file(s)",
+            total_size_label: "Total size",
+            remove_label: "Remove",
+            encrypted_label: "Encrypted",
+            lang: "en",
+        }
+    } else {
+        UploadPageLabels {
+            title: "PureSend - 文件上传",
+            select_files: "选择文件",
+            drag_hint: "或将文件拖拽到此处",
+            upload_btn: "上传",
+            transferring: "正在上传文件...",
+            success_msg: "文件上传成功！",
+            failed_msg: "上传失败",
+            file_label: "个文件",
+            total_size_label: "总大小",
+            remove_label: "移除",
+            encrypted_label: "已加密",
+            lang: "zh-CN",
+        }
+    };
+
+    let css = upload_page_css();
+    let javascript = upload_page_javascript(&labels);
+
+    format!(
+        r##"<!DOCTYPE html>
+<html lang="{lang}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title}</title>
+    <link rel="icon" type="image/png" href="/favicon.ico">
+    <style>{css}</style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>📤 {title}</h1>
+            <p class="subtitle">PureSend</p>
+            <div class="badges" id="capBadges"></div>
+
+            <div class="drop-zone" id="dropZone">
+                <div class="drop-zone-icon">📁</div>
+                <div class="drop-zone-text">{drag_hint}</div>
+                <button class="drop-zone-btn" onclick="document.getElementById('fileInput').click()">{select_files}</button>
+                <input type="file" id="fileInput" multiple style="display:none" />
+            </div>
+
+            <div class="file-list hidden" id="fileList"></div>
+            <div class="stats hidden" id="stats"></div>
+            <div id="resumePrompt" class="resume-prompt hidden"></div>
+
+            <button class="upload-btn" id="uploadBtn" disabled>{upload_btn}</button>
+
+            <div class="progress-bar hidden" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+            <div class="progress-text hidden" id="progressText"></div>
+            <div class="status" id="status"></div>
+        </div>
+    </div>
+
+    <script>{javascript}</script>
 </body>
 </html>"##,
-        lang = lang,
-        title = title,
-        select_files = select_files,
-        drag_hint = drag_hint,
-        upload_btn = upload_btn,
-        transferring = transferring,
-        success_msg = success_msg,
-        failed_msg = failed_msg,
-        file_label = file_label,
-        total_size_label = total_size_label,
-        remove_label = remove_label,
-        encrypted_label = encrypted_label,
+        lang = labels.lang,
+        title = labels.title,
+        css = css,
+        select_files = labels.select_files,
+        drag_hint = labels.drag_hint,
+        upload_btn = labels.upload_btn,
+        javascript = javascript,
     )
 }
 

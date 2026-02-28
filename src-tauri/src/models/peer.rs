@@ -46,33 +46,7 @@ impl PeerInfo {
         }
     }
 
-    /// 更新最后活跃时间
-    #[allow(dead_code)]
-    pub fn update_last_seen(&mut self) {
-        self.last_seen = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as u64;
-    }
-
-    /// 获取显示名称
-    #[allow(dead_code)]
-    pub fn display_name(&self) -> &str {
-        if self.name.is_empty() {
-            "Unknown Device"
-        } else {
-            &self.name
-        }
-    }
-
-    /// 获取地址字符串
-    #[allow(dead_code)]
-    pub fn address(&self) -> String {
-        format!("{}:{}", self.ip, self.port)
-    }
-
     /// 检查设备是否在线（5秒内有活动）
-    #[allow(dead_code)]
     pub fn is_online(&self) -> bool {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)

@@ -4,6 +4,7 @@
 
 mod discovery;
 mod error;
+mod http_common;
 mod models;
 mod network;
 mod share;

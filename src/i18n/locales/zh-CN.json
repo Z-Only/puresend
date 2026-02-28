@@ -83,7 +83,8 @@
         "label": "隐私模式",
         "description": "在历史记录中隐藏敏感信息",
         "hideFileName": "隐藏文件名",
-        "hidePeerName": "隐藏设备名"
+        "hidePeerName": "隐藏设备名",
+        "hideIp": "隐藏 IP 地址"
       },
       "autoCleanup": {
         "label": "自动清理",
@@ -251,7 +252,8 @@
     },
     "privacy": {
       "hiddenFileName": "****",
-      "hiddenPeerName": "***"
+      "hiddenPeerName": "***",
+      "hiddenPeerIp": "***"
     }
   },
   "peer": {

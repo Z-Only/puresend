@@ -37,7 +37,7 @@ export const useDiscoveryStore = defineStore('discovery', () => {
     const deviceName = ref<string>('')
 
     /** 事件监听器清理函数 */
-    let unlistenFns: UnlistenFn[] = []
+    const unlistenFns: UnlistenFn[] = []
 
     // ============ 计算属性 ============
 
@@ -207,7 +207,7 @@ export const useDiscoveryStore = defineStore('discovery', () => {
      */
     function destroy() {
         unlistenFns.forEach((fn) => fn())
-        unlistenFns = []
+        unlistenFns.length = 0
         peers.value.clear()
         selectedPeerId.value = ''
         initialized.value = false

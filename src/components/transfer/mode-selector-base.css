@@ -1,0 +1,19 @@
+/* ModeSelector 公共样式 */
+
+.mode-card {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.mode-card:hover {
+    transform: translateY(-2px);
+}
+
+.mode-card-disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.mode-card-disabled:hover {
+    transform: none;
+}

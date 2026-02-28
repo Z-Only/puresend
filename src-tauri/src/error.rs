@@ -10,67 +10,67 @@ use thiserror::Error;
 #[derive(Debug, Error, Serialize)]
 #[allow(dead_code)]
 pub enum TransferError {
-    #[error("IO错误: {0}")]
+    #[error("IO error: {0}")]
     Io(String),
 
-    #[error("网络错误: {0}")]
+    #[error("Network error: {0}")]
     Network(String),
 
-    #[error("文件不存在: {0}")]
+    #[error("File not found: {0}")]
     FileNotFound(String),
 
-    #[error("文件过大: {0}")]
+    #[error("File too large: {0}")]
     FileTooLarge(String),
 
-    #[error("传输超时")]
+    #[error("Transfer timeout")]
     Timeout,
 
-    #[error("传输已取消")]
+    #[error("Transfer cancelled")]
     Cancelled,
 
-    #[error("校验失败: {0}")]
+    #[error("Integrity check failed: {0}")]
     IntegrityCheckFailed(String),
 
-    #[error("设备不可达: {0}")]
+    #[error("Peer unreachable: {0}")]
     PeerUnreachable(String),
 
-    #[error("无效的文件元数据: {0}")]
+    #[error("Invalid file metadata: {0}")]
     InvalidMetadata(String),
 
-    #[error("存储空间不足")]
+    #[error("Insufficient storage")]
     InsufficientStorage,
 
-    #[error("不支持的操作: {0}")]
+    #[error("Unsupported operation: {0}")]
     UnsupportedOperation(String),
 
-    #[error("内部错误: {0}")]
+    #[error("Internal error: {0}")]
     Internal(String),
 
-    #[error("加密错误: {0}")]
+    #[error("Encryption error: {0}")]
     Encryption(String),
 
-    #[error("解密错误: {0}")]
+    #[error("Decryption error: {0}")]
     Decryption(String),
 
-    #[error("密钥交换失败: {0}")]
+    #[error("Key exchange failed: {0}")]
     KeyExchange(String),
 
-    #[error("压缩错误: {0}")]
+    #[error("Compression error: {0}")]
     Compression(String),
 
-    #[error("解压错误: {0}")]
+    #[error("Decompression error: {0}")]
     Decompression(String),
 
-    #[error("续传失败: {0}")]
+    #[error("Resume failed: {0}")]
     ResumeFailed(String),
 
-    #[error("断点信息已过期")]
+    #[error("Resume info expired")]
     ResumeInfoExpired,
 
-    #[error("分块校验失败: {0}")]
+    #[error("Chunk verification failed: {0}")]
     ChunkVerificationFailed(String),
 
-    #[error("协议版本不兼容: {0}")]
+    #[error("Protocol version mismatch: {0}")]
     ProtocolVersionMismatch(String),
 }
 
@@ -90,19 +90,19 @@ impl From<serde_json::Error> for TransferError {
 #[derive(Debug, Error, Serialize)]
 #[allow(dead_code)]
 pub enum DiscoveryError {
-    #[error("mDNS服务错误: {0}")]
+    #[error("mDNS service error: {0}")]
     Mdns(String),
 
-    #[error("没有发现设备")]
+    #[error("No peers found")]
     NoPeersFound,
 
-    #[error("设备连接失败: {0}")]
+    #[error("Connection failed: {0}")]
     ConnectionFailed(String),
 
-    #[error("握手失败: {0}")]
+    #[error("Handshake failed: {0}")]
     HandshakeFailed(String),
 
-    #[error("内部错误: {0}")]
+    #[error("Internal error: {0}")]
     Internal(String),
 }
 

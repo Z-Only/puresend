@@ -98,20 +98,6 @@ impl FileMetadata {
         }
     }
 
-    /// 获取文件扩展名
-    #[allow(dead_code)]
-    pub fn extension(&self) -> Option<&str> {
-        self.name.rsplit('.').next()
-    }
-
-    /// 计算分块数量
-    #[allow(dead_code)]
-    pub fn chunk_count(&self, chunk_size: u64) -> u32 {
-        if self.size == 0 {
-            return 0;
-        }
-        ((self.size + chunk_size - 1) / chunk_size) as u32
-    }
 }
 
 /// 分块信息
@@ -158,9 +144,4 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_chunk_count() {
-        let meta = FileMetadata::new("test.txt".to_string(), 2_500_000, "text/plain".to_string());
-        assert_eq!(meta.chunk_count(1_000_000), 3);
-    }
 }

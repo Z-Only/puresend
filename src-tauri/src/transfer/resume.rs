@@ -235,24 +235,6 @@ impl ResumeManager {
         self.save().await
     }
 
-    /// 清理所有过期的断点信息
-    #[allow(dead_code)]
-    pub async fn cleanup_expired(&self) -> TransferResult<usize> {
-        let removed_count;
-        {
-            let mut cache = self.resume_infos.write().await;
-            let before_count = cache.len();
-            cache.retain(|_, info| !info.is_expired());
-            removed_count = before_count - cache.len();
-        }
-
-        if removed_count > 0 {
-            self.save().await?;
-        }
-
-        Ok(removed_count)
-    }
-
     /// 清理所有断点信息
     pub async fn cleanup_all(&self) -> TransferResult<()> {
         {

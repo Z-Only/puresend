@@ -91,16 +91,8 @@ export function inferMimeType(filename: string): string {
     return mimeTypes[extension] || 'application/octet-stream'
 }
 
-/** 格式化文件大小 */
-export function formatFileSize(bytes: number): string {
-    if (bytes === 0) return '0 B'
-
-    const units = ['B', 'KB', 'MB', 'GB', 'TB']
-    const k = 1024
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${units[i]}`
-}
+/** 格式化文件大小（re-export from utils/format） */
+export { formatFileSize } from '@/utils/format'
 
 /** 获取文件类型图标名称 */
 export function getFileIcon(mimeType: string): string {

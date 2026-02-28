@@ -1,44 +1,82 @@
 # File Transfer
 
-PureSend provides fast and secure LAN file transfer functionality.
+PureSend provides fast and secure file transfer capabilities with multiple transfer modes.
 
 ## How It Works
 
-PureSend uses HTTP/TCP direct connection technology for peer-to-peer transfer:
+PureSend supports three transfer modes:
 
-1. **Device Discovery**: Discover other devices on the same network through LAN broadcasting
-2. **Connection Establishment**: Establish direct TCP connection via device IP and port
-3. **Data Transfer**: File data is transferred directly between devices without passing through servers
+### P2P Direct Transfer
+
+1. **Device Discovery**: Auto-discover other PureSend devices on the LAN via mDNS protocol
+2. **Connection Establishment**: Establish direct HTTP connection via device IP and port
+3. **Security Handshake**: Use P-256 ECDH key exchange to establish encrypted channel (optional)
+4. **Data Transfer**: Files are automatically chunked with optional encryption and compression
+
+### Web Download (Link Sharing)
+
+1. The sender starts an HTTP server and shares files
+2. A download link and QR code are generated
+3. The receiver opens the link in any browser to download
+4. Supports PIN protection and access approval
+
+### Web Upload
+
+1. The receiver starts an HTTP upload server
+2. An upload link and QR code are generated
+3. The sender opens the link in a browser to upload files
+4. Supports per-IP approval and chunked upload
 
 ## Features
 
-### Sending Files
+### Multiple Content Types
 
-- **Supported Types**: Any file type
-- **Batch Transfer**: Support selecting multiple files or entire folders at once
-- **Resume Transfer**: Support resuming transfer after interruption
+- **Files**: Select any type of file for transfer
+- **Folders**: Select entire folders for batch transfer
+- **Clipboard**: Transfer clipboard contents directly
+- **Text**: Quick text message sending
+- **Media**: Select photos/videos from media library
+- **Apps**: Share installed apps (Android)
+
+### Transfer Capabilities
+
+- **Resume Transfer**: Resume interrupted transfers from the breakpoint
+- **Chunked Transfer**: Large files are automatically chunked (1MB/chunk) with parallel processing
+- **Dynamic Compression**: Smart compression based on zstd algorithm, automatically determines whether to compress
 - **Transfer Speed**: Can reach 100Mbps+ within LAN
 
-### Receiving Files
+### Device Discovery
 
-- **Auto Discovery**: Automatically discover nearby sending devices
-- **QR Code Scanning**: Quick connection by scanning QR code
-- **Pairing Code Input**: Manual connection by entering pairing code
-- **Save Location**: Customize the save location for received files
+- **mDNS Auto-Discovery**: Automatically discover PureSend devices on the same LAN
+- **Manual Add**: Support adding devices manually via IP address
 
 ## Security
 
-### LAN Direct Connection
+### Transfer Encryption
 
-- File data is transferred only within the LAN
-- Does not pass through any external servers
-- Data transfer is secure and controllable
+- **AES-256-GCM** end-to-end encryption protects transfer data
+- **P-256 ECDH** key exchange (HTTP transfer mode, compatible with browser Web Crypto API)
+- **X25519** key exchange (P2P transfer mode)
+- Encryption can be enabled/disabled in settings
+
+### Access Control
+
+- **PIN Protection**: Web download links can be protected with PIN code
+- **Access Approval**: Support manual approval or auto-accept for transfer requests
+- **IP Approval**: Web upload mode supports per-IP address approval
 
 ### Privacy Protection
 
-- Files do not pass through any relay servers
-- No records are kept after transfer completion
-- Only visible to devices on the same LAN
+- File data is transferred only within LAN or Wi-Fi direct
+- No external servers or cloud relay involved
+- Privacy mode available to disable transfer history
+
+## Transfer History
+
+- Automatically records detailed information for each transfer (direction, status, file list, duration, etc.)
+- Filter by direction (send/receive) and status (completed/failed, etc.)
+- Sort by time, size, etc.
+- Privacy mode can disable history recording
 
 ## Tips
 
@@ -47,12 +85,7 @@ PureSend uses HTTP/TCP direct connection technology for peer-to-peer transfer:
 1. Ensure devices are on the same LAN
 2. Turn off VPN and proxy
 3. Use 5GHz WiFi network
-
-### Large File Transfer
-
-- Supports transferring very large files (GB level)
-- Automatic chunked transfer
-- Real-time transfer progress display
+4. Enable dynamic compression (especially effective for text-based files)
 
 ### Cross-Platform Transfer
 
@@ -61,3 +94,4 @@ Supports file transfer between any platforms:
 - macOS ↔ Windows
 - Linux ↔ Android
 - Desktop ↔ Mobile
+- Any device ↔ Browser (via Web Download/Upload)

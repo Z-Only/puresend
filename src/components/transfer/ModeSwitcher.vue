@@ -132,22 +132,4 @@ function selectMode(mode: ModeOption) {
 }
 </script>
 
-<style scoped>
-.mode-card {
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.mode-card:hover {
-    transform: translateY(-2px);
-}
-
-.mode-card-disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
-}
-
-.mode-card-disabled:hover {
-    transform: none;
-}
-</style>
+<style scoped src="./mode-selector-base.css"></style>

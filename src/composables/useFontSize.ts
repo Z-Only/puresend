@@ -25,17 +25,7 @@ export function useFontSize() {
      * 获取系统字体大小设置
      */
     function getSystemFontScale(): number {
-        try {
-            // 检测系统字体大小偏好（通过媒体查询）
-            const isLargeText = window.matchMedia(
-                '(prefers-reduced-motion: reduce)'
-            ).matches
-            // 如果用户启了"减少动态效果"，通常也意味着需要更大的字体
-            return isLargeText ? 1.2 : 1.0
-        } catch (error) {
-            console.error('[FontSize] 系统字体大小检测失败:', error)
-            return 1.0
-        }
+        return 1.0
     }
 
     /**

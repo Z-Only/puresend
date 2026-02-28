@@ -65,20 +65,31 @@ chmod +x puresend_*.AppImage
 
 ## Basic Usage
 
-### Sending Files
+### P2P Direct Transfer
 
 1. Open the PureSend app
 2. Click the "Send" tab
-3. Select the files or folders you want to send
-4. Wait for the receiver to scan the QR code or enter the pairing code
+3. Select the content type (files, folders, clipboard, text, media, app)
+4. Set the transfer mode to "P2P Transfer"
+5. Select the receiving device from the device list (auto-discovered via mDNS)
+6. Click send and wait for the receiver to accept
+
+### Web Download (Link Sharing)
+
+1. Open the PureSend app
+2. Click the "Send" tab and set the transfer mode to "Web Download"
+3. Select the files to share
+4. The system generates a download link and QR code
+5. Share the link or QR code with the receiver, who can download files in any browser
 
 ### Receiving Files
 
 1. Open the PureSend app
 2. Click the "Receive" tab
-3. Scan the sender's QR code, or enter the pairing code
-4. Wait for the connection to be established
-5. Choose the save location and start receiving
+3. Select the receive mode (P2P Receive or Web Upload Receive)
+4. In P2P mode, it automatically listens for transfer requests from other devices on the LAN
+5. In Web Upload mode, a link is generated for the sender to upload files via browser
+6. Review and accept incoming transfer requests
 
 ## Next Steps
 
