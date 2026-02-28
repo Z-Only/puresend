@@ -27,9 +27,34 @@ import {
     onWebUploadFileProgress,
     onWebUploadFileComplete,
 } from '../../services/webUploadService'
+import {
+    onNetworkChanged,
+    updateLinkIp,
+    type NetworkChangedPayload,
+} from '../../services/networkService'
 import { useSettingsStore } from '../settings'
 import { addHistoryItem } from './history'
 import type { TransferHistoryItem } from '../../types'
+
+// ============ 网络变化监听 ============
+
+let webUploadNetworkUnlisten: UnlistenFn | null = null
+
+/**
+ * 处理网络变化事件，更新 Web 上传链接
+ */
+function handleWebUploadNetworkChanged(payload: NetworkChangedPayload): void {
+    if (payload.changeType === 'disconnected' || !webUploadInfo.value) return
+
+    const updatedUrls = webUploadInfo.value.urls.map((url) =>
+        updateLinkIp(url, payload.previousIpAddresses, payload.ipAddresses)
+    )
+
+    webUploadInfo.value = {
+        ...webUploadInfo.value,
+        urls: updatedUrls,
+    }
+}
 
 // ============ Web 上传状态 ============
 
@@ -112,6 +137,13 @@ export async function startWebUpload(
             await onWebUploadFileComplete(handleWebUploadFileComplete)
         )
 
+        // 启动网络变化监听，自动更新上传链接
+        if (!webUploadNetworkUnlisten) {
+            webUploadNetworkUnlisten = await onNetworkChanged(
+                handleWebUploadNetworkChanged
+            )
+        }
+
         // 持久化 Web 上传服务器状态
         await settingsStore.setWebUploadState(true, info.port)
     } catch (e) {
@@ -132,6 +164,12 @@ export async function stopWebUpload(): Promise<void> {
         webUploadEnabled.value = false
         webUploadInfo.value = null
         webUploadRequests.value.clear()
+
+        // 停止网络变化监听
+        if (webUploadNetworkUnlisten) {
+            webUploadNetworkUnlisten()
+            webUploadNetworkUnlisten = null
+        }
 
         // 持久化 Web 上传服务器关闭状态（保留端口号）
         const settingsStore = useSettingsStore()

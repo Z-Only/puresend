@@ -34,6 +34,11 @@ import {
     type UploadCompletePayload,
     type UploadStartPayload,
 } from '../services/shareService'
+import {
+    onNetworkChanged,
+    updateLinkIp,
+    type NetworkChangedPayload,
+} from '../services/networkService'
 import { useSettingsStore } from './settings'
 
 export const useShareStore = defineStore('share', () => {
@@ -66,8 +71,14 @@ export const useShareStore = defineStore('share', () => {
     /** 内容类型（发送页面的内容类型选择） */
     const contentType = ref<ContentType>('file')
 
+    /** 网络断开状态 */
+    const networkDisconnected = ref(false)
+
     /** 事件监听器清理函数 */
     const unlistenFns: UnlistenFn[] = []
+
+    /** 网络变化监听器清理函数 */
+    let networkUnlisten: UnlistenFn | null = null
 
     // ============ 计算属性 ============
 
@@ -415,6 +426,49 @@ export const useShareStore = defineStore('share', () => {
     }
 
     /**
+     * 处理网络变化事件，更新分享链接
+     */
+    function handleNetworkChanged(payload: NetworkChangedPayload): void {
+        if (payload.changeType === 'disconnected') {
+            networkDisconnected.value = true
+            return
+        }
+
+        networkDisconnected.value = false
+
+        if (!shareInfo.value || !shareInfo.value.links.length) return
+
+        // 使用新 IP 替换链接中的旧 IP
+        const updatedLinks = shareInfo.value.links.map((link) =>
+            updateLinkIp(link, payload.previousIpAddresses, payload.ipAddresses)
+        )
+
+        shareInfo.value = {
+            ...shareInfo.value,
+            links: updatedLinks,
+        }
+    }
+
+    /**
+     * 启动网络变化监听
+     */
+    async function startNetworkListener(): Promise<void> {
+        if (networkUnlisten) return
+        networkUnlisten = await onNetworkChanged(handleNetworkChanged)
+    }
+
+    /**
+     * 停止网络变化监听
+     */
+    function stopNetworkListener(): void {
+        if (networkUnlisten) {
+            networkUnlisten()
+            networkUnlisten = null
+        }
+        networkDisconnected.value = false
+    }
+
+    /**
      * 设置事件监听器
      */
     async function setupEventListeners(): Promise<void> {
@@ -453,6 +507,9 @@ export const useShareStore = defineStore('share', () => {
             // 设置事件监听
             await setupEventListeners()
 
+            // 启动网络变化监听，自动更新链接
+            await startNetworkListener()
+
             // 持久化 Web 下载服务器状态
             await settingsStore.setWebDownloadState(true, result.port)
 
@@ -479,6 +536,9 @@ export const useShareStore = defineStore('share', () => {
             // 清理事件监听
             unlistenFns.forEach((unlisten) => unlisten())
             unlistenFns.length = 0
+
+            // 停止网络变化监听
+            stopNetworkListener()
 
             // 重置状态
             shareInfo.value = null
@@ -686,6 +746,7 @@ export const useShareStore = defineStore('share', () => {
     function destroy(): void {
         unlistenFns.forEach((unlisten) => unlisten())
         unlistenFns.length = 0
+        stopNetworkListener()
         shareInfo.value = null
         accessRequests.value.clear()
         qrCodeDataUrl.value = ''
@@ -703,6 +764,7 @@ export const useShareStore = defineStore('share', () => {
         qrCodeDataUrl,
         selectedFiles,
         contentType,
+        networkDisconnected,
         // 计算属性
         isSharing,
         shareLinks,

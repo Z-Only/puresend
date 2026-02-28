@@ -163,7 +163,7 @@ pub async fn get_device_name() -> String {
 /// 设备发现状态
 pub struct DiscoveryState {
     /// 发现管理器
-    manager: Arc<Mutex<Option<DiscoveryManager>>>,
+    pub(crate) manager: Arc<Mutex<Option<DiscoveryManager>>>,
 }
 
 impl DiscoveryState {

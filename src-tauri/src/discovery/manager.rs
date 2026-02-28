@@ -59,6 +59,26 @@ impl DiscoveryManager {
         Ok(())
     }
 
+    /// 重启发现服务（网络变化时调用）
+    ///
+    /// 执行 stop → 清空设备列表 → start 的完整重启流程，
+    /// 使 mDNS 广播使用新的网络地址。
+    pub async fn restart(&self) -> DiscoveryResult<()> {
+        let mut started = self.started.lock().await;
+
+        // 如果正在运行，先停止
+        if *started {
+            self.mdns.stop().await?;
+            *started = false;
+        }
+
+        // 重新启动
+        self.mdns.start().await?;
+        *started = true;
+
+        Ok(())
+    }
+
     /// 获取所有已发现的设备
     pub async fn get_peers(&self) -> Vec<PeerInfo> {
         self.mdns.get_peers().await

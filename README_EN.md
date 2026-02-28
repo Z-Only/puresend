@@ -13,28 +13,33 @@
 ## Features
 
 ### Transfer Modes
+
 - 🚀 **P2P Direct Transfer** - High-speed direct transfer between devices on the same LAN with automatic device discovery (mDNS)
 - 🌐 **Web Download (Link Sharing)** - Generate download links/QR codes for direct browser downloads
 - 📤 **Web Upload** - Upload files to the app via browser with per-IP approval
 
 ### Transfer Capabilities
+
 - 📦 **Multiple Content Types** - Supports files, folders, clipboard, text, media, and apps (6 content types)
 - 🔄 **Resume Transfer** - Resume interrupted transfers from the breakpoint
 - ⚡ **Chunked Transfer** - Automatic chunking for large files with parallel transfer
 - 🗜️ **Dynamic Compression** - Smart compression based on zstd algorithm, automatically determines whether to compress
 
 ### Security & Privacy
+
 - 🔒 **Transfer Encryption** - AES-256-GCM end-to-end encryption with P-256 ECDH key exchange
 - 🔑 **PIN Protection** - Protect Web download links with PIN code access
 - 👁️ **Privacy Mode** - Option to disable transfer history recording
 
 ### User Experience
+
 - 📱 **Cross-platform** - Supports macOS, Windows, Linux, and Android
 - 📋 **Transfer History** - Records transfer history with filtering and sorting
 - 🌍 **Multi-language** - Supports Chinese and English, follows system language
 - 🎨 **Theme Settings** - Light/Dark/System theme switching
 - 📐 **Customizable UI** - Tab bar layout configuration, font size adjustment
 - 🎯 **Device Discovery** - Automatic LAN device discovery based on mDNS
+- 🔄 **Network Adaptive** - Automatically detects network changes (Wi-Fi switching, IP changes), updates share links and QR codes in real-time, and restarts device discovery service
 
 ## Supported Platforms
 

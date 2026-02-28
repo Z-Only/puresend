@@ -12,6 +12,7 @@ mod transfer;
 mod web_upload;
 
 use discovery::DiscoveryState;
+use network::NetworkWatcherState;
 use share::ShareManagerState;
 use transfer::TransferState;
 use web_upload::WebUploadManagerState;
@@ -189,6 +190,38 @@ fn toggle_devtools(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
     }
 }
 
+/// 启动网络变化监视器
+///
+/// 在应用启动时调用，监听网络状态变化并通知前端。
+/// 同时设置 mDNS 重启回调，在网络变化时自动重启设备发现服务。
+fn start_network_watcher(app: &tauri::App) {
+    let app_handle = app.handle().clone();
+    let network_state = app.state::<NetworkWatcherState>();
+    let watcher = network_state.watcher.clone();
+
+    let callback_app_handle = app_handle.clone();
+
+    tokio::spawn(async move {
+        // 设置 mDNS 重启回调：网络变化时自动重启设备发现服务
+        let callback: network::NetworkChangeCallback =
+            std::sync::Arc::new(move |_payload| {
+                let handle = callback_app_handle.clone();
+                tokio::spawn(async move {
+                    let discovery_state = handle.state::<DiscoveryState>();
+                    let manager_guard = discovery_state.manager.lock().await;
+                    if let Some(manager) = manager_guard.as_ref() {
+                        if let Err(err) = manager.restart().await {
+                            eprintln!("网络变化后重启 mDNS 服务失败: {}", err);
+                        }
+                    }
+                });
+            });
+
+        watcher.set_on_change_callback(callback).await;
+        watcher.start(app_handle).await;
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
@@ -203,6 +236,7 @@ pub fn run() {
         .manage(DiscoveryState::default())
         .manage(ShareManagerState::default())
         .manage(WebUploadManagerState::default())
+        .manage(NetworkWatcherState::default())
         .invoke_handler(tauri::generate_handler![
             // Device commands
             crate::discovery::get_device_name,
@@ -302,6 +336,16 @@ pub fn run() {
             }
         });
 
+        // 启动网络变化监视器
+        start_network_watcher(app);
+
+        Ok(())
+    });
+
+    // 非 macOS 平台：仅启动网络变化监视器
+    #[cfg(not(target_os = "macos"))]
+    let builder = builder.setup(|app| {
+        start_network_watcher(app);
         Ok(())
     });
 
