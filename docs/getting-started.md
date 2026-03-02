@@ -74,7 +74,7 @@ chmod +x puresend_*.AppImage
 5. 在设备列表中选择接收设备（通过 mDNS 自动发现）
 6. 点击发送，等待对方接受
 
-### Web 下载（链接分享）
+### Web 下载
 
 1. 打开 PureSend 应用
 2. 点击「发送」标签，选择发送模式为「Web 下载」
