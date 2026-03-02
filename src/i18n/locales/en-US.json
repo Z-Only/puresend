@@ -2,6 +2,7 @@
   "nav": {
     "send": "Send",
     "receive": "Receive",
+    "cloud": "Cloud",
     "history": "History",
     "settings": "Settings"
   },
@@ -15,6 +16,7 @@
     "apply": "Apply",
     "add": "Add",
     "edit": "Edit",
+    "browse": "Browse",
     "justNow": "Just now",
     "minutesAgo": "{count} min ago",
     "hoursAgo": "{count} hr ago",
@@ -683,5 +685,97 @@
       "github": "GitHub Repository",
       "docs": "Online Documentation"
     }
+  },
+  "cloudAccount": {
+    "title": "Cloud Accounts",
+    "add": "Add Account",
+    "edit": "Edit Account",
+    "delete": "Delete",
+    "name": "Account Name",
+    "namePlaceholder": "Please enter account name",
+    "type": "Cloud Type",
+    "serverUrl": "Server URL",
+    "serverUrlPlaceholder": "Please enter a valid server URL",
+    "username": "Username",
+    "usernamePlaceholder": "Please enter username",
+    "password": "Password",
+    "passwordPlaceholder": "Please enter password",
+    "defaultDirectory": "Default Directory",
+    "defaultDirectoryPlaceholder": "Please enter default directory path",
+    "testConnection": "Test Connection",
+    "testSuccess": "Connection successful",
+    "testFailed": "Connection failed",
+    "saveError": "Failed to save account",
+    "noAccounts": "No cloud accounts",
+    "noAccountsHint": "Add a cloud account to use cloud relay feature",
+    "deleteConfirm": {
+      "title": "Delete Account",
+      "message": "Are you sure you want to delete account \"{name}\"? This action cannot be undone."
+    },
+    "status": {
+      "connected": "Connected",
+      "disconnected": "Disconnected",
+      "invalid": "Invalid"
+    }
+  },
+  "cloudTransfer": {
+    "selectAccount": "Select Cloud Account",
+    "noAccounts": "Please add a cloud account in Settings first",
+    "targetDirectory": "Target Directory",
+    "sourceDirectory": "Source Directory",
+    "browse": "Browse",
+    "refreshFiles": "Refresh Files",
+    "downloadSelected": "Download Selected",
+    "noFilesSelected": "No files available",
+    "downloading": "Downloading",
+    "downloadSuccess": "Download Complete",
+    "downloadFailed": "Download Failed",
+    "uploadToCloud": "Upload to Cloud",
+    "uploading": "Uploading",
+    "uploadSuccess": "Upload Complete",
+    "uploadFailed": "Upload Failed",
+    "uploadSelected": "Upload Selected",
+    "downloadFromCloud": "Download from Cloud",
+    "noAccountSelected": "Please select a cloud account",
+    "uploadTasks": "Upload Tasks",
+    "downloadTasks": "Download Tasks",
+    "noUploadTasks": "No upload tasks",
+    "noDownloadTasks": "No download tasks",
+    "selectFileToUpload": "Select files to start uploading",
+    "browseFilesToStart": "Browse files to start downloading",
+    "downloadDirectory": "Download Directory",
+    "selectDownloadDirectory": "Select Download Directory",
+    "fileCount": "{count} file(s)",
+    "moreFiles": "{count} more file(s)",
+    "collapseFiles": "Collapse file list",
+    "expand": "Expand All",
+    "collapse": "Collapse",
+    "status": {
+      "pending": "Pending",
+      "uploading": "Uploading",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
+    "fileStatus": {
+      "pending": "Pending",
+      "uploading": "Uploading",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
+    "directoryBrowser": {
+      "title": "Browse Cloud Directory",
+      "currentPath": "Root",
+      "parentDirectory": "Parent Directory",
+      "newFolder": "New Folder",
+      "newFolderName": "Folder Name",
+      "newFolderPlaceholder": "Enter folder name",
+      "empty": "Directory is empty",
+      "loadError": "Failed to load directory",
+      "createFolderError": "Failed to create folder"
+    },
+    "uploadSettings": "Upload Settings",
+    "overwriteFiles": "Overwrite Files with Same Name",
+    "overwriteHint": "When enabled, files with the same name will be overwritten",
+    "renameHint": "When disabled, files with the same name will be auto-renamed"
   }
 }

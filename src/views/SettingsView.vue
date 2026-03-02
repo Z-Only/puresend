@@ -2,6 +2,7 @@
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import SettingsGroup from '@/components/settings/SettingsGroup.vue'
+import CloudAccountGroup from '@/components/settings/CloudAccountGroup.vue'
 import ThemeSelector from '@/components/settings/ThemeSelector.vue'
 import LanguageSelector from '@/components/settings/LanguageSelector.vue'
 import { usePlatform } from '@/composables'
@@ -31,6 +32,25 @@ const deviceName = computed({
         editingDeviceName.value = value
     },
 })
+
+// 云账号测试连接结果
+const cloudTestResults = ref<
+    Array<{ accountId: string; success: boolean; message: string }>
+>([])
+
+function handleCloudTestResult(result: {
+    accountId: string
+    success: boolean
+    message: string
+}) {
+    cloudTestResults.value.push(result)
+    // 3 秒后自动移除
+    setTimeout(() => {
+        cloudTestResults.value = cloudTestResults.value.filter(
+            (r) => r.accountId !== result.accountId
+        )
+    }, 3000)
+}
 
 function startEditDeviceName() {
     editingDeviceName.value = settingsStore.deviceName
@@ -604,6 +624,9 @@ const compressionModeOptions = computed(() => [
             </div>
         </SettingsGroup>
 
+        <!-- 云盘账号管理 -->
+        <CloudAccountGroup class="mt-6" @test-result="handleCloudTestResult" />
+
         <!-- 高级设置开关 -->
         <div class="d-flex justify-end mt-6 mb-2">
             <v-checkbox
@@ -967,6 +990,35 @@ const compressionModeOptions = computed(() => [
                 </div>
             </div>
         </SettingsGroup>
+        <!-- 云账号测试连接结果提示 -->
+        <v-snackbar
+            v-for="(result, index) in cloudTestResults"
+            :key="result.accountId"
+            :model-value="true"
+            :color="result.success ? 'success' : 'error'"
+            :timeout="3000"
+            location="top"
+            :style="{ marginTop: `${index * 60}px` }"
+            @update:model-value="
+                cloudTestResults = cloudTestResults.filter(
+                    (r) => r.accountId !== result.accountId
+                )
+            "
+        >
+            {{ result.message }}
+            <template #actions>
+                <v-btn
+                    variant="text"
+                    icon="$close"
+                    size="small"
+                    @click="
+                        cloudTestResults = cloudTestResults.filter(
+                            (r) => r.accountId !== result.accountId
+                        )
+                    "
+                />
+            </template>
+        </v-snackbar>
     </v-container>
 </template>
 

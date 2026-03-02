@@ -9,6 +9,7 @@ import { useTheme } from 'vuetify'
 import {
     mdiSend,
     mdiWifiPlus,
+    mdiCloudSync,
     mdiHistory,
     mdiCog,
     mdiChevronLeft,
@@ -74,6 +75,11 @@ const navigationItems = computed(() => [
         title: t('nav.receive'),
         icon: mdiWifiPlus,
         route: 'Receive',
+    },
+    {
+        title: t('nav.cloud'),
+        icon: mdiCloudSync,
+        route: 'Cloud',
     },
     { title: t('nav.history'), icon: mdiHistory, route: 'History' },
     { title: t('nav.settings'), icon: mdiCog, route: 'Settings' },
@@ -284,7 +290,7 @@ onUnmounted(() => {
         <!-- 主内容区域 -->
         <v-main :class="{ 'mobile-main': isMobile }">
             <div
-                class="main-content-scroll"
+                class="main-content-scroll custom-scrollbar"
                 :class="{ 'mobile-content-scroll': isMobile }"
             >
                 <router-view v-slot="{ Component }">
@@ -350,26 +356,25 @@ body,
     overflow-x: hidden;
 }
 
-/* 自定义滚动条样式 - Webkit */
-.main-content-scroll::-webkit-scrollbar {
+/* 公共滚动条样式 - 适用于所有可滚动的文件列表 */
+.custom-scrollbar::-webkit-scrollbar {
     width: 6px;
 }
 
-.main-content-scroll::-webkit-scrollbar-track {
+.custom-scrollbar::-webkit-scrollbar-track {
     background: transparent;
 }
 
-.main-content-scroll::-webkit-scrollbar-thumb {
+.custom-scrollbar::-webkit-scrollbar-thumb {
     background-color: rgba(128, 128, 128, 0.3);
     border-radius: 3px;
 }
 
-.main-content-scroll::-webkit-scrollbar-thumb:hover {
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background-color: rgba(128, 128, 128, 0.5);
 }
 
-/* 自定义滚动条样式 - Firefox */
-.main-content-scroll {
+.custom-scrollbar {
     scrollbar-width: thin;
     scrollbar-color: rgba(128, 128, 128, 0.3) transparent;
 }

@@ -105,7 +105,7 @@
                                 </v-card-text>
                             </v-card>
                         </template>
-                        <span>{{ t('receiveMode.cloud.comingSoon') }}</span>
+                        <span>{{ t('cloudTransfer.noAccounts') }}</span>
                     </v-tooltip>
                 </v-col>
             </v-row>
@@ -122,6 +122,7 @@
  * 本地网络模式下显示网络信息提示
  */
 import { computed } from 'vue'
+import { useCloudStore } from '@/stores/cloud'
 import { useI18n } from 'vue-i18n'
 import { useTheme } from 'vuetify'
 import { useTransferStore } from '@/stores/transfer'
@@ -133,6 +134,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const cloudStore = useCloudStore()
 const vuetifyTheme = useTheme()
 const transferStore = useTransferStore()
 const settingsStore = useSettingsStore()
@@ -163,7 +165,7 @@ interface ModeOption {
     disabled: boolean
 }
 
-const modes: ModeOption[] = [
+const modes = computed<ModeOption[]>(() => [
     {
         value: 'local',
         label: t('receiveMode.local.label'),
@@ -176,9 +178,9 @@ const modes: ModeOption[] = [
         label: t('receiveMode.cloud.label'),
         icon: mdiCloudUpload,
         description: t('receiveMode.cloud.description'),
-        disabled: true,
+        disabled: !cloudStore.hasAccounts,
     },
-]
+])
 
 // 切换模式
 function handleModeChange(mode: ModeOption) {

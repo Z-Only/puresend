@@ -2,6 +2,7 @@
 //!
 //! 提供本地网络和云盘文件传输功能
 
+mod cloud;
 mod discovery;
 mod error;
 mod http_common;
@@ -11,6 +12,7 @@ mod share;
 mod transfer;
 mod web_upload;
 
+use cloud::CloudState;
 use discovery::DiscoveryState;
 use network::NetworkWatcherState;
 use share::ShareManagerState;
@@ -201,12 +203,12 @@ fn start_network_watcher(app: &tauri::App) {
 
     let callback_app_handle = app_handle.clone();
 
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         // 设置 mDNS 重启回调：网络变化时自动重启设备发现服务
         let callback: network::NetworkChangeCallback =
             std::sync::Arc::new(move |_payload| {
                 let handle = callback_app_handle.clone();
-                tokio::spawn(async move {
+                tauri::async_runtime::spawn(async move {
                     let discovery_state = handle.state::<DiscoveryState>();
                     let manager_guard = discovery_state.manager.lock().await;
                     if let Some(manager) = manager_guard.as_ref() {
@@ -237,6 +239,7 @@ pub fn run() {
         .manage(ShareManagerState::default())
         .manage(WebUploadManagerState::default())
         .manage(NetworkWatcherState::default())
+        .manage(CloudState::default())
         .invoke_handler(tauri::generate_handler![
             // Device commands
             crate::discovery::get_device_name,
@@ -298,6 +301,18 @@ pub fn run() {
             crate::web_upload::get_web_upload_requests,
             crate::web_upload::accept_web_upload,
             crate::web_upload::reject_web_upload,
+            // Cloud commands
+            crate::cloud::list_cloud_accounts,
+            crate::cloud::add_cloud_account,
+            crate::cloud::update_cloud_account,
+            crate::cloud::delete_cloud_account,
+            crate::cloud::test_cloud_connection,
+            crate::cloud::test_cloud_connection_with_credentials,
+            crate::cloud::get_cloud_account_credentials,
+            crate::cloud::browse_cloud_directory,
+            crate::cloud::create_cloud_directory,
+            crate::cloud::upload_to_cloud,
+            crate::cloud::download_from_cloud,
             // Menu commands
             update_menu_language,
             toggle_devtools,

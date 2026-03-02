@@ -2,6 +2,7 @@
   "nav": {
     "send": "发送",
     "receive": "接收",
+    "cloud": "云盘",
     "history": "历史",
     "settings": "设置"
   },
@@ -15,6 +16,7 @@
     "apply": "应用",
     "add": "添加",
     "edit": "编辑",
+    "browse": "浏览",
     "justNow": "刚刚",
     "minutesAgo": "{count} 分钟前",
     "hoursAgo": "{count} 小时前",
@@ -683,5 +685,97 @@
       "github": "GitHub 仓库",
       "docs": "在线文档"
     }
+  },
+  "cloudAccount": {
+    "title": "云盘账号",
+    "add": "添加账号",
+    "edit": "编辑账号",
+    "delete": "删除",
+    "name": "账号名称",
+    "namePlaceholder": "请输入账号名称",
+    "type": "云盘类型",
+    "serverUrl": "服务器地址",
+    "serverUrlPlaceholder": "请输入有效的服务器 URL",
+    "username": "用户名",
+    "usernamePlaceholder": "请输入用户名",
+    "password": "密码",
+    "passwordPlaceholder": "请输入密码",
+    "defaultDirectory": "默认目录",
+    "defaultDirectoryPlaceholder": "请输入默认目录路径",
+    "testConnection": "测试连接",
+    "testSuccess": "连接成功",
+    "testFailed": "连接失败",
+    "saveError": "保存账号失败",
+    "noAccounts": "暂无云盘账号",
+    "noAccountsHint": "添加云盘账号以使用云盘中转功能",
+    "deleteConfirm": {
+      "title": "删除账号",
+      "message": "确定要删除账号 \"{name}\" 吗？此操作不可撤销。"
+    },
+    "status": {
+      "connected": "已连接",
+      "disconnected": "未连接",
+      "invalid": "无效"
+    }
+  },
+  "cloudTransfer": {
+    "selectAccount": "选择云盘账号",
+    "noAccounts": "请先在设置中添加云盘账号",
+    "targetDirectory": "目标目录",
+    "sourceDirectory": "源目录",
+    "browse": "浏览",
+    "refreshFiles": "刷新文件列表",
+    "downloadSelected": "下载选中文件",
+    "noFilesSelected": "暂无文件",
+    "downloading": "下载中",
+    "downloadSuccess": "下载完成",
+    "downloadFailed": "下载失败",
+    "uploadToCloud": "上传到云盘",
+    "uploading": "上传中",
+    "uploadSuccess": "上传完成",
+    "uploadFailed": "上传失败",
+    "uploadSelected": "上传选中文件",
+    "downloadFromCloud": "从云盘下载",
+    "noAccountSelected": "请选择云盘账号",
+    "uploadTasks": "上传任务",
+    "downloadTasks": "下载任务",
+    "noUploadTasks": "暂无上传任务",
+    "noDownloadTasks": "暂无下载任务",
+    "selectFileToUpload": "选择文件开始上传",
+    "browseFilesToStart": "浏览文件开始下载",
+    "downloadDirectory": "下载目录",
+    "selectDownloadDirectory": "选择下载目录",
+    "fileCount": "{count} 个文件",
+    "moreFiles": "还有 {count} 个文件",
+    "collapseFiles": "收起文件列表",
+    "expand": "展开全部",
+    "collapse": "收起",
+    "status": {
+      "pending": "等待中",
+      "uploading": "上传中",
+      "completed": "已完成",
+      "failed": "失败"
+    },
+    "fileStatus": {
+      "pending": "等待中",
+      "uploading": "上传中",
+      "completed": "已完成",
+      "failed": "失败"
+    },
+    "directoryBrowser": {
+      "title": "浏览云盘目录",
+      "currentPath": "根目录",
+      "parentDirectory": "上级目录",
+      "newFolder": "新建文件夹",
+      "newFolderName": "文件夹名称",
+      "newFolderPlaceholder": "请输入文件夹名称",
+      "empty": "目录为空",
+      "loadError": "加载目录失败",
+      "createFolderError": "创建文件夹失败"
+    },
+    "uploadSettings": "上传设置",
+    "overwriteFiles": "覆盖同名文件",
+    "overwriteHint": "开启后同名文件将被覆盖",
+    "renameHint": "关闭后同名文件将自动重命名"
   }
 }

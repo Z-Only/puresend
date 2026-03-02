@@ -63,7 +63,7 @@
                                 </v-card-text>
                             </v-card>
                         </template>
-                        <span>{{ t('transfer.mode.cloudComingSoon') }}</span>
+                        <span>{{ t('cloudTransfer.noAccounts') }}</span>
                     </v-tooltip>
                 </v-col>
             </v-row>
@@ -84,10 +84,13 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { computed } from 'vue'
+import { useCloudStore } from '@/stores/cloud'
 import type { TransferMode } from '../../types'
 import { mdiWifi, mdiCloudUpload } from '@mdi/js'
 
 const { t } = useI18n()
+const cloudStore = useCloudStore()
 
 defineProps<{
     modelValue: TransferMode
@@ -106,7 +109,7 @@ interface ModeOption {
     disabled: boolean
 }
 
-const modes: ModeOption[] = [
+const modes = computed<ModeOption[]>(() => [
     {
         value: 'local',
         title: t('transfer.mode.local.title'),
@@ -119,9 +122,9 @@ const modes: ModeOption[] = [
         title: t('transfer.mode.cloud.title'),
         description: t('transfer.mode.cloud.description'),
         icon: mdiCloudUpload,
-        disabled: true,
+        disabled: !cloudStore.hasAccounts,
     },
-]
+])
 
 function selectMode(mode: ModeOption) {
     // 云盘中转模式禁用，不切换

@@ -14,6 +14,12 @@ const routes = [
         meta: { titleKey: 'nav.receive' },
     },
     {
+        path: '/cloud',
+        name: 'Cloud',
+        component: () => import('@/views/CloudView.vue'),
+        meta: { titleKey: 'nav.cloud' },
+    },
+    {
         path: '/history',
         name: 'History',
         component: () => import('@/views/HistoryView.vue'),

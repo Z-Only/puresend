@@ -55,22 +55,11 @@
                     @thumbnail-error="handleThumbnailError"
                 />
 
-                <!-- 传输模式选择器 -->
-                <ModeSwitcher
-                    v-model="transferMode"
-                    :online-peer-count="discoveryStore.onlineCount"
-                    class="mt-4 mb-4"
-                />
-
                 <!-- 发送设置卡片 -->
-                <SendSettingsCard
-                    v-if="transferMode === 'local'"
-                    class="mt-4"
-                />
+                <SendSettingsCard class="mt-4" />
 
-                <!-- 设备列表（本地网络模式） -->
+                <!-- 设备列表 -->
                 <PeerList
-                    v-if="transferMode === 'local'"
                     :peers="discoveryStore.peerList"
                     :selected-peer-id="selectedPeerId"
                     :loading="discoveryStore.scanning"
@@ -391,10 +380,9 @@
                                         </div>
                                     </template>
 
-                                    <!-- 展开状态：显示最多10条文件（可滚动） -->
                                     <div
                                         v-show="isTaskExpanded(task.id)"
-                                        class="expanded-records"
+                                        class="expanded-records custom-scrollbar"
                                     >
                                         <div
                                             v-for="(
@@ -579,13 +567,9 @@
             </v-col>
         </v-row>
 
-        <!-- 发送按钮（P2P 模式） -->
+        <!-- 发送按钮 -->
         <v-fab
-            v-if="
-                selectedFiles.count.value > 0 &&
-                selectedPeerId &&
-                transferMode === 'local'
-            "
+            v-if="selectedFiles.count.value > 0 && selectedPeerId"
             color="primary"
             :icon="mdiSend"
             location="bottom right"
@@ -676,7 +660,6 @@ import {
     MediaPicker,
     FolderPicker,
     AppPicker,
-    ModeSwitcher,
     PeerList,
     SelectedFileList,
     SendSettingsCard,
@@ -695,7 +678,12 @@ import type {
     FileSourceType,
 } from '../types'
 import { FILE_COUNT_LIMIT } from '../types/content'
-import { formatFileSize, formatSpeed, formatTime, getFileStatusColor } from '../utils/format'
+import {
+    formatFileSize,
+    formatSpeed,
+    formatTime,
+    getFileStatusColor,
+} from '../utils/format'
 import {
     mdiInboxArrowUp,
     mdiSend,
@@ -711,7 +699,7 @@ const shareStore = useShareStore()
 const settingsStore = useSettingsStore()
 
 // 从 store 获取响应式状态（Tab 切换时保留）
-const { transferMode, selectedPeerId } = storeToRefs(transferStore)
+const { selectedPeerId } = storeToRefs(transferStore)
 const { contentType } = storeToRefs(shareStore)
 
 // 使用已选文件管理 composable（现在直接使用 shareStore.selectedFiles）
@@ -1053,7 +1041,6 @@ async function handleRejectTask(taskId: string) {
         errorMessage.value = t('send.task.rejectError', { error })
     }
 }
-
 
 function getFileStatusText(status: string): string {
     const keyMap: Record<string, string> = {

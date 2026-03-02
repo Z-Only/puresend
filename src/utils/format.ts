@@ -44,3 +44,132 @@ export function getStatusColor(status: string): string {
 
 /** 获取文件状态对应的颜色（等同于 getStatusColor，保持向后兼容） */
 export const getFileStatusColor = getStatusColor
+
+/** 文件类型图标映射 */
+import {
+    mdiFile,
+    mdiFileDocument,
+    mdiFileImage,
+    mdiFileVideo,
+    mdiFileMusic,
+    mdiFilePdfBox,
+    mdiFileExcel,
+    mdiFileWord,
+    mdiFilePowerpoint,
+    mdiFileCode,
+    mdiFolder,
+    mdiArchive,
+} from '@mdi/js'
+
+/** 文件扩展名到图标的映射 */
+export function getFileTypeIcon(
+    fileName: string,
+    isDirectory: boolean
+): string {
+    if (isDirectory) return mdiFolder
+
+    const ext = fileName.toLowerCase().split('.').pop() || ''
+
+    // 图片
+    if (
+        [
+            'jpg',
+            'jpeg',
+            'png',
+            'gif',
+            'bmp',
+            'webp',
+            'svg',
+            'ico',
+            'heic',
+            'heif',
+        ].includes(ext)
+    ) {
+        return mdiFileImage
+    }
+    // 视频
+    if (
+        [
+            'mp4',
+            'avi',
+            'mkv',
+            'mov',
+            'wmv',
+            'flv',
+            'webm',
+            'm4v',
+            '3gp',
+        ].includes(ext)
+    ) {
+        return mdiFileVideo
+    }
+    // 音频
+    if (
+        ['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a', 'ape'].includes(ext)
+    ) {
+        return mdiFileMusic
+    }
+    // PDF
+    if (ext === 'pdf') return mdiFilePdfBox
+    // Excel
+    if (['xls', 'xlsx', 'csv', 'ods'].includes(ext)) return mdiFileExcel
+    // Word
+    if (['doc', 'docx', 'odt', 'rtf'].includes(ext)) return mdiFileWord
+    // PowerPoint
+    if (['ppt', 'pptx', 'odp'].includes(ext)) return mdiFilePowerpoint
+    // 压缩包
+    if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz'].includes(ext))
+        return mdiArchive
+    // 代码文件
+    if (
+        [
+            'js',
+            'ts',
+            'jsx',
+            'tsx',
+            'vue',
+            'html',
+            'css',
+            'scss',
+            'sass',
+            'less',
+            'json',
+            'xml',
+            'yaml',
+            'yml',
+            'md',
+            'py',
+            'java',
+            'c',
+            'cpp',
+            'h',
+            'hpp',
+            'go',
+            'rs',
+            'rb',
+            'php',
+            'swift',
+            'kt',
+            'scala',
+            'sh',
+            'bash',
+        ].includes(ext)
+    ) {
+        return mdiFileCode
+    }
+    // 文档
+    if (['txt', 'log', 'cfg', 'conf', 'ini'].includes(ext))
+        return mdiFileDocument
+
+    return mdiFile
+}
+
+/** 格式化文件大小（支持文件夹显示为 "--"） */
+export function formatFileSizeSafe(
+    size: number | undefined,
+    isDirectory: boolean
+): string {
+    if (isDirectory) return '--'
+    if (size === undefined || size === null || isNaN(size)) return '--'
+    return formatFileSize(size)
+}

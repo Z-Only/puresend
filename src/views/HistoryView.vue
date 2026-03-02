@@ -170,18 +170,18 @@
                         <v-list-item-title>
                             {{ displayFileName(item) }}
                         </v-list-item-title>
-                        <v-list-item-subtitle>
-                            <span class="mr-2">{{
+                        <v-list-item-subtitle class="history-meta">
+                            <span class="meta-item meta-size">{{
                                 formatSize(item.fileSize)
                             }}</span>
-                            <span class="mr-2">•</span>
-                            <span class="mr-2">{{ displayPeerIp(item) }}</span>
-                            <span class="mr-2">•</span>
-                            <span class="mr-2">{{
-                                displayPeerName(item)
+                            <span class="meta-separator">•</span>
+                            <span class="meta-item meta-peer">{{
+                                displayPeerInfo(item)
                             }}</span>
-                            <span class="mr-2">•</span>
-                            <span>{{ formatTime(item.completedAt) }}</span>
+                            <span class="meta-separator">•</span>
+                            <span class="meta-item meta-time">{{
+                                formatTime(item.completedAt)
+                            }}</span>
                         </v-list-item-subtitle>
 
                         <template #append>
@@ -394,23 +394,25 @@ function displayFileName(item: TransferHistoryItem): string {
     return item.fileName
 }
 
-function displayPeerName(item: TransferHistoryItem): string {
+// 合并显示设备名称和 IP
+function displayPeerInfo(item: TransferHistoryItem): string {
     const privacy = settingsStore.history.privacy
-    if (privacy.enabled && privacy.hidePeerName) {
-        return t('history.privacy.hiddenPeerName')
-    }
-    return item.peerName || t('history.unknownDevice')
-}
+    const nameHidden =
+        privacy.enabled && privacy.hidePeerName
+            ? t('history.privacy.hiddenPeerName')
+            : item.peerName || t('history.unknownDevice')
+    const ipHidden =
+        privacy.enabled && privacy.hideIp
+            ? t('history.privacy.hiddenPeerIp')
+            : item.peerIp && item.peerIp !== item.peerName
+              ? item.peerIp
+              : ''
 
-function displayPeerIp(item: TransferHistoryItem): string {
-    const privacy = settingsStore.history.privacy
-    if (privacy.enabled && privacy.hideIp) {
-        return t('history.privacy.hiddenPeerIp')
+    // 如果 IP 为空，只显示名称；否则显示 "名称 IP"
+    if (!ipHidden) {
+        return nameHidden
     }
-    if (item.peerIp && item.peerIp !== item.peerName) {
-        return item.peerIp
-    }
-    return ''
+    return `${nameHidden} ${ipHidden}`
 }
 
 // 选择操作
@@ -485,5 +487,41 @@ onMounted(async () => {
 
 .header-actions :deep(.v-btn__content) {
     font-size: 14px;
+}
+
+/* 历史记录元信息样式 */
+.history-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.meta-item {
+    display: inline-block;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 固定宽度实现垂直居中对齐 */
+.meta-size {
+    min-width: 70px;
+    width: 70px;
+}
+
+.meta-peer {
+    min-width: 250px;
+    width: 250px;
+}
+
+.meta-time {
+    min-width: 150px;
+    width: 150px;
+}
+
+.meta-separator {
+    color: rgba(var(--v-theme-on-surface), 0.38);
+    user-select: none;
 }
 </style>

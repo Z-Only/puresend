@@ -13,6 +13,13 @@ declare module 'vue' {
   export interface GlobalComponents {
     AppPicker: typeof import('./src/components/transfer/AppPicker.vue')['default']
     ClipboardImporter: typeof import('./src/components/transfer/ClipboardImporter.vue')['default']
+    CloudAccountDialog: typeof import('./src/components/settings/CloudAccountDialog.vue')['default']
+    CloudAccountGroup: typeof import('./src/components/settings/CloudAccountGroup.vue')['default']
+    CloudDirectoryBrowser: typeof import('./src/components/cloud/CloudDirectoryBrowser.vue')['default']
+    CloudDownloadPanel: typeof import('./src/components/cloud/CloudDownloadPanel.vue')['default']
+    CloudReceiveSettings: typeof import('./src/components/cloud/CloudReceiveSettings.vue')['default']
+    CloudSendSettings: typeof import('./src/components/cloud/CloudSendSettings.vue')['default']
+    CloudUploadPanel: typeof import('./src/components/cloud/CloudUploadPanel.vue')['default']
     ContentTypeSelector: typeof import('./src/components/transfer/ContentTypeSelector.vue')['default']
     FileSelector: typeof import('./src/components/transfer/FileSelector.vue')['default']
     FileThumbnail: typeof import('./src/components/transfer/FileThumbnail.vue')['default']

@@ -4,9 +4,6 @@
         <v-row>
             <!-- 左侧：接收设置 -->
             <v-col cols="12" md="6" class="settings-col">
-                <!-- 接收模式选择器 -->
-                <ReceiveModeSelector />
-
                 <!-- 接收设置卡片 -->
                 <ReceiveSettingsCard />
 
@@ -62,7 +59,9 @@
                         </div>
                         <div class="header-actions">
                             <v-btn
-                                v-if="transferStore.unifiedReceiveTasks.length > 0"
+                                v-if="
+                                    transferStore.unifiedReceiveTasks.length > 0
+                                "
                                 variant="text"
                                 size="x-small"
                                 color="error"
@@ -597,12 +596,14 @@
 <script setup lang="ts">
 import { ref, computed, reactive, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import {
-    ReceiveModeSelector,
-    ReceiveSettingsCard,
-} from '../components/transfer'
+import { ReceiveSettingsCard } from '../components/transfer'
 import { useTransferStore, useSettingsStore } from '../stores'
-import { formatFileSize, formatSpeed, formatTime, getFileStatusColor } from '../utils/format'
+import {
+    formatFileSize,
+    formatSpeed,
+    formatTime,
+    getFileStatusColor,
+} from '../utils/format'
 import {
     mdiWifiOff,
     mdiWifiPlus,
@@ -646,7 +647,6 @@ const visibleReceiveTasks = computed(() => {
 function isTaskExpanded(taskId: string): boolean {
     return expandedTasks.has(taskId)
 }
-
 
 /** 获取文件状态文本 */
 function getFileStatusText(status: string): string {
@@ -749,7 +749,6 @@ function toggleFileList(taskId: string) {
         expandedTasks.add(taskId)
     }
 }
-
 
 onMounted(async () => {
     await transferStore.initialize()
