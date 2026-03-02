@@ -30,9 +30,9 @@ const accounts = computed(() => cloudStore.accounts)
 const loading = computed(() => cloudStore.loading)
 
 const cloudTypeLabels: Record<string, string> = {
-    webdav: 'WebDAV',
-    oss: 'OSS',
-    netdisk: t('cloudAccount.type'),
+    webDAV: 'WebDAV',
+    aliyunOSS: t('cloudAccount.aliyunOSS'),
+    aliyunDrive: t('cloudAccount.aliyunDrive'),
 }
 
 function getStatusColor(status: string): string {

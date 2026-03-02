@@ -26,6 +26,10 @@ use tokio::sync::Mutex;
 pub enum CloudType {
     /// WebDAV 协议（如坚果云、NextCloud）
     WebDAV,
+    /// 阿里云 OSS
+    AliyunOSS,
+    /// 阿里云盘
+    AliyunDrive,
 }
 
 /// 云盘账号连接状态
@@ -64,10 +68,18 @@ pub struct CloudAccount {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CloudAccountCredentials {
-    /// 服务器地址
-    pub server_url: String,
-    /// 用户名
-    pub username: String,
+    /// 服务器地址（WebDAV）
+    pub server_url: Option<String>,
+    /// 用户名（WebDAV/OSS）
+    pub username: Option<String>,
+    /// Bucket 名称（OSS）
+    pub bucket: Option<String>,
+    /// Region（OSS）
+    pub region: Option<String>,
+    /// 自定义域名（OSS）
+    pub custom_domain: Option<String>,
+    /// Refresh Token（阿里云盘）
+    pub refresh_token_hint: Option<String>,
 }
 
 /// 云盘文件/目录项
@@ -86,7 +98,7 @@ pub struct CloudFileItem {
     pub modified: Option<u64>,
 }
 
-/// WebDAV 凭证（前端传入）
+/// WebDAV 凭证
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WebDAVCredentials {
@@ -98,6 +110,39 @@ pub struct WebDAVCredentials {
     pub password: String,
 }
 
+/// 阿里云 OSS 凭证
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AliyunOSSCredentials {
+    /// Bucket 名称
+    pub bucket: String,
+    /// Region ID（如 oss-cn-hangzhou）
+    pub region: String,
+    /// AccessKey ID
+    pub access_key_id: String,
+    /// AccessKey Secret
+    pub access_key_secret: String,
+    /// 自定义域名（可选）
+    pub custom_domain: Option<String>,
+}
+
+/// 阿里云盘凭证
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AliyunDriveCredentials {
+    /// Refresh Token
+    pub refresh_token: String,
+}
+
+/// 统一的凭证枚举
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "data", rename_all = "camelCase")]
+pub enum CloudCredentials {
+    WebDAV(WebDAVCredentials),
+    AliyunOSS(AliyunOSSCredentials),
+    AliyunDrive(AliyunDriveCredentials),
+}
+
 /// 添加/更新云盘账号的输入
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -106,8 +151,8 @@ pub struct CloudAccountInput {
     pub name: String,
     /// 云盘类型
     pub cloud_type: CloudType,
-    /// 凭证信息
-    pub credentials: WebDAVCredentials,
+    /// 凭证信息（统一格式）
+    pub credentials: CloudCredentials,
     /// 默认目录
     pub default_directory: String,
 }
@@ -119,7 +164,7 @@ pub struct CloudConnectionTestInput {
     /// 云盘类型
     pub cloud_type: CloudType,
     /// 凭证信息
-    pub credentials: WebDAVCredentials,
+    pub credentials: CloudCredentials,
 }
 
 /// 云盘上传进度事件
@@ -162,20 +207,30 @@ pub struct CloudDownloadProgress {
     pub status: String,
 }
 
-/// 存储在 Tauri Store 中的账号数据（含加密后的密码）
+/// 存储在 Tauri Store 中的账号数据（含加密后的敏感信息）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct StoredAccountData {
     /// 账号元信息
     account: CloudAccount,
     /// WebDAV 服务器地址
-    server_url: String,
-    /// 用户名
-    username: String,
-    /// 加密后的密码（Base64 编码）
-    encrypted_password: String,
+    server_url: Option<String>,
+    /// 用户名（WebDAV/OSS）
+    username: Option<String>,
+    /// 加密后的密码/密钥（Base64 编码）
+    encrypted_secret: String,
     /// 加密随机数（Base64 编码）
-    password_nonce: String,
+    secret_nonce: String,
+    /// OSS Bucket 名称
+    bucket: Option<String>,
+    /// OSS Region
+    region: Option<String>,
+    /// OSS 自定义域名
+    custom_domain: Option<String>,
+    /// 加密后的 Refresh Token（阿里云盘，Base64 编码）
+    encrypted_refresh_token: Option<String>,
+    /// Refresh Token 加密随机数（Base64 编码）
+    refresh_token_nonce: Option<String>,
 }
 
 // ============ 云盘操作 Trait ============
@@ -914,26 +969,64 @@ impl CloudState {
     ) -> Result<CloudAccount, CloudError> {
         self.ensure_initialized(app_handle).await?;
 
-        let (encrypted_password, password_nonce) =
-            encrypt_password(&input.credentials.password)?;
-
         let now = chrono::Utc::now().timestamp_millis() as u64;
         let account = CloudAccount {
             id: uuid::Uuid::new_v4().to_string(),
             name: input.name,
-            cloud_type: input.cloud_type,
+            cloud_type: input.cloud_type.clone(),
             default_directory: input.default_directory,
             status: CloudAccountStatus::Disconnected,
             created_at: now,
             updated_at: now,
         };
 
-        let stored = StoredAccountData {
-            account: account.clone(),
-            server_url: input.credentials.server_url,
-            username: input.credentials.username,
-            encrypted_password,
-            password_nonce,
+        // 根据凭证类型提取并加密敏感信息
+        let stored = match &input.credentials {
+            CloudCredentials::WebDAV(creds) => {
+                let (encrypted_secret, secret_nonce) = encrypt_password(&creds.password)?;
+                StoredAccountData {
+                    account: account.clone(),
+                    server_url: Some(creds.server_url.clone()),
+                    username: Some(creds.username.clone()),
+                    encrypted_secret,
+                    secret_nonce,
+                    bucket: None,
+                    region: None,
+                    custom_domain: None,
+                    encrypted_refresh_token: None,
+                    refresh_token_nonce: None,
+                }
+            }
+            CloudCredentials::AliyunOSS(creds) => {
+                let (encrypted_secret, secret_nonce) = encrypt_password(&creds.access_key_secret)?;
+                StoredAccountData {
+                    account: account.clone(),
+                    server_url: None,
+                    username: Some(creds.access_key_id.clone()),
+                    encrypted_secret,
+                    secret_nonce,
+                    bucket: Some(creds.bucket.clone()),
+                    region: Some(creds.region.clone()),
+                    custom_domain: creds.custom_domain.clone(),
+                    encrypted_refresh_token: None,
+                    refresh_token_nonce: None,
+                }
+            }
+            CloudCredentials::AliyunDrive(creds) => {
+                let (encrypted_refresh_token, refresh_token_nonce) = encrypt_password(&creds.refresh_token)?;
+                StoredAccountData {
+                    account: account.clone(),
+                    server_url: None,
+                    username: None,
+                    encrypted_secret: String::new(),
+                    secret_nonce: String::new(),
+                    bucket: None,
+                    region: None,
+                    custom_domain: None,
+                    encrypted_refresh_token: Some(encrypted_refresh_token),
+                    refresh_token_nonce: Some(refresh_token_nonce),
+                }
+            }
         };
 
         {
@@ -954,9 +1047,6 @@ impl CloudState {
     ) -> Result<CloudAccount, CloudError> {
         self.ensure_initialized(app_handle).await?;
 
-        let (encrypted_password, password_nonce) =
-            encrypt_password(&input.credentials.password)?;
-
         let now = chrono::Utc::now().timestamp_millis() as u64;
 
         let mut accounts = self.accounts.lock().await;
@@ -966,14 +1056,50 @@ impl CloudState {
             .ok_or_else(|| CloudError::AccountNotFound(account_id.to_string()))?;
 
         stored.account.name = input.name;
-        stored.account.cloud_type = input.cloud_type;
+        stored.account.cloud_type = input.cloud_type.clone();
         stored.account.default_directory = input.default_directory;
         stored.account.status = CloudAccountStatus::Disconnected;
         stored.account.updated_at = now;
-        stored.server_url = input.credentials.server_url;
-        stored.username = input.credentials.username;
-        stored.encrypted_password = encrypted_password;
-        stored.password_nonce = password_nonce;
+
+        // 根据凭证类型更新存储数据
+        match &input.credentials {
+            CloudCredentials::WebDAV(creds) => {
+                let (encrypted_secret, secret_nonce) = encrypt_password(&creds.password)?;
+                stored.server_url = Some(creds.server_url.clone());
+                stored.username = Some(creds.username.clone());
+                stored.encrypted_secret = encrypted_secret;
+                stored.secret_nonce = secret_nonce;
+                stored.bucket = None;
+                stored.region = None;
+                stored.custom_domain = None;
+                stored.encrypted_refresh_token = None;
+                stored.refresh_token_nonce = None;
+            }
+            CloudCredentials::AliyunOSS(creds) => {
+                let (encrypted_secret, secret_nonce) = encrypt_password(&creds.access_key_secret)?;
+                stored.server_url = None;
+                stored.username = Some(creds.access_key_id.clone());
+                stored.encrypted_secret = encrypted_secret;
+                stored.secret_nonce = secret_nonce;
+                stored.bucket = Some(creds.bucket.clone());
+                stored.region = Some(creds.region.clone());
+                stored.custom_domain = creds.custom_domain.clone();
+                stored.encrypted_refresh_token = None;
+                stored.refresh_token_nonce = None;
+            }
+            CloudCredentials::AliyunDrive(creds) => {
+                let (encrypted_refresh_token, refresh_token_nonce) = encrypt_password(&creds.refresh_token)?;
+                stored.server_url = None;
+                stored.username = None;
+                stored.encrypted_secret = String::new();
+                stored.secret_nonce = String::new();
+                stored.bucket = None;
+                stored.region = None;
+                stored.custom_domain = None;
+                stored.encrypted_refresh_token = Some(encrypted_refresh_token);
+                stored.refresh_token_nonce = Some(refresh_token_nonce);
+            }
+        }
 
         let updated_account = stored.account.clone();
         drop(accounts);
@@ -1003,12 +1129,12 @@ impl CloudState {
         Ok(())
     }
 
-    /// 获取指定账号的 WebDAV Provider
+    /// 获取指定账号的 Provider（返回动态类型）
     async fn get_provider(
         &self,
         app_handle: &AppHandle,
         account_id: &str,
-    ) -> Result<WebDAVProvider, CloudError> {
+    ) -> Result<Box<dyn CloudProvider>, CloudError> {
         self.ensure_initialized(app_handle).await?;
 
         let accounts = self.accounts.lock().await;
@@ -1017,13 +1143,50 @@ impl CloudState {
             .find(|a| a.account.id == account_id)
             .ok_or_else(|| CloudError::AccountNotFound(account_id.to_string()))?;
 
-        let password = decrypt_password(&stored.encrypted_password, &stored.password_nonce)?;
-
-        Ok(WebDAVProvider::new(
-            &stored.server_url,
-            &stored.username,
-            &password,
-        ))
+        match stored.account.cloud_type {
+            CloudType::WebDAV => {
+                let server_url = stored.server_url.as_ref()
+                    .ok_or_else(|| CloudError::Internal("缺少 WebDAV 服务器地址".to_string()))?;
+                let username = stored.username.as_ref()
+                    .ok_or_else(|| CloudError::Internal("缺少 WebDAV 用户名".to_string()))?;
+                let password = decrypt_password(&stored.encrypted_secret, &stored.secret_nonce)?;
+                Ok(Box::new(WebDAVProvider::new(server_url, username, &password)))
+            }
+            CloudType::AliyunOSS => {
+                let bucket = stored.bucket.as_ref()
+                    .ok_or_else(|| CloudError::Internal("缺少 OSS Bucket".to_string()))?;
+                let region = stored.region.as_ref()
+                    .ok_or_else(|| CloudError::Internal("缺少 OSS Region".to_string()))?;
+                let access_key_id = stored.username.as_ref()
+                    .ok_or_else(|| CloudError::Internal("缺少 AccessKey ID".to_string()))?;
+                let access_key_secret = decrypt_password(&stored.encrypted_secret, &stored.secret_nonce)?;
+                
+                let credentials = crate::cloud_providers::AliyunOSSProvider::new(
+                    crate::cloud_providers::OSSCredentials {
+                        bucket: bucket.clone(),
+                        region: region.clone(),
+                        access_key_id: access_key_id.clone(),
+                        access_key_secret,
+                        custom_domain: stored.custom_domain.clone(),
+                    },
+                );
+                Ok(Box::new(credentials))
+            }
+            CloudType::AliyunDrive => {
+                let encrypted_token = stored.encrypted_refresh_token.as_ref()
+                    .ok_or_else(|| CloudError::Internal("缺少 Refresh Token".to_string()))?;
+                let nonce = stored.refresh_token_nonce.as_ref()
+                    .ok_or_else(|| CloudError::Internal("缺少 Refresh Token Nonce".to_string()))?;
+                let refresh_token = decrypt_password(encrypted_token, nonce)?;
+                
+                let provider = crate::cloud_providers::AliyunDriveProvider::new(
+                    crate::cloud_providers::DriveCredentials {
+                        refresh_token,
+                    },
+                );
+                Ok(Box::new(provider))
+            }
+        }
     }
 
     /// 获取账号凭证信息（不含密码，用于编辑时回显）
@@ -1040,9 +1203,14 @@ impl CloudState {
             .find(|a| a.account.id == account_id)
             .ok_or_else(|| CloudError::AccountNotFound(account_id.to_string()))?;
 
+        // 返回凭证提示信息（不返回敏感信息）
         Ok(CloudAccountCredentials {
             server_url: stored.server_url.clone(),
             username: stored.username.clone(),
+            bucket: stored.bucket.clone(),
+            region: stored.region.clone(),
+            custom_domain: stored.custom_domain.clone(),
+            refresh_token_hint: stored.encrypted_refresh_token.as_ref().map(|_| "******".to_string()),
         })
     }
 
@@ -1203,18 +1371,45 @@ pub async fn test_cloud_connection(
 pub async fn test_cloud_connection_with_credentials(
     input: CloudConnectionTestInput,
 ) -> Result<bool, String> {
-    match input.cloud_type {
-        CloudType::WebDAV => {
+    match (&input.cloud_type, &input.credentials) {
+        (CloudType::WebDAV, CloudCredentials::WebDAV(creds)) => {
             let provider = WebDAVProvider::new(
-                &input.credentials.server_url,
-                &input.credentials.username,
-                &input.credentials.password,
+                &creds.server_url,
+                &creds.username,
+                &creds.password,
             );
             provider
                 .test_connection()
                 .await
                 .map_err(|e| e.to_string())
         }
+        (CloudType::AliyunOSS, CloudCredentials::AliyunOSS(creds)) => {
+            let provider = crate::cloud_providers::AliyunOSSProvider::new(
+                crate::cloud_providers::OSSCredentials {
+                    bucket: creds.bucket.clone(),
+                    region: creds.region.clone(),
+                    access_key_id: creds.access_key_id.clone(),
+                    access_key_secret: creds.access_key_secret.clone(),
+                    custom_domain: creds.custom_domain.clone(),
+                },
+            );
+            provider
+                .test_connection()
+                .await
+                .map_err(|e| e.to_string())
+        }
+        (CloudType::AliyunDrive, CloudCredentials::AliyunDrive(creds)) => {
+            let provider = crate::cloud_providers::AliyunDriveProvider::new(
+                crate::cloud_providers::DriveCredentials {
+                    refresh_token: creds.refresh_token.clone(),
+                },
+            );
+            provider
+                .test_connection()
+                .await
+                .map_err(|e| e.to_string())
+        }
+        _ => Err("凭证类型与云盘类型不匹配".to_string()),
     }
 }
 

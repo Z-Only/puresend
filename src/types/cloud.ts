@@ -3,7 +3,7 @@
  */
 
 /** 云盘类型 */
-export type CloudType = 'webDAV' | 'oss' | 'netdisk'
+export type CloudType = 'webDAV' | 'aliyunOSS' | 'aliyunDrive'
 
 /** 云盘账号连接状态 */
 export type CloudAccountStatus = 'connected' | 'disconnected' | 'invalid'
@@ -32,8 +32,11 @@ export interface CloudAccountInput {
     name: string
     /** 云盘类型 */
     cloudType: CloudType
-    /** 凭证信息 */
-    credentials: WebDAVCredentials
+    /** 凭证信息（根据 cloudType 选择对应的凭证类型） */
+    credentials:
+        | WebDAVCredentials
+        | AliyunOSSCredentials
+        | AliyunDriveCredentials
     /** 默认目录 */
     defaultDirectory: string
     /** 初始状态（添加账号时如果测试连接通过可设置为 connected） */
@@ -45,11 +48,15 @@ export interface CloudConnectionTestInput {
     /** 云盘类型 */
     cloudType: CloudType
     /** 凭证信息 */
-    credentials: WebDAVCredentials
+    credentials:
+        | WebDAVCredentials
+        | AliyunOSSCredentials
+        | AliyunDriveCredentials
 }
 
 /** WebDAV 凭证 */
 export interface WebDAVCredentials {
+    type: 'webDAV'
     /** 服务器地址（如 https://dav.jianguoyun.com/dav/） */
     serverUrl: string
     /** 用户名 */
@@ -58,14 +65,44 @@ export interface WebDAVCredentials {
     password: string
 }
 
+/** 阿里云 OSS 凭证 */
+export interface AliyunOSSCredentials {
+    type: 'aliyunOSS'
+    /** Bucket 名称 */
+    bucket: string
+    /** Region ID（如 oss-cn-hangzhou） */
+    region: string
+    /** AccessKey ID */
+    accessKeyId: string
+    /** AccessKey Secret */
+    accessKeySecret: string
+    /** 自定义域名（可选） */
+    customDomain?: string
+}
+
+/** 阿里云盘凭证 */
+export interface AliyunDriveCredentials {
+    type: 'aliyunDrive'
+    /** Refresh Token */
+    refreshToken: string
+}
+
 /** 云盘账号凭证（用于编辑时获取现有账号信息） */
 export interface CloudAccountCredentials {
-    /** 服务器地址 */
-    serverUrl: string
-    /** 用户名 */
-    username: string
-    /** 密码 */
-    password: string
+    /** WebDAV 凭证 */
+    serverUrl?: string
+    username?: string
+    password?: string
+    /** 阿里云 OSS 凭证 */
+    bucket?: string
+    region?: string
+    accessKeyId?: string
+    accessKeySecret?: string
+    customDomain?: string
+    /** 阿里云盘凭证 */
+    refreshToken?: string
+    /** 刷新 token 提示（部分显示） */
+    refreshTokenHint?: string
 }
 
 /** 云盘文件/目录项 */

@@ -3,6 +3,7 @@
 //! 提供本地网络和云盘文件传输功能
 
 mod cloud;
+mod cloud_providers;
 mod discovery;
 mod error;
 mod http_common;

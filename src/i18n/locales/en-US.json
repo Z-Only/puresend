@@ -108,17 +108,17 @@
       "title": "Transfer Enhancement",
       "encryption": {
         "label": "Transfer Encryption",
-        "description": "Protect transfer data with AES-256 encryption (applies to all transfer modes)",
+        "description": "Protect transfer data with AES-256 encryption (local network transfer only)",
         "enabled": "Enabled",
         "disabled": "Disabled"
       },
       "compression": {
         "label": "Dynamic Compression",
-        "description": "Automatically compress data before transfer to improve efficiency (applies to all transfer modes)",
+        "description": "Automatically compress data before transfer to improve efficiency (local network transfer only)",
         "mode": {
           "label": "Compression Mode",
           "smart": "Smart Compression",
-          "smartDescription": "Automatically adjust compression strategy based on file type (applies to all transfer modes)",
+          "smartDescription": "Automatically adjust compression strategy based on file type (local network transfer only)",
           "manual": "Manual Compression Level"
         },
         "level": {
@@ -708,6 +708,22 @@
     "saveError": "Failed to save account",
     "noAccounts": "No cloud accounts",
     "noAccountsHint": "Add a cloud account to use cloud relay feature",
+    "aliyunOSS": "Aliyun OSS",
+    "aliyunDrive": "Aliyun Drive",
+    "bucket": "Bucket Name",
+    "bucketPlaceholder": "Please enter bucket name",
+    "region": "Region",
+    "regionPlaceholder": "Please select region",
+    "accessKeyId": "AccessKey ID",
+    "accessKeyIdPlaceholder": "Please enter AccessKey ID",
+    "accessKeySecret": "AccessKey Secret",
+    "accessKeySecretPlaceholder": "Please enter AccessKey Secret",
+    "customDomain": "Custom Domain",
+    "customDomainPlaceholder": "Optional, e.g. https://cdn.example.com",
+    "customDomainHint": "Use custom domain to access OSS, leave empty for default domain",
+    "refreshToken": "Refresh Token",
+    "refreshTokenPlaceholder": "Please enter refresh token",
+    "refreshTokenHint": "Get from Aliyun Drive web version for API authorization",
     "deleteConfirm": {
       "title": "Delete Account",
       "message": "Are you sure you want to delete account \"{name}\"? This action cannot be undone."

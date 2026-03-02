@@ -3412,6 +3412,7 @@ dependencies = [
  "futures",
  "hex",
  "hkdf",
+ "hmac",
  "hostname",
  "local-ip-address",
  "open",
