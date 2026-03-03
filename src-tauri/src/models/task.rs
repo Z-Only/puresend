@@ -55,7 +55,7 @@ impl TransferTask {
     pub fn new(file: FileMetadata, mode: TransferMode, direction: TransferDirection) -> Self {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_millis() as u64;
 
         Self {
@@ -96,7 +96,7 @@ impl TransferTask {
         self.completed_at = Some(
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_millis() as u64,
         );
     }
@@ -108,7 +108,7 @@ impl TransferTask {
         self.completed_at = Some(
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .unwrap()
+                .unwrap_or_default()
                 .as_millis() as u64,
         );
     }

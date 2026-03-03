@@ -496,14 +496,9 @@ onMounted(async () => {
     // 初始化 cloud store（加载任务列表）
     await cloudStore.initialize()
 
-    if (props.accountId) {
-        const account = cloudStore.getAccountById(props.accountId)
-        if (account && account.defaultDirectory) {
-            targetDirectory.value = account.defaultDirectory
-        } else {
-            targetDirectory.value = '/'
-        }
-    }
+    // 默认目录为云盘根目录
+    targetDirectory.value = '/'
+
     setupUploadProgressListener()
 })
 

@@ -43,23 +43,17 @@ pub async fn start_share(
 ) -> Result<ShareLinkInfo, String> {
     // 验证文件存在性并收集路径
     let mut file_paths: Vec<(FileMetadata, PathBuf)> = Vec::new();
-    // 保存验证通过的文件副本用于后续创建分享信息
     let mut valid_files: Vec<FileMetadata> = Vec::new();
 
-    for file in files {
-        if let Some(path_str) = &file.path {
-            let path = PathBuf::from(path_str);
-            if !path.exists() {
-                return Err(format!("文件不存在：{}", path_str));
-            }
-            file_paths.push((file.clone(), path));
-            valid_files.push(file);
-        } else {
-            return Err(format!("文件路径未设置：{}", file.name));
+    for file in &files {
+        let path_str = file.path.as_ref().ok_or_else(|| format!("文件路径未设置：{}", file.name))?;
+        let path = PathBuf::from(path_str);
+        if !path.exists() {
+            return Err(format!("文件不存在：{}", path_str));
         }
+        file_paths.push((file.clone(), path));
+        valid_files.push(file.clone());
     }
-
-    // 允许空文件列表启动分享服务（Web 下载模式下可以先启动服务，后续再添加文件）
 
     // 创建并启动服务器（优先使用首选端口，失败则自动分配）
     let port = preferred_port.unwrap_or(0);
@@ -81,11 +75,9 @@ pub async fn start_share(
     // 创建分享信息
     let mut share_info = ShareLinkInfo::new(links, actual_port, valid_files);
 
-    // 先克隆需要的值，避免所有权问题
-    let pin_clone = settings.pin.clone();
     if settings.pin_enabled {
-        if let Some(pin) = pin_clone {
-            share_info = share_info.with_pin(pin);
+        if let Some(pin) = &settings.pin {
+            share_info = share_info.with_pin(pin.clone());
         }
     }
 
@@ -154,9 +146,7 @@ pub async fn accept_access_request(
     let mut share_state = state.share_state.lock().await;
 
     if let Some(request) = share_state.accept_request(&request_id) {
-        // 发送事件通知（使用克隆的请求数据，避免借用问题）
-        let request_clone = request.clone();
-        let _ = app.emit("access-request-accepted", request_clone);
+        let _ = app.emit("access-request-accepted", request.clone());
     } else {
         return Err("请求不存在".to_string());
     }
@@ -174,9 +164,7 @@ pub async fn reject_access_request(
     let mut share_state = state.share_state.lock().await;
 
     if let Some(request) = share_state.reject_request(&request_id) {
-        // 发送事件通知（使用克隆的请求数据，避免借用问题）
-        let request_clone = request.clone();
-        let _ = app.emit("access-request-rejected", request_clone);
+        let _ = app.emit("access-request-rejected", request.clone());
     } else {
         return Err("请求不存在".to_string());
     }
@@ -233,17 +221,14 @@ pub async fn update_share_files(
     let mut new_file_paths: Vec<(FileMetadata, std::path::PathBuf)> = Vec::new();
     let mut valid_files: Vec<FileMetadata> = Vec::new();
 
-    for file in files {
-        if let Some(path_str) = &file.path {
-            let path = std::path::PathBuf::from(path_str);
-            if !path.exists() {
-                return Err(format!("文件不存在：{}", path_str));
-            }
-            new_file_paths.push((file.clone(), path));
-            valid_files.push(file);
-        } else {
-            return Err(format!("文件路径未设置：{}", file.name));
+    for file in &files {
+        let path_str = file.path.as_ref().ok_or_else(|| format!("文件路径未设置：{}", file.name))?;
+        let path = std::path::PathBuf::from(path_str);
+        if !path.exists() {
+            return Err(format!("文件不存在：{}", path_str));
         }
+        new_file_paths.push((file.clone(), path));
+        valid_files.push(file.clone());
     }
 
     // 更新服务器的文件映射

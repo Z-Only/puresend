@@ -137,18 +137,12 @@ pub async fn accept_web_upload(
 ) -> Result<(), String> {
     let mut upload_state = state.upload_state.lock().await;
 
-    if !upload_state.requests.contains_key(&request_id) {
-        return Err("请求不存在".to_string());
-    }
+    let request = upload_state.requests.get_mut(&request_id)
+        .ok_or_else(|| "请求不存在".to_string())?;
 
-    let client_ip;
-    let request_clone;
-    {
-        let request = upload_state.requests.get_mut(&request_id).unwrap();
-        request.status = UploadRequestStatus::Accepted;
-        client_ip = request.client_ip.clone();
-        request_clone = request.clone();
-    }
+    request.status = UploadRequestStatus::Accepted;
+    let client_ip = request.client_ip.clone();
+    let request_clone = request.clone();
 
     if !upload_state.allowed_ips.contains(&client_ip) {
         upload_state.allowed_ips.push(client_ip);
@@ -167,18 +161,12 @@ pub async fn reject_web_upload(
 ) -> Result<(), String> {
     let mut upload_state = state.upload_state.lock().await;
 
-    if !upload_state.requests.contains_key(&request_id) {
-        return Err("请求不存在".to_string());
-    }
+    let request = upload_state.requests.get_mut(&request_id)
+        .ok_or_else(|| "请求不存在".to_string())?;
 
-    let client_ip;
-    let request_clone;
-    {
-        let request = upload_state.requests.get_mut(&request_id).unwrap();
-        request.status = UploadRequestStatus::Rejected;
-        client_ip = request.client_ip.clone();
-        request_clone = request.clone();
-    }
+    request.status = UploadRequestStatus::Rejected;
+    let client_ip = request.client_ip.clone();
+    let request_clone = request.clone();
 
     upload_state.allowed_ips.retain(|ip| ip != &client_ip);
 

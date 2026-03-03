@@ -404,30 +404,30 @@ impl LocalTransport {
             let raw_data = self.chunker.read_chunk(file_path, chunk)?;
 
             // 可选压缩
-            let (chunk_data, is_compressed) =
-                if let Some(ref comp) = compressor {
-                    if let Some(level) = comp.get_level(mime_type) {
-                        let compressed = crate::transfer::compression::Compressor::compress(
-                            &raw_data, level,
-                        )?;
-                        // 仅当压缩后更小时才使用压缩数据
-                        if compressed.len() < raw_data.len() {
-                            (compressed, true)
-                        } else {
-                            (raw_data, false)
+            let (chunk_data, is_compressed) = match &compressor {
+                Some(comp) => {
+                    match comp.get_level(mime_type) {
+                        Some(level) => {
+                            let compressed = crate::transfer::compression::Compressor::compress(
+                                &raw_data, level,
+                            )?;
+                            // 仅当压缩后更小时才使用压缩数据
+                            if compressed.len() < raw_data.len() {
+                                (compressed, true)
+                            } else {
+                                (raw_data, false)
+                            }
                         }
-                    } else {
-                        (raw_data, false)
+                        None => (raw_data, false),
                     }
-                } else {
-                    (raw_data, false)
-                };
+                }
+                None => (raw_data, false),
+            };
 
             // 可选加密
-            let final_data = if let Some(ref mut session) = crypto_session {
-                session.encrypt(&chunk_data)?
-            } else {
-                chunk_data
+            let final_data = match &mut crypto_session {
+                Some(session) => session.encrypt(&chunk_data)?,
+                None => chunk_data,
             };
 
             // 发送分块

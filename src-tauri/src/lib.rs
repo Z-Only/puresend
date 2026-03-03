@@ -252,6 +252,7 @@ pub fn run() {
             crate::discovery::add_peer_manual,
             crate::discovery::is_peer_online,
             crate::discovery::get_online_count,
+            crate::discovery::restart_discovery,
             // Transfer commands
             crate::transfer::init_transfer,
             crate::transfer::get_transfer_port,
@@ -338,7 +339,7 @@ pub fn run() {
                 }
                 "toggle_fullscreen" => {
                     if let Some(window) = app_handle.get_webview_window("main") {
-                        let is_fullscreen: bool = window.is_fullscreen().unwrap_or(false);
+                        let is_fullscreen = window.is_fullscreen().unwrap_or(false);
                         let _ = window.set_fullscreen(!is_fullscreen);
                     }
                 }

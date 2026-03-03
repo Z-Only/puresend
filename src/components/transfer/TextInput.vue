@@ -52,7 +52,7 @@ const emit = defineEmits<{
 const textContent = ref('')
 
 function handleTextComplete() {
-    // 可以在这里添加自动保存等逻辑
+    // Placeholder for future features like auto-save
 }
 
 function confirmText() {

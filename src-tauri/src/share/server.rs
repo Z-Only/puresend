@@ -279,7 +279,9 @@ async fn download_meta_handler(
         .and_then(|n| n.to_str())
         .unwrap_or("download")
         .to_string();
-    let file_size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+    let file_size = std::fs::metadata(&path)
+        .map(|m| m.len())
+        .unwrap_or(0);
     let mime_type = FileMetadata::infer_mime_type(&file_name);
 
     let encryption = is_encryption_enabled();
@@ -379,7 +381,9 @@ async fn download_chunk_handler(
         .and_then(|n| n.to_str())
         .unwrap_or("download")
         .to_string();
-    let file_size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+    let file_size = std::fs::metadata(&path)
+        .map(|m| m.len())
+        .unwrap_or(0);
     let mime_type = FileMetadata::infer_mime_type(&file_name);
 
     // Read the chunk
@@ -689,21 +693,27 @@ async fn list_files_handler(
         );
     }
 
-    let share_info = share_state.share_info.as_ref().unwrap();
+    let share_info = match share_state.share_info.as_ref() {
+        Some(info) => info,
+        None => return (
+            StatusCode::NOT_FOUND,
+            Json(FilesResponse {
+                files: vec![],
+                waiting_response: None,
+            }),
+        ),
+    };
+
     let hash_to_filename = state.hash_to_filename.lock().await;
     let files: Vec<FileInfo> = hash_to_filename
         .iter()
         .map(|(hash_id, file_name)| {
-            let file_size = share_info
+            let file_info = share_info
                 .files
                 .iter()
-                .find(|f| f.name == *file_name)
-                .map(|f| f.size)
-                .unwrap_or(0);
-            let mime_type = share_info
-                .files
-                .iter()
-                .find(|f| f.name == *file_name)
+                .find(|f| f.name == *file_name);
+            let file_size = file_info.map(|f| f.size).unwrap_or(0);
+            let mime_type = file_info
                 .map(|f| f.mime_type.clone())
                 .unwrap_or_else(|| "application/octet-stream".to_string());
             FileInfo {
@@ -844,7 +854,8 @@ async fn request_status_handler(
     let request = share_state
         .access_requests
         .values()
-        .find(|r| r.ip == client_ip);
+        .find(|r| r.ip == client_ip)
+        .cloned();
 
     let response = match request {
         Some(req) => {
@@ -1459,7 +1470,7 @@ impl Stream for ProgressTrackingStream {
                     let mut state = share_state.lock().await;
                     let now = std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
+                        .unwrap_or_default()
                         .as_millis() as u64;
                     for request in state.access_requests.values_mut() {
                         if let Some(record) = request

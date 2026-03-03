@@ -1,6 +1,7 @@
-//! 阿里云 OSS 云盘实现
-//!
-//! 使用 OSS RESTful API 实现文件操作。
+//! 阿里云 OSS 云存储提供商
+
+use crate::cloud::{CloudProvider, CloudError};
+use serde::{Deserialize, Serialize};
 
 use async_trait::async_trait;
 use base64::Engine;
@@ -9,68 +10,53 @@ use sha2::Sha256;
 use hmac::{Hmac, Mac};
 use tauri::Emitter;
 
-use crate::cloud::{CloudProvider, CloudError, CloudFileItem, CloudUploadProgress, CloudDownloadProgress};
+use crate::cloud::{CloudFileItem, CloudUploadProgress, CloudDownloadProgress};
 
 type HmacSha256 = Hmac<Sha256>;
 
 /// 阿里云 OSS 凭证
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OSSCredentials {
-    /// Bucket 名称
-    pub bucket: String,
-    /// Region ID（如 oss-cn-hangzhou）
-    pub region: String,
-    /// AccessKey ID
     pub access_key_id: String,
-    /// AccessKey Secret
     pub access_key_secret: String,
-    /// 自定义域名（可选）
+    pub bucket: String,
+    pub region: String,
     pub custom_domain: Option<String>,
 }
 
-/// 阿里云 OSS Provider
+/// 阿里云 OSS 云存储提供商
 pub struct AliyunOSSProvider {
-    /// HTTP 客户端
-    client: Client,
-    /// 凭证
     credentials: OSSCredentials,
-    /// Endpoint
-    endpoint: String,
+    client: reqwest::Client,
 }
 
 impl AliyunOSSProvider {
-    /// 创建 OSS Provider 实例
     pub fn new(credentials: OSSCredentials) -> Self {
-        let client = Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
-            .build()
-            .unwrap_or_default();
-
-        // 构建Endpoint：优先使用自定义域名
-        let endpoint = if let Some(ref custom_domain) = credentials.custom_domain {
-            custom_domain.clone()
-        } else {
-            format!(
-                "https://{}.oss-{}.aliyuncs.com",
-                credentials.bucket, credentials.region
-            )
-        };
-
         Self {
-            client,
             credentials,
-            endpoint,
+            client: Client::builder().build().unwrap_or_default(),
         }
     }
 
     /// 构建对象 URL
     fn build_url(&self, path: &str) -> String {
         let normalized_path = if path.starts_with('/') {
-            path
+            path.to_string()
         } else {
-            &format!("/{}", path)
+            format!("/{}", path)
         };
-        format!("{}{}", self.endpoint, normalized_path)
+        format!("{}{}", self.get_endpoint(), normalized_path)
+    }
+
+    /// 获取 Endpoint
+    fn get_endpoint(&self) -> String {
+        self.credentials
+            .custom_domain
+            .clone()
+            .unwrap_or_else(|| format!(
+                "https://{}.oss-{}.aliyuncs.com",
+                self.credentials.bucket, self.credentials.region
+            ))
     }
 
     /// 生成 OSS 签名
@@ -102,7 +88,7 @@ impl AliyunOSSProvider {
         // 添加 CanonicalizedResource
         string_to_sign.push_str(resource);
 
-        // HMAC-SHA1 签名
+        // HMAC-SHA256 签名
         let mut mac = HmacSha256::new_from_slice(self.credentials.access_key_secret.as_bytes())
             .expect("HMAC can take key of any size");
         mac.update(string_to_sign.as_bytes());
@@ -239,7 +225,7 @@ impl CloudProvider for AliyunOSSProvider {
 
         let url = format!(
             "{}?prefix={}&delimiter=/",
-            self.endpoint,
+            self.get_endpoint(),
             urlencoding::encode(&prefix)
         );
 

@@ -1,797 +1,795 @@
 {
-  "nav": {
-    "send": "发送",
-    "receive": "接收",
-    "cloud": "云盘",
-    "history": "历史",
-    "settings": "设置"
-  },
-  "common": {
-    "cancel": "取消",
-    "delete": "删除",
-    "remove": "移除",
-    "confirm": "确认",
-    "enabled": "已启用",
-    "disabled": "已禁用",
-    "apply": "应用",
-    "add": "添加",
-    "edit": "编辑",
-    "browse": "浏览",
-    "justNow": "刚刚",
-    "minutesAgo": "{count} 分钟前",
-    "hoursAgo": "{count} 小时前",
-    "daysAgo": "{count} 天前"
-  },
-  "settings": {
-    "title": "设置",
-    "advanced": {
-      "showLabel": "高级设置"
+    "nav": {
+        "send": "发送",
+        "receive": "接收",
+        "cloud": "云盘",
+        "history": "历史",
+        "settings": "设置"
     },
-    "device": {
-      "title": "设备",
-      "deviceName": {
-        "label": "设备名称",
-        "description": "其他设备将看到此名称",
-        "placeholder": "输入设备名称",
-        "reset": "恢复默认"
-      }
+    "common": {
+        "cancel": "取消",
+        "delete": "删除",
+        "remove": "移除",
+        "confirm": "确认",
+        "enabled": "已启用",
+        "disabled": "已禁用",
+        "apply": "应用",
+        "add": "添加",
+        "edit": "编辑",
+        "browse": "浏览",
+        "justNow": "刚刚",
+        "minutesAgo": "{count} 分钟前",
+        "hoursAgo": "{count} 小时前",
+        "daysAgo": "{count} 天前"
     },
-    "appearance": "外观",
-    "tabLayout": {
-      "label": "Tab 栏布局",
-      "horizontalTop": "水平（顶部）",
-      "horizontalBottom": "水平（底部）",
-      "verticalLeft": "垂直（左侧）",
-      "verticalRight": "垂直（右侧）"
-    },
-    "theme": {
-      "label": "主题",
-      "light": "浅色",
-      "dark": "深色",
-      "system": "跟随系统"
-    },
-    "language": {
-      "label": "语言",
-      "zhCN": "中文",
-      "enUS": "English",
-      "system": "跟随系统"
-    },
-    "fontSize": {
-      "label": "字体大小",
-      "mode": {
-        "system": "跟随系统",
-        "preset": "预设大小",
-        "custom": "自定义"
-      },
-      "preset": {
-        "small": "小",
-        "medium": "中",
-        "large": "大",
-        "xlarge": "特大"
-      },
-      "custom": {
-        "label": "自定义缩放",
-        "min": "80%",
-        "max": "150%"
-      }
-    },
-    "history": {
-      "title": "历史记录",
-      "recordHistory": {
-        "label": "记录传输历史",
-        "description": "传输完成后自动记录到历史列表"
-      },
-      "privacy": {
-        "label": "隐私模式",
-        "description": "在历史记录中隐藏敏感信息",
-        "hideFileName": "隐藏文件名",
-        "hidePeerName": "隐藏设备名",
-        "hideIp": "隐藏 IP 地址"
-      },
-      "autoCleanup": {
-        "label": "自动清理",
-        "description": "自动清理旧的历史记录",
-        "strategy": {
-          "disabled": "禁用",
-          "byTime": "按时间",
-          "byCount": "按数量"
+    "settings": {
+        "title": "设置",
+        "advanced": {
+            "showLabel": "高级设置"
         },
-        "retentionDays": "保留天数",
-        "maxCount": "保留条数",
-        "daysUnit": "天",
-        "countUnit": "条"
-      },
-      "currentCount": "当前记录数：{count} 条",
-      "cleanupNow": "立即清理"
-    },
-    "transferEnhancement": {
-      "title": "传输增强",
-      "encryption": {
-        "label": "传输加密",
-        "description": "使用 AES-256 加密保护传输数据（仅适用于本地网络传输）",
-        "enabled": "已开启",
-        "disabled": "已关闭"
-      },
-      "compression": {
-        "label": "动态压缩",
-        "description": "传输前自动压缩数据以提升效率（仅适用于本地网络传输）",
-        "mode": {
-          "label": "压缩模式",
-          "smart": "智能压缩",
-          "smartDescription": "根据文件类型自动调整压缩策略（仅适用于本地网络传输）",
-          "manual": "手动压缩级别"
+        "device": {
+            "title": "设备",
+            "deviceName": {
+                "label": "设备名称",
+                "description": "其他设备将看到此名称",
+                "placeholder": "输入设备名称",
+                "reset": "恢复默认"
+            }
         },
-        "level": {
-          "label": "压缩级别",
-          "low": "低",
-          "high": "高"
+        "appearance": "外观",
+        "tabLayout": {
+            "label": "Tab 栏布局",
+            "horizontalTop": "水平（顶部）",
+            "horizontalBottom": "水平（底部）",
+            "verticalLeft": "垂直（左侧）",
+            "verticalRight": "垂直（右侧）"
+        },
+        "theme": {
+            "label": "主题",
+            "light": "浅色",
+            "dark": "深色",
+            "system": "跟随系统"
+        },
+        "language": {
+            "label": "语言",
+            "zhCN": "中文",
+            "enUS": "English",
+            "system": "跟随系统"
+        },
+        "fontSize": {
+            "label": "字体大小",
+            "mode": {
+                "system": "跟随系统",
+                "preset": "预设大小",
+                "custom": "自定义"
+            },
+            "preset": {
+                "small": "小",
+                "medium": "中",
+                "large": "大",
+                "xlarge": "特大"
+            },
+            "custom": {
+                "label": "自定义缩放",
+                "min": "80%",
+                "max": "150%"
+            }
+        },
+        "history": {
+            "title": "历史记录",
+            "recordHistory": {
+                "label": "记录传输历史",
+                "description": "传输完成后自动记录到历史列表"
+            },
+            "privacy": {
+                "label": "隐私模式",
+                "description": "在历史记录中隐藏敏感信息",
+                "hideFileName": "隐藏文件名",
+                "hidePeerName": "隐藏设备名",
+                "hideIp": "隐藏 IP 地址"
+            },
+            "autoCleanup": {
+                "label": "自动清理",
+                "description": "自动清理旧的历史记录",
+                "strategy": {
+                    "disabled": "禁用",
+                    "byTime": "按时间",
+                    "byCount": "按数量"
+                },
+                "retentionDays": "保留天数",
+                "maxCount": "保留条数",
+                "daysUnit": "天",
+                "countUnit": "条"
+            },
+            "currentCount": "当前记录数：{count} 条",
+            "cleanupNow": "立即清理"
+        },
+        "transferEnhancement": {
+            "title": "传输增强",
+            "encryption": {
+                "label": "传输加密",
+                "description": "使用 AES-256 加密保护传输数据（仅适用于本地网络传输）",
+                "enabled": "已开启",
+                "disabled": "已关闭"
+            },
+            "compression": {
+                "label": "动态压缩",
+                "description": "传输前自动压缩数据以提升效率（仅适用于本地网络传输）",
+                "mode": {
+                    "label": "压缩模式",
+                    "smart": "智能压缩",
+                    "smartDescription": "根据文件类型自动调整压缩策略（仅适用于本地网络传输）",
+                    "manual": "手动压缩级别"
+                },
+                "level": {
+                    "label": "压缩级别",
+                    "low": "低",
+                    "high": "高"
+                }
+            }
+        },
+        "developer": {
+            "title": "开发者",
+            "devTools": {
+                "label": "开发者工具",
+                "description": "启用应用内开发者工具（DevTools）",
+                "androidHint": "Android 设备需要通过 Chrome DevTools 远程调试"
+            },
+            "portRange": {
+                "label": "服务端口范围",
+                "hint": "设置为 0 表示系统自动分配端口，自定义端口范围需在 1024-65535 之间",
+                "transfer": "文件接收服务器",
+                "webUpload": "Web 上传服务器",
+                "share": "Web 下载服务器",
+                "minPort": "最小端口",
+                "maxPort": "最大端口"
+            }
+        },
+        "about": {
+            "title": "关于",
+            "version": "版本",
+            "changelog": "更新日志",
+            "homepage": "项目主页",
+            "github": "GitHub 项目",
+            "collapse": "收起",
+            "expand": "展开"
         }
-      }
-    },
-    "developer": {
-      "title": "开发者",
-      "devTools": {
-        "label": "开发者工具",
-        "description": "启用应用内开发者工具（DevTools）",
-        "androidHint": "Android 设备需要通过 Chrome DevTools 远程调试"
-      },
-      "portRange": {
-        "label": "服务端口范围",
-        "hint": "设置为 0 表示系统自动分配端口，自定义端口范围需在 1024-65535 之间",
-        "transfer": "文件接收服务器",
-        "webUpload": "Web 上传服务器",
-        "share": "Web 下载服务器",
-        "minPort": "最小端口",
-        "maxPort": "最大端口"
-      }
-    },
-    "about": {
-      "title": "关于",
-      "version": "版本",
-      "changelog": "更新日志",
-      "homepage": "项目主页",
-      "github": "GitHub 项目",
-      "collapse": "收起",
-      "expand": "展开"
-    }
-  },
-  "transfer": {
-    "selectFile": "选择文件",
-    "dragDropHint": "拖拽文件到此处",
-    "send": "发送",
-    "receive": "接收",
-    "completed": "已完成",
-    "failed": "传输失败",
-    "cancelled": "已取消",
-    "mode": {
-      "title": "传输模式",
-      "local": {
-        "title": "本地网络",
-        "description": "通过局域网直接传输，速度快"
-      },
-      "cloud": {
-        "title": "云盘中转",
-        "description": "通过云盘中转，跨网络传输"
-      },
-      "noDeviceHint": "当前没有发现可用的设备，请确保目标设备已打开 PureSend",
-      "cloudComingSoon": "云盘中转功能即将推出"
-    },
-    "status": {
-      "pending": "等待中",
-      "transferring": "传输中",
-      "completed": "已完成",
-      "failed": "失败",
-      "cancelled": "已取消",
-      "interrupted": "已中断"
-    },
-    "progress": {
-      "transferred": "已传输",
-      "speed": "传输速度",
-      "timeRemaining": "预估剩余时间",
-      "mode": "传输模式",
-      "localNetwork": "本地网络",
-      "cloudTransfer": "云盘中转",
-      "cancelTransfer": "取消传输",
-      "retry": "重试",
-      "remove": "移除",
-      "unknownFile": "未知文件",
-      "resumed": "已恢复传输",
-      "encrypted": "已加密传输",
-      "compressionRatio": "压缩率 {ratio}%",
-      "interrupted": "传输中断，等待恢复",
-      "degradedEncryption": "对方不支持加密传输，已降级为明文传输",
-      "degradedCompression": "对方不支持压缩传输，已使用原始数据传输"
-    },
-    "time": {
-      "seconds": "{count} 秒",
-      "minutesSeconds": "{minutes} 分 {seconds} 秒",
-      "hoursMinutes": "{hours} 小时 {minutes} 分"
-    }
-  },
-  "history": {
-    "title": "传输历史",
-    "empty": "暂无传输历史",
-    "emptyHint": "完成文件传输后将显示在此处",
-    "clear": "清空历史",
-    "unknownDevice": "未知设备",
-    "noResults": "没有符合条件的记录",
-    "recordCount": "共 {count} 条记录",
-    "selectAll": "全选",
-    "deleteSelected": "删除选中 ({count})",
-    "direction": {
-      "send": "发送",
-      "receive": "接收"
-    },
-    "filter": {
-      "direction": "传输方向",
-      "status": "状态",
-      "all": "全部"
-    },
-    "sort": {
-      "field": "排序字段",
-      "order": "排序顺序",
-      "fields": {
-        "time": "时间",
-        "fileName": "文件名",
-        "fileSize": "文件大小"
-      },
-      "orders": {
-        "asc": "升序",
-        "desc": "降序"
-      }
-    },
-    "deleteConfirm": {
-      "title": "删除记录",
-      "message": "确定要删除 \"{name}\" 的传输记录吗？"
-    },
-    "batchDeleteConfirm": {
-      "title": "批量删除",
-      "message": "确定要删除选中的 {count} 条记录吗？"
-    },
-    "clearConfirm": {
-      "title": "清空历史",
-      "message": "确定要清空所有传输历史记录吗？此操作不可撤销。"
-    },
-    "privacy": {
-      "hiddenFileName": "****",
-      "hiddenPeerName": "***",
-      "hiddenPeerIp": "***"
-    }
-  },
-  "peer": {
-    "nearbyDevices": "附近设备",
-    "noDevices": "未发现设备",
-    "noDevicesHint": "请确保目标设备已打开 PureSend",
-    "addManual": "手动添加设备",
-    "addDevice": "添加设备",
-    "ipAddress": "IP 地址",
-    "port": "端口",
-    "status": {
-      "available": "在线",
-      "busy": "忙碌中",
-      "offline": "离线"
-    },
-    "deviceType": {
-      "desktop": "桌面端",
-      "mobile": "移动端",
-      "web": "网页端",
-      "unknown": "未知"
-    },
-    "validation": {
-      "enterIp": "请输入 IP 地址",
-      "invalidIp": "请输入有效的 IP 地址"
-    }
-  },
-  "content": {
-    "type": {
-      "file": {
-        "label": "文件",
-        "description": "选择单个文件进行传输"
-      },
-      "folder": {
-        "label": "文件夹",
-        "description": "选择整个文件夹进行传输"
-      },
-      "clipboard": {
-        "label": "剪贴板",
-        "description": "从剪贴板导入文本内容"
-      },
-      "text": {
-        "label": "文本",
-        "description": "手动输入或粘贴文本内容"
-      },
-      "media": {
-        "label": "媒体",
-        "description": "选择图片、视频、音频文件"
-      },
-      "app": {
-        "label": "应用",
-        "description": "选择已安装的应用程序"
-      }
-    },
-    "filter": {
-      "media": "媒体文件",
-      "app": "应用程序"
-    }
-  },
-  "selectedFiles": {
-    "title": "已选文件",
-    "count": "{count} 个文件",
-    "stats": "已选择 {count} 个文件，共 {size}",
-    "mediaCount": "{count} 个媒体文件",
-    "empty": "未选择文件，请选择要发送的文件",
-    "clearAll": "清空全部",
-    "tempFile": "临时文件",
-    "limitReached": "已达到文件数量限制（{limit} 个文件）",
-    "added": "已添加 {count} 个文件",
-    "duplicate": "文件已存在，已跳过",
-    "duplicates": "{count} 个文件已存在，已跳过",
-    "limitExceeded": "{count} 个文件超出限制，未添加",
-    "noFilesAdded": "未添加任何文件"
-  },
-  "send": {
-    "title": "发送",
-    "selectFiles": "选择文件",
-    "sending": "发送中...",
-    "noPeers": "未发现附近设备",
-    "peerDisconnected": "设备已断开连接",
-    "tasks": "发送任务",
-    "noTasks": "暂无发送任务",
-    "selectFileToStart": "选择文件开始发送",
-    "cleanup": "清理已完成",
-    "settings": {
-      "title": "发送设置",
-      "webDownload": "Web 下载",
-      "webDownloadHint": "开启后启动 HTTP 服务器，其他设备可通过浏览器下载已选文件",
-      "webDownloadLink": "下载链接",
-      "webDownloadQrcode": "扫码下载",
-      "webDownloadStartFailed": "启动 Web 下载服务失败：{error}",
-      "webDownloadStopFailed": "停止 Web 下载服务失败：{error}"
-    },
-    "task": {
-      "fileCount": "{count} 个文件",
-      "approval": {
-        "pending": "等待确认",
-        "accepted": "已接受",
-        "rejected": "已拒绝",
-        "waitingResponse": "等待对方响应"
-      },
-      "moreFiles": "还有 {count} 个文件",
-      "collapseFiles": "收起文件列表",
-      "expand": "展开全部",
-      "collapse": "收起",
-      "clearAll": "移除全部",
-      "removeConfirm": {
-        "title": "移除任务",
-        "message": "确定要移除该发送任务吗？"
-      },
-      "clearAllConfirm": {
-        "title": "移除全部任务",
-        "message": "确定要移除所有 {count} 条发送任务吗？"
-      },
-      "acceptError": "接受请求失败：{error}",
-      "rejectError": "拒绝请求失败：{error}",
-      "fileStatus": {
-        "pending": "等待中",
-        "transferring": "传输中",
-        "completed": "已完成",
-        "failed": "失败",
-        "cancelled": "已取消",
-        "interrupted": "已中断"
-      }
-    }
-  },
-  "receiveMode": {
-    "label": "传输模式",
-    "local": {
-      "label": "本地网络",
-      "description": "通过局域网直接传输，速度快"
-    },
-    "cloud": {
-      "label": "云盘中转",
-      "description": "通过云盘中转，跨网络传输",
-      "comingSoon": "云盘中转功能即将推出"
-    }
-  },
-  "receive": {
-    "networkInfo": "网络信息",
-    "viewNetworkInfo": "查看网络信息",
-    "clickToViewNetwork": "点击\"查看网络信息\"获取本机网络信息",
-    "mode": "接收模式",
-    "localNetwork": "本地网络",
-    "cloudTransferDev": "云盘中转（开发中）",
-    "receiveDirectory": "接收目录",
-    "saveLocation": "文件保存位置",
-    "startReceiving": "开始接收",
-    "stopReceiving": "停止接收",
-    "tasks": "接收任务",
-    "noTasks": "暂无接收任务",
-    "waitingForSender": "等待发送方连接",
-    "clickToStart": "点击开始接收等待连接",
-    "getNetworkInfoFailed": "获取网络信息失败：{error}",
-    "startFailed": "启动接收失败：{error}",
-    "stopFailed": "停止接收失败：{error}",
-    "notReceiving": "未开始接收",
-    "hideNetworkInfo": "收起网络信息",
-    "retryNotSupported": "接收任务暂不支持重试",
-    "selectDirectory": "选择接收目录",
-    "selectDirectoryFailed": "选择目录失败：{error}",
-    "settings": {
-      "title": "接收设置",
-      "autoReceive": "自动接收",
-      "autoReceiveHint": "开启后接收请求将自动同意，无需手动确认",
-      "fileOverwrite": "文件覆盖",
-      "fileOverwriteHint": "开启后同名文件将被覆盖，关闭则自动重命名",
-      "webUpload": "Web 上传",
-      "webUploadHint": "开启后启动 HTTP 服务器，其他设备可通过浏览器上传文件",
-      "webUploadLink": "上传链接",
-      "webUploadQrcode": "扫码上传",
-      "webUploadStartFailed": "启动 Web 上传服务失败：{error}",
-      "webUploadStopFailed": "停止 Web 上传服务失败：{error}"
-    },
-    "task": {
-      "fileCount": "{count} 个文件",
-      "from": "来自 {sender}",
-      "approval": {
-        "pending": "等待确认",
-        "accepted": "已接受",
-        "rejected": "已拒绝",
-        "expired": "已过期"
-      },
-      "expandFiles": "展开文件列表",
-      "collapseFiles": "收起文件列表",
-      "moreFiles": "还有 {count} 个文件",
-      "expand": "展开全部",
-      "collapse": "收起",
-      "clearAll": "移除全部",
-      "removeConfirm": {
-        "title": "移除任务",
-        "message": "确定要移除该接收任务吗？"
-      },
-      "clearAllConfirm": {
-        "title": "移除全部任务",
-        "message": "确定要移除所有 {count} 条接收任务吗？"
-      },
-      "acceptError": "接受请求失败：{error}",
-      "rejectError": "拒绝请求失败：{error}",
-      "fileStatus": {
-        "pending": "等待中",
-        "transferring": "传输中",
-        "completed": "已完成",
-        "failed": "失败",
-        "cancelled": "已取消",
-        "interrupted": "已中断"
-      }
-    },
-    "webUpload": {
-      "requests": "上传请求",
-      "noRequests": "暂无上传请求",
-      "waitingForUpload": "等待浏览器上传文件",
-      "accept": "接受",
-      "reject": "拒绝",
-      "fileCount": "{count} 个文件",
-      "fromIp": "来自 {ip}",
-      "status": {
-        "pending": "等待确认",
-        "accepted": "已接受",
-        "rejected": "已拒绝",
-        "expired": "已过期"
-      },
-      "progress": {
-        "title": "上传进度",
-        "moreRecords": "还有 {count} 条上传记录",
-        "expand": "展开全部",
-        "collapse": "收起",
-        "noRecords": "暂无上传记录"
-      },
-      "acceptError": "接受上传请求失败：{error}",
-      "rejectError": "拒绝上传请求失败：{error}"
-    }
-  },
-  "network": {
-    "title": "网络信息",
-    "deviceName": "设备名称",
-    "ipAddress": "IP 地址",
-    "port": "端口",
-    "listeningAddress": "监听地址",
-    "scanToConnect": "扫码连接",
-    "connectionHint": "其他设备可以通过扫描二维码或输入 IP 地址和端口连接到您的设备",
-    "connectionHintInactive": "点击\"开始接收\"按钮启动接收服务后，其他设备才能连接",
-    "copiedToClipboard": "已复制到剪贴板",
-    "qrCodeAlt": "连接二维码",
-    "notReceivingHint": "当前未开始接收，网络信息将在启动接收后显示",
-    "qrCodeUnavailable": "二维码不可用"
-  },
-  "fileSelector": {
-    "releaseToUpload": "松开以上传",
-    "dragDropHint": "拖拽文件到此处",
-    "orClickToSelect": "或点击选择文件",
-    "selectFile": "选择文件",
-    "noFileDetected": "未检测到拖拽的文件",
-    "handleDragFailed": "处理拖拽文件失败：{error}",
-    "selectFileToTransfer": "选择要传输的文件",
-    "openDialogFailed": "打开文件对话框失败：{error}"
-  },
-  "sendMode": {
-    "label": "发送模式",
-    "p2p": {
-      "label": "P2P 直连",
-      "description": "直接发送到附近设备"
-    },
-    "link": {
-      "label": "链接分享",
-      "description": "生成分享链接和二维码",
-      "selectFileHint": "请先选择要分享的文件"
-    }
-  },
-  "share": {
-    "backToSend": "返回",
-    "startError": "开始分享失败：{error}",
-    "stopError": "停止分享失败：{error}",
-    "acceptError": "接受请求失败：{error}",
-    "rejectError": "拒绝请求失败：{error}",
-    "noRequests": "暂无访问请求",
-    "link": {
-      "title": "分享链接",
-      "copy": "复制链接",
-      "copied": "已复制",
-      "warning": "请确保在安全的环境下使用分享链接"
-    },
-    "qrcode": {
-      "title": "二维码",
-      "generating": "生成中..."
-    },
-    "info": {
-      "files": "文件数量",
-      "created": "创建时间",
-      "status": "状态"
-    },
-    "status": {
-      "active": "进行中"
-    },
-    "pin": {
-      "enabled": "已启用 PIN 码保护"
-    },
-    "requests": {
-      "title": "访问请求",
-      "accept": "接受",
-      "reject": "拒绝",
-      "clearAll": "移除全部",
-      "status": {
-        "pending": "等待响应",
-        "accepted": "已同意",
-        "rejected": "已拒绝"
-      }
-    },
-    "removeConfirm": {
-      "title": "移除请求",
-      "message": "确定要移除该访问请求吗？"
-    },
-    "clearAllConfirm": {
-      "title": "移除全部请求",
-      "message": "确定要移除所有 {count} 条访问请求吗？"
-    },
-    "removeError": "移除请求失败：{error}",
-    "clearAllError": "清除请求失败：{error}",
-    "uploads": {
-      "title": "上传进度",
-      "fileCount": "{count} 个文件",
-      "moreRecords": "还有 {count} 条上传记录",
-      "expand": "展开全部",
-      "collapse": "收起",
-      "noRecords": "暂无上传记录"
     },
     "transfer": {
-      "transferring": "传输中",
-      "completed": "传输完成",
-      "failed": "传输失败",
-      "cancelled": "已取消",
-      "idle": "空闲"
+        "selectFile": "选择文件",
+        "dragDropHint": "拖拽文件到此处",
+        "send": "发送",
+        "receive": "接收",
+        "completed": "已完成",
+        "failed": "传输失败",
+        "cancelled": "已取消",
+        "mode": {
+            "title": "传输模式",
+            "local": {
+                "title": "本地网络",
+                "description": "通过局域网直接传输，速度快"
+            },
+            "cloud": {
+                "title": "云盘中转",
+                "description": "通过云盘中转，跨网络传输"
+            },
+            "noDeviceHint": "当前没有发现可用的设备，请确保目标设备已打开 PureSend",
+            "cloudComingSoon": "云盘中转功能即将推出"
+        },
+        "status": {
+            "pending": "等待中",
+            "transferring": "传输中",
+            "completed": "已完成",
+            "failed": "失败",
+            "cancelled": "已取消",
+            "interrupted": "已中断"
+        },
+        "progress": {
+            "transferred": "已传输",
+            "speed": "传输速度",
+            "timeRemaining": "预估剩余时间",
+            "mode": "传输模式",
+            "localNetwork": "本地网络",
+            "cloudTransfer": "云盘中转",
+            "cancelTransfer": "取消传输",
+            "retry": "重试",
+            "remove": "移除",
+            "unknownFile": "未知文件",
+            "resumed": "已恢复传输",
+            "encrypted": "已加密传输",
+            "compressionRatio": "压缩率 {ratio}%",
+            "interrupted": "传输中断，等待恢复",
+            "degradedEncryption": "对方不支持加密传输，已降级为明文传输",
+            "degradedCompression": "对方不支持压缩传输，已使用原始数据传输"
+        },
+        "time": {
+            "seconds": "{count} 秒",
+            "minutesSeconds": "{minutes} 分 {seconds} 秒",
+            "hoursMinutes": "{hours} 小时 {minutes} 分"
+        }
     },
-    "actions": {
-      "stop": "停止分享"
+    "history": {
+        "title": "传输历史",
+        "empty": "暂无传输历史",
+        "emptyHint": "完成文件传输后将显示在此处",
+        "clear": "清空历史",
+        "unknownDevice": "未知设备",
+        "noResults": "没有符合条件的记录",
+        "recordCount": "共 {count} 条记录",
+        "selectAll": "全选",
+        "deleteSelected": "删除选中 ({count})",
+        "direction": {
+            "send": "发送",
+            "receive": "接收"
+        },
+        "filter": {
+            "direction": "传输方向",
+            "status": "状态",
+            "all": "全部"
+        },
+        "sort": {
+            "field": "排序字段",
+            "order": "排序顺序",
+            "fields": {
+                "time": "时间",
+                "fileName": "文件名",
+                "fileSize": "文件大小"
+            },
+            "orders": {
+                "asc": "升序",
+                "desc": "降序"
+            }
+        },
+        "deleteConfirm": {
+            "title": "删除记录",
+            "message": "确定要删除 \"{name}\" 的传输记录吗？"
+        },
+        "batchDeleteConfirm": {
+            "title": "批量删除",
+            "message": "确定要删除选中的 {count} 条记录吗？"
+        },
+        "clearConfirm": {
+            "title": "清空历史",
+            "message": "确定要清空所有传输历史记录吗？此操作不可撤销。"
+        },
+        "privacy": {
+            "hiddenFileName": "****",
+            "hiddenPeerName": "***",
+            "hiddenPeerIp": "***"
+        }
     },
-    "inactive": {
-      "waiting": "等待开始分享..."
+    "peer": {
+        "nearbyDevices": "附近设备",
+        "noDevices": "未发现设备",
+        "noDevicesHint": "请确保目标设备已打开 PureSend",
+        "addManual": "手动添加设备",
+        "addDevice": "添加设备",
+        "ipAddress": "IP 地址",
+        "port": "端口",
+        "status": {
+            "available": "在线",
+            "busy": "忙碌中",
+            "offline": "离线"
+        },
+        "deviceType": {
+            "desktop": "桌面端",
+            "mobile": "移动端",
+            "web": "网页端",
+            "unknown": "未知"
+        },
+        "validation": {
+            "enterIp": "请输入 IP 地址",
+            "invalidIp": "请输入有效的 IP 地址"
+        }
     },
-    "settings": {
-      "title": "分享设置",
-      "autoAccept": "自动接受请求",
-      "pinEnabled": "PIN 码保护",
-      "pinSet": "已设置",
-      "pinNotSet": "未设置",
-      "currentPin": "当前 PIN",
-      "configure": "配置",
-      "pinEnabledHint": "访问分享链接时需要输入 PIN 码",
-      "autoAcceptHint": "自动接受所有访问请求，无需手动审批"
+    "content": {
+        "type": {
+            "file": {
+                "label": "文件",
+                "description": "选择单个文件进行传输"
+            },
+            "folder": {
+                "label": "文件夹",
+                "description": "选择整个文件夹进行传输"
+            },
+            "clipboard": {
+                "label": "剪贴板",
+                "description": "从剪贴板导入文本内容"
+            },
+            "text": {
+                "label": "文本",
+                "description": "手动输入或粘贴文本内容"
+            },
+            "media": {
+                "label": "媒体",
+                "description": "选择图片、视频、音频文件"
+            },
+            "app": {
+                "label": "应用",
+                "description": "选择已安装的应用程序"
+            }
+        },
+        "filter": {
+            "media": "媒体文件",
+            "app": "应用程序"
+        }
     },
-    "settingsUpdateError": "更新分享设置失败：{error}",
-    "pinConfig": {
-      "title": "配置 PIN 码",
-      "pinLabel": "PIN 码",
-      "pinHint": "用于保护分享链接的访问",
-      "pinPlaceholder": "输入或生成 PIN 码",
-      "refresh": "生成新的 PIN",
-      "tips": "默认生成 6 位随机数字，您可以修改为任意长度和类型的字符组合"
+    "selectedFiles": {
+        "title": "已选文件",
+        "count": "{count} 个文件",
+        "stats": "已选择 {count} 个文件，共 {size}",
+        "mediaCount": "{count} 个媒体文件",
+        "empty": "未选择文件，请选择要发送的文件",
+        "clearAll": "清空全部",
+        "tempFile": "临时文件",
+        "limitReached": "已达到文件数量限制（{limit} 个文件）",
+        "added": "已添加 {count} 个文件",
+        "duplicate": "文件已存在，已跳过",
+        "duplicates": "{count} 个文件已存在，已跳过",
+        "limitExceeded": "{count} 个文件超出限制，未添加",
+        "noFilesAdded": "未添加任何文件"
+    },
+    "send": {
+        "title": "发送",
+        "selectFiles": "选择文件",
+        "sending": "发送中...",
+        "noPeers": "未发现附近设备",
+        "peerDisconnected": "设备已断开连接",
+        "tasks": "发送任务",
+        "noTasks": "暂无发送任务",
+        "selectFileToStart": "选择文件开始发送",
+        "cleanup": "清理已完成",
+        "settings": {
+            "title": "发送设置",
+            "webDownload": "Web 下载",
+            "webDownloadHint": "开启后启动 HTTP 服务器，其他设备可通过浏览器下载已选文件",
+            "webDownloadLink": "下载链接",
+            "webDownloadQrcode": "扫码下载",
+            "webDownloadStartFailed": "启动 Web 下载服务失败：{error}",
+            "webDownloadStopFailed": "停止 Web 下载服务失败：{error}"
+        },
+        "task": {
+            "fileCount": "{count} 个文件",
+            "approval": {
+                "pending": "等待确认",
+                "accepted": "已接受",
+                "rejected": "已拒绝",
+                "waitingResponse": "等待对方响应"
+            },
+            "moreFiles": "还有 {count} 个文件",
+            "collapseFiles": "收起文件列表",
+            "expand": "展开全部",
+            "collapse": "收起",
+            "clearAll": "移除全部",
+            "removeConfirm": {
+                "title": "移除任务",
+                "message": "确定要移除该发送任务吗？"
+            },
+            "clearAllConfirm": {
+                "title": "移除全部任务",
+                "message": "确定要移除所有 {count} 条发送任务吗？"
+            },
+            "acceptError": "接受请求失败：{error}",
+            "rejectError": "拒绝请求失败：{error}",
+            "fileStatus": {
+                "pending": "等待中",
+                "transferring": "传输中",
+                "completed": "已完成",
+                "failed": "失败",
+                "cancelled": "已取消",
+                "interrupted": "已中断"
+            }
+        }
+    },
+    "receiveMode": {
+        "label": "传输模式",
+        "local": {
+            "label": "本地网络",
+            "description": "通过局域网直接传输，速度快"
+        },
+        "cloud": {
+            "label": "云盘中转",
+            "description": "通过云盘中转，跨网络传输",
+            "comingSoon": "云盘中转功能即将推出"
+        }
+    },
+    "receive": {
+        "networkInfo": "网络信息",
+        "viewNetworkInfo": "查看网络信息",
+        "clickToViewNetwork": "点击\"查看网络信息\"获取本机网络信息",
+        "mode": "接收模式",
+        "localNetwork": "本地网络",
+        "cloudTransferDev": "云盘中转（开发中）",
+        "receiveDirectory": "接收目录",
+        "saveLocation": "文件保存位置",
+        "startReceiving": "开始接收",
+        "stopReceiving": "停止接收",
+        "tasks": "接收任务",
+        "noTasks": "暂无接收任务",
+        "waitingForSender": "等待发送方连接",
+        "clickToStart": "点击开始接收等待连接",
+        "getNetworkInfoFailed": "获取网络信息失败：{error}",
+        "startFailed": "启动接收失败：{error}",
+        "stopFailed": "停止接收失败：{error}",
+        "notReceiving": "未开始接收",
+        "hideNetworkInfo": "收起网络信息",
+        "retryNotSupported": "接收任务暂不支持重试",
+        "selectDirectory": "选择接收目录",
+        "selectDirectoryFailed": "选择目录失败：{error}",
+        "settings": {
+            "title": "接收设置",
+            "autoReceive": "自动接收",
+            "autoReceiveHint": "开启后接收请求将自动同意，无需手动确认",
+            "fileOverwrite": "文件覆盖",
+            "fileOverwriteHint": "开启后同名文件将被覆盖，关闭则自动重命名",
+            "webUpload": "Web 上传",
+            "webUploadHint": "开启后启动 HTTP 服务器，其他设备可通过浏览器上传文件",
+            "webUploadLink": "上传链接",
+            "webUploadQrcode": "扫码上传",
+            "webUploadStartFailed": "启动 Web 上传服务失败：{error}",
+            "webUploadStopFailed": "停止 Web 上传服务失败：{error}"
+        },
+        "task": {
+            "fileCount": "{count} 个文件",
+            "from": "来自 {sender}",
+            "approval": {
+                "pending": "等待确认",
+                "accepted": "已接受",
+                "rejected": "已拒绝",
+                "expired": "已过期"
+            },
+            "expandFiles": "展开文件列表",
+            "collapseFiles": "收起文件列表",
+            "moreFiles": "还有 {count} 个文件",
+            "expand": "展开全部",
+            "collapse": "收起",
+            "clearAll": "移除全部",
+            "removeConfirm": {
+                "title": "移除任务",
+                "message": "确定要移除该接收任务吗？"
+            },
+            "clearAllConfirm": {
+                "title": "移除全部任务",
+                "message": "确定要移除所有 {count} 条接收任务吗？"
+            },
+            "acceptError": "接受请求失败：{error}",
+            "rejectError": "拒绝请求失败：{error}",
+            "fileStatus": {
+                "pending": "等待中",
+                "transferring": "传输中",
+                "completed": "已完成",
+                "failed": "失败",
+                "cancelled": "已取消",
+                "interrupted": "已中断"
+            }
+        },
+        "webUpload": {
+            "requests": "上传请求",
+            "noRequests": "暂无上传请求",
+            "waitingForUpload": "等待浏览器上传文件",
+            "accept": "接受",
+            "reject": "拒绝",
+            "fileCount": "{count} 个文件",
+            "fromIp": "来自 {ip}",
+            "status": {
+                "pending": "等待确认",
+                "accepted": "已接受",
+                "rejected": "已拒绝",
+                "expired": "已过期"
+            },
+            "progress": {
+                "title": "上传进度",
+                "moreRecords": "还有 {count} 条上传记录",
+                "expand": "展开全部",
+                "collapse": "收起",
+                "noRecords": "暂无上传记录"
+            },
+            "acceptError": "接受上传请求失败：{error}",
+            "rejectError": "拒绝上传请求失败：{error}"
+        }
+    },
+    "network": {
+        "title": "网络信息",
+        "deviceName": "设备名称",
+        "ipAddress": "IP 地址",
+        "port": "端口",
+        "listeningAddress": "监听地址",
+        "scanToConnect": "扫码连接",
+        "connectionHint": "其他设备可以通过扫描二维码或输入 IP 地址和端口连接到您的设备",
+        "connectionHintInactive": "点击\"开始接收\"按钮启动接收服务后，其他设备才能连接",
+        "copiedToClipboard": "已复制到剪贴板",
+        "qrCodeAlt": "连接二维码",
+        "notReceivingHint": "当前未开始接收，网络信息将在启动接收后显示",
+        "qrCodeUnavailable": "二维码不可用"
+    },
+    "fileSelector": {
+        "releaseToUpload": "松开以上传",
+        "dragDropHint": "拖拽文件到此处",
+        "orClickToSelect": "或点击选择文件",
+        "selectFile": "选择文件",
+        "noFileDetected": "未检测到拖拽的文件",
+        "handleDragFailed": "处理拖拽文件失败：{error}",
+        "selectFileToTransfer": "选择要传输的文件",
+        "openDialogFailed": "打开文件对话框失败：{error}"
+    },
+    "sendMode": {
+        "label": "发送模式",
+        "p2p": {
+            "label": "P2P 直连",
+            "description": "直接发送到附近设备"
+        },
+        "link": {
+            "label": "链接分享",
+            "description": "生成分享链接和二维码",
+            "selectFileHint": "请先选择要分享的文件"
+        }
+    },
+    "share": {
+        "backToSend": "返回",
+        "startError": "开始分享失败：{error}",
+        "stopError": "停止分享失败：{error}",
+        "acceptError": "接受请求失败：{error}",
+        "rejectError": "拒绝请求失败：{error}",
+        "noRequests": "暂无访问请求",
+        "link": {
+            "title": "分享链接",
+            "copy": "复制链接",
+            "copied": "已复制",
+            "warning": "请确保在安全的环境下使用分享链接"
+        },
+        "qrcode": {
+            "title": "二维码",
+            "generating": "生成中..."
+        },
+        "info": {
+            "files": "文件数量",
+            "created": "创建时间",
+            "status": "状态"
+        },
+        "status": {
+            "active": "进行中"
+        },
+        "pin": {
+            "enabled": "已启用 PIN 码保护"
+        },
+        "requests": {
+            "title": "访问请求",
+            "accept": "接受",
+            "reject": "拒绝",
+            "clearAll": "移除全部",
+            "status": {
+                "pending": "等待响应",
+                "accepted": "已同意",
+                "rejected": "已拒绝"
+            }
+        },
+        "removeConfirm": {
+            "title": "移除请求",
+            "message": "确定要移除该访问请求吗？"
+        },
+        "clearAllConfirm": {
+            "title": "移除全部请求",
+            "message": "确定要移除所有 {count} 条访问请求吗？"
+        },
+        "removeError": "移除请求失败：{error}",
+        "clearAllError": "清除请求失败：{error}",
+        "uploads": {
+            "title": "上传进度",
+            "fileCount": "{count} 个文件",
+            "moreRecords": "还有 {count} 条上传记录",
+            "expand": "展开全部",
+            "collapse": "收起",
+            "noRecords": "暂无上传记录"
+        },
+        "transfer": {
+            "transferring": "传输中",
+            "completed": "传输完成",
+            "failed": "传输失败",
+            "cancelled": "已取消",
+            "idle": "空闲"
+        },
+        "actions": {
+            "stop": "停止分享"
+        },
+        "inactive": {
+            "waiting": "等待开始分享..."
+        },
+        "settings": {
+            "title": "分享设置",
+            "autoAccept": "自动接受请求",
+            "pinEnabled": "PIN 码保护",
+            "pinSet": "已设置",
+            "pinNotSet": "未设置",
+            "currentPin": "当前 PIN",
+            "configure": "配置",
+            "pinEnabledHint": "访问分享链接时需要输入 PIN 码",
+            "autoAcceptHint": "自动接受所有访问请求，无需手动审批"
+        },
+        "settingsUpdateError": "更新分享设置失败：{error}",
+        "pinConfig": {
+            "title": "配置 PIN 码",
+            "pinLabel": "PIN 码",
+            "pinHint": "用于保护分享链接的访问",
+            "pinPlaceholder": "输入或生成 PIN 码",
+            "refresh": "生成新的 PIN",
+            "tips": "默认生成 6 位随机数字，您可以修改为任意长度和类型的字符组合"
+        }
+    },
+    "folderPicker": {
+        "title": "选择文件夹",
+        "description": "选择整个文件夹进行传输，包含所有子文件夹",
+        "selectFolder": "选择文件夹",
+        "emptyFolder": "文件夹为空",
+        "selectFailed": "选择文件夹失败：{error}"
+    },
+    "mediaPicker": {
+        "title": "选择媒体文件",
+        "description": "选择图片、视频或音频文件",
+        "selectMedia": "选择媒体",
+        "selectFailed": "选择媒体文件失败：{error}"
+    },
+    "appPicker": {
+        "title": "选择应用程序",
+        "description": "选择已安装的应用程序",
+        "selectApp": "选择应用",
+        "selectFailed": "选择应用失败：{error}"
+    },
+    "clipboardImporter": {
+        "title": "剪贴板导入",
+        "preview": "预览",
+        "charCount": "{count} 个字符",
+        "reRead": "重新读取",
+        "readClipboard": "读取剪贴板",
+        "confirmImport": "确认导入",
+        "clipboardEmpty": "剪贴板为空",
+        "readFailed": "读取剪贴板失败：{error}",
+        "saveFailed": "保存剪贴板内容失败：{error}",
+        "content": "剪贴板内容"
+    },
+    "textInput": {
+        "title": "文本输入",
+        "placeholder": "在此输入或粘贴文本内容...",
+        "charCount": "{count} 个字符",
+        "addToSend": "添加到发送列表",
+        "content": "文本内容"
+    },
+    "menu": {
+        "puresend": {
+            "about": "关于 PureSend",
+            "quit": "退出"
+        },
+        "file": {
+            "title": "文件",
+            "sendFile": "发送文件"
+        },
+        "edit": {
+            "title": "编辑",
+            "undo": "撤销",
+            "redo": "重做",
+            "cut": "剪切",
+            "copy": "复制",
+            "paste": "粘贴",
+            "selectAll": "全选"
+        },
+        "view": {
+            "title": "视图",
+            "toggleFullscreen": "切换全屏"
+        },
+        "window": {
+            "title": "窗口",
+            "minimize": "最小化",
+            "zoom": "缩放"
+        },
+        "help": {
+            "title": "帮助",
+            "github": "GitHub 仓库",
+            "docs": "在线文档"
+        }
+    },
+    "cloudAccount": {
+        "title": "云盘账号",
+        "add": "添加账号",
+        "edit": "编辑账号",
+        "delete": "删除",
+        "name": "账号名称",
+        "namePlaceholder": "请输入账号名称",
+        "type": "云盘类型",
+        "serverUrl": "服务器地址",
+        "serverUrlPlaceholder": "请输入有效的服务器 URL",
+        "username": "用户名",
+        "usernamePlaceholder": "请输入用户名",
+        "password": "密码",
+        "passwordPlaceholder": "请输入密码",
+        "testConnection": "测试连接",
+        "testSuccess": "连接成功",
+        "testFailed": "连接失败",
+        "saveError": "保存账号失败",
+        "noAccounts": "暂无云盘账号",
+        "noAccountsHint": "添加云盘账号以使用云盘中转功能",
+        "aliyunOSS": "阿里云 OSS",
+        "aliyunDrive": "阿里云盘",
+        "bucket": "Bucket 名称",
+        "bucketPlaceholder": "请输入 Bucket 名称",
+        "region": "Region",
+        "regionPlaceholder": "请选择 Region",
+        "accessKeyId": "AccessKey ID",
+        "accessKeyIdPlaceholder": "请输入 AccessKey ID",
+        "accessKeySecret": "AccessKey Secret",
+        "accessKeySecretPlaceholder": "请输入 AccessKey Secret",
+        "customDomain": "自定义域名",
+        "customDomainPlaceholder": "可选，如 https://cdn.example.com",
+        "customDomainHint": "使用自定义域名访问 OSS，留空则使用默认域名",
+        "refreshToken": "Refresh Token",
+        "refreshTokenPlaceholder": "请输入 Refresh Token",
+        "refreshTokenHint": "从阿里云盘网页版获取，用于 API 授权",
+        "deleteConfirm": {
+            "title": "删除账号",
+            "message": "确定要删除账号 \"{name}\" 吗？此操作不可撤销。"
+        },
+        "status": {
+            "connected": "已连接",
+            "disconnected": "未连接",
+            "invalid": "无效"
+        }
+    },
+    "cloudTransfer": {
+        "selectAccount": "选择云盘账号",
+        "noAccounts": "请先在设置中添加云盘账号",
+        "targetDirectory": "目标目录",
+        "sourceDirectory": "源目录",
+        "browse": "浏览",
+        "refreshFiles": "刷新文件列表",
+        "downloadSelected": "下载选中文件",
+        "noFilesSelected": "暂无文件",
+        "downloading": "下载中",
+        "downloadSuccess": "下载完成",
+        "downloadFailed": "下载失败",
+        "uploadToCloud": "上传到云盘",
+        "uploading": "上传中",
+        "uploadSuccess": "上传完成",
+        "uploadFailed": "上传失败",
+        "uploadSelected": "上传选中文件",
+        "downloadFromCloud": "从云盘下载",
+        "noAccountSelected": "请选择云盘账号",
+        "uploadTasks": "上传任务",
+        "downloadTasks": "下载任务",
+        "noUploadTasks": "暂无上传任务",
+        "noDownloadTasks": "暂无下载任务",
+        "selectFileToUpload": "选择文件开始上传",
+        "browseFilesToStart": "浏览文件开始下载",
+        "downloadDirectory": "下载目录",
+        "selectDownloadDirectory": "选择下载目录",
+        "fileCount": "{count} 个文件",
+        "moreFiles": "还有 {count} 个文件",
+        "collapseFiles": "收起文件列表",
+        "expand": "展开全部",
+        "collapse": "收起",
+        "status": {
+            "pending": "等待中",
+            "uploading": "上传中",
+            "completed": "已完成",
+            "failed": "失败"
+        },
+        "fileStatus": {
+            "pending": "等待中",
+            "uploading": "上传中",
+            "completed": "已完成",
+            "failed": "失败"
+        },
+        "directoryBrowser": {
+            "title": "浏览云盘目录",
+            "currentPath": "根目录",
+            "parentDirectory": "上级目录",
+            "newFolder": "新建文件夹",
+            "newFolderName": "文件夹名称",
+            "newFolderPlaceholder": "请输入文件夹名称",
+            "empty": "目录为空",
+            "loadError": "加载目录失败",
+            "createFolderError": "创建文件夹失败"
+        },
+        "uploadSettings": "上传设置",
+        "overwriteFiles": "覆盖同名文件",
+        "overwriteHint": "开启后同名文件将被覆盖",
+        "renameHint": "关闭后同名文件将自动重命名"
     }
-  },
-  "folderPicker": {
-    "title": "选择文件夹",
-    "description": "选择整个文件夹进行传输，包含所有子文件夹",
-    "selectFolder": "选择文件夹",
-    "emptyFolder": "文件夹为空",
-    "selectFailed": "选择文件夹失败：{error}"
-  },
-  "mediaPicker": {
-    "title": "选择媒体文件",
-    "description": "选择图片、视频或音频文件",
-    "selectMedia": "选择媒体",
-    "selectFailed": "选择媒体文件失败：{error}"
-  },
-  "appPicker": {
-    "title": "选择应用程序",
-    "description": "选择已安装的应用程序",
-    "selectApp": "选择应用",
-    "selectFailed": "选择应用失败：{error}"
-  },
-  "clipboardImporter": {
-    "title": "剪贴板导入",
-    "preview": "预览",
-    "charCount": "{count} 个字符",
-    "reRead": "重新读取",
-    "readClipboard": "读取剪贴板",
-    "confirmImport": "确认导入",
-    "clipboardEmpty": "剪贴板为空",
-    "readFailed": "读取剪贴板失败：{error}",
-    "saveFailed": "保存剪贴板内容失败：{error}",
-    "content": "剪贴板内容"
-  },
-  "textInput": {
-    "title": "文本输入",
-    "placeholder": "在此输入或粘贴文本内容...",
-    "charCount": "{count} 个字符",
-    "addToSend": "添加到发送列表",
-    "content": "文本内容"
-  },
-  "menu": {
-    "puresend": {
-      "about": "关于 PureSend",
-      "quit": "退出"
-    },
-    "file": {
-      "title": "文件",
-      "sendFile": "发送文件"
-    },
-    "edit": {
-      "title": "编辑",
-      "undo": "撤销",
-      "redo": "重做",
-      "cut": "剪切",
-      "copy": "复制",
-      "paste": "粘贴",
-      "selectAll": "全选"
-    },
-    "view": {
-      "title": "视图",
-      "toggleFullscreen": "切换全屏"
-    },
-    "window": {
-      "title": "窗口",
-      "minimize": "最小化",
-      "zoom": "缩放"
-    },
-    "help": {
-      "title": "帮助",
-      "github": "GitHub 仓库",
-      "docs": "在线文档"
-    }
-  },
-  "cloudAccount": {
-    "title": "云盘账号",
-    "add": "添加账号",
-    "edit": "编辑账号",
-    "delete": "删除",
-    "name": "账号名称",
-    "namePlaceholder": "请输入账号名称",
-    "type": "云盘类型",
-    "serverUrl": "服务器地址",
-    "serverUrlPlaceholder": "请输入有效的服务器 URL",
-    "username": "用户名",
-    "usernamePlaceholder": "请输入用户名",
-    "password": "密码",
-    "passwordPlaceholder": "请输入密码",
-    "defaultDirectory": "默认目录",
-    "defaultDirectoryPlaceholder": "请输入默认目录路径",
-    "testConnection": "测试连接",
-    "testSuccess": "连接成功",
-    "testFailed": "连接失败",
-    "saveError": "保存账号失败",
-    "noAccounts": "暂无云盘账号",
-    "noAccountsHint": "添加云盘账号以使用云盘中转功能",
-    "aliyunOSS": "阿里云 OSS",
-    "aliyunDrive": "阿里云盘",
-    "bucket": "Bucket 名称",
-    "bucketPlaceholder": "请输入 Bucket 名称",
-    "region": "Region",
-    "regionPlaceholder": "请选择 Region",
-    "accessKeyId": "AccessKey ID",
-    "accessKeyIdPlaceholder": "请输入 AccessKey ID",
-    "accessKeySecret": "AccessKey Secret",
-    "accessKeySecretPlaceholder": "请输入 AccessKey Secret",
-    "customDomain": "自定义域名",
-    "customDomainPlaceholder": "可选，如 https://cdn.example.com",
-    "customDomainHint": "使用自定义域名访问 OSS，留空则使用默认域名",
-    "refreshToken": "Refresh Token",
-    "refreshTokenPlaceholder": "请输入 Refresh Token",
-    "refreshTokenHint": "从阿里云盘网页版获取，用于 API 授权",
-    "deleteConfirm": {
-      "title": "删除账号",
-      "message": "确定要删除账号 \"{name}\" 吗？此操作不可撤销。"
-    },
-    "status": {
-      "connected": "已连接",
-      "disconnected": "未连接",
-      "invalid": "无效"
-    }
-  },
-  "cloudTransfer": {
-    "selectAccount": "选择云盘账号",
-    "noAccounts": "请先在设置中添加云盘账号",
-    "targetDirectory": "目标目录",
-    "sourceDirectory": "源目录",
-    "browse": "浏览",
-    "refreshFiles": "刷新文件列表",
-    "downloadSelected": "下载选中文件",
-    "noFilesSelected": "暂无文件",
-    "downloading": "下载中",
-    "downloadSuccess": "下载完成",
-    "downloadFailed": "下载失败",
-    "uploadToCloud": "上传到云盘",
-    "uploading": "上传中",
-    "uploadSuccess": "上传完成",
-    "uploadFailed": "上传失败",
-    "uploadSelected": "上传选中文件",
-    "downloadFromCloud": "从云盘下载",
-    "noAccountSelected": "请选择云盘账号",
-    "uploadTasks": "上传任务",
-    "downloadTasks": "下载任务",
-    "noUploadTasks": "暂无上传任务",
-    "noDownloadTasks": "暂无下载任务",
-    "selectFileToUpload": "选择文件开始上传",
-    "browseFilesToStart": "浏览文件开始下载",
-    "downloadDirectory": "下载目录",
-    "selectDownloadDirectory": "选择下载目录",
-    "fileCount": "{count} 个文件",
-    "moreFiles": "还有 {count} 个文件",
-    "collapseFiles": "收起文件列表",
-    "expand": "展开全部",
-    "collapse": "收起",
-    "status": {
-      "pending": "等待中",
-      "uploading": "上传中",
-      "completed": "已完成",
-      "failed": "失败"
-    },
-    "fileStatus": {
-      "pending": "等待中",
-      "uploading": "上传中",
-      "completed": "已完成",
-      "failed": "失败"
-    },
-    "directoryBrowser": {
-      "title": "浏览云盘目录",
-      "currentPath": "根目录",
-      "parentDirectory": "上级目录",
-      "newFolder": "新建文件夹",
-      "newFolderName": "文件夹名称",
-      "newFolderPlaceholder": "请输入文件夹名称",
-      "empty": "目录为空",
-      "loadError": "加载目录失败",
-      "createFolderError": "创建文件夹失败"
-    },
-    "uploadSettings": "上传设置",
-    "overwriteFiles": "覆盖同名文件",
-    "overwriteHint": "开启后同名文件将被覆盖",
-    "renameHint": "关闭后同名文件将自动重命名"
-  }
 }

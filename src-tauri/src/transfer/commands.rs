@@ -91,6 +91,7 @@ pub async fn prepare_file_transfer(
 ) -> Result<FileMetadata, String> {
     let path = PathBuf::from(&file_path);
 
+    // 检查文件是否存在
     if !tokio::fs::try_exists(&path).await.unwrap_or(false) {
         return Err(format!("文件不存在：{}", file_path));
     }
@@ -100,6 +101,7 @@ pub async fn prepare_file_transfer(
         .await
         .map_err(|e| format!("无法解析文件路径：{}", e))?;
 
+    // 提取文件名
     let file_name = path
         .file_name()
         .and_then(|n| n.to_str())
@@ -112,12 +114,10 @@ pub async fn prepare_file_transfer(
     let file_metadata = FileMetadata::new(file_name, metadata.len(), mime_type);
 
     // 计算文件哈希和分块信息
-    let file_metadata = state
+    state
         .chunker
         .compute_metadata_with_hashes(file_metadata, &path)
-        .map_err(|e| e.to_string())?;
-
-    Ok(file_metadata)
+        .map_err(|e| e.to_string())
 }
 
 /// 发送文件（同步执行，阻塞直到完成或失败）
@@ -245,17 +245,19 @@ pub async fn send_file_async(
         let transport_result = {
             let local_transport = local_transport.lock().await;
             if let Some(transport) = local_transport.as_ref() {
-                // 使用内部方法获取任务并发送
+                // 获取任务并发送
                 let tasks = active_tasks.lock().await;
-                if let Some(task) = tasks.get(&task_id_clone) {
-                    let task_clone = task.clone();
-                    drop(tasks); // 释放锁
-                    transport.send(&task_clone).await
-                } else {
-                    Err(crate::error::TransferError::Internal(
+                let result = match tasks.get(&task_id_clone) {
+                    Some(task) => {
+                        let task_clone = task.clone();
+                        drop(tasks);
+                        transport.send(&task_clone).await
+                    }
+                    None => Err(crate::error::TransferError::Internal(
                         "任务不存在".to_string(),
-                    ))
-                }
+                    )),
+                };
+                result
             } else {
                 Err(crate::error::TransferError::Internal(
                     "传输服务未初始化".to_string(),
@@ -424,15 +426,13 @@ pub async fn start_receiving(
     let network_addresses = crate::network::get_local_ips();
 
     // 生成分享码（6 位数字，基于端口和时间戳）
-    let share_code = format!(
-        "{:06}",
-        (listen_port as u32
-            + std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u32)
-            % 1000000
-    );
+    let share_code = {
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u32;
+        format!("{:06}", (listen_port as u32 + timestamp) % 1000000)
+    };
 
     // 保存传输实例
     {
@@ -536,9 +536,7 @@ pub async fn get_file_metadata(file_path: String) -> Result<FileMetadata, String
     let metadata = std::fs::metadata(&path).map_err(|e| e.to_string())?;
     let mime_type = FileMetadata::infer_mime_type(&file_name);
 
-    let file_metadata = FileMetadata::new(file_name, metadata.len(), mime_type);
-
-    Ok(file_metadata)
+    Ok(FileMetadata::new(file_name, metadata.len(), mime_type))
 }
 
 /// 文件信息
@@ -608,12 +606,10 @@ fn collect_files_recursive(
                 .to_string();
 
             let metadata = std::fs::metadata(&path)?;
-            let size = metadata.len();
-
             files.push(FileInfo {
                 path: path.to_string_lossy().to_string(),
                 name,
-                size,
+                size: metadata.len(),
                 relative_path,
             });
         }
@@ -682,17 +678,21 @@ pub async fn set_file_overwrite(enabled: bool) -> Result<(), String> {
 
 /// 默认接收目录
 fn get_default_receive_directory() -> String {
-    // 尝试获取用户下载目录
-    if let Some(home) = std::env::var("HOME").ok() {
-        let download_dir = PathBuf::from(home).join("Downloads").join("PureSend");
-        return download_dir.to_string_lossy().to_string();
-    }
     // Windows 系统
     if let Ok(userprofile) = std::env::var("USERPROFILE") {
-        let download_dir = PathBuf::from(userprofile)
+        return PathBuf::from(userprofile)
             .join("Downloads")
-            .join("PureSend");
-        return download_dir.to_string_lossy().to_string();
+            .join("PureSend")
+            .to_string_lossy()
+            .to_string();
+    }
+    // 尝试获取用户下载目录
+    if let Some(home) = std::env::var("HOME").ok() {
+        return PathBuf::from(home)
+            .join("Downloads")
+            .join("PureSend")
+            .to_string_lossy()
+            .to_string();
     }
     // 降级到当前目录
     "./downloads".to_string()

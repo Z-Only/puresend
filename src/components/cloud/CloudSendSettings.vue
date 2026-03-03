@@ -104,18 +104,14 @@ onMounted(async () => {
     await cloudStore.loadAccounts()
     if (cloudStore.hasAccounts) {
         selectedAccountId.value = cloudStore.accounts[0].id
-        const account = cloudStore.getAccountById(selectedAccountId.value)
-        if (account) {
-            targetDirectory.value = account.defaultDirectory
-        }
+        // 默认目录为云盘根目录
+        targetDirectory.value = '/'
     }
 })
 
 function handleAccountChange(accountId: string): void {
-    const account = cloudStore.getAccountById(accountId)
-    if (account) {
-        targetDirectory.value = account.defaultDirectory
-    }
+    // 切换账号时，默认目录为云盘根目录
+    targetDirectory.value = '/'
     emit('accountSelected', accountId)
 }
 

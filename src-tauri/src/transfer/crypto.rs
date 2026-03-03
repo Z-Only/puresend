@@ -112,11 +112,11 @@ impl CryptoSession {
     /// 输出格式：[12 字节 nonce][密文 + 16 字节 tag]
     pub fn encrypt(&mut self, plaintext: &[u8]) -> TransferResult<Vec<u8>> {
         let nonce_bytes = self.next_nonce();
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        let nonce = Nonce::from(nonce_bytes);
 
         let ciphertext = self
             .cipher
-            .encrypt(nonce, plaintext)
+            .encrypt(&nonce, plaintext)
             .map_err(|e| TransferError::Encryption(format!("加密失败: {}", e)))?;
 
         // 输出格式：nonce + ciphertext
@@ -139,10 +139,13 @@ impl CryptoSession {
         }
 
         let (nonce_bytes, ciphertext) = encrypted_data.split_at(NONCE_SIZE);
-        let nonce = Nonce::from_slice(nonce_bytes);
+        let nonce_array: [u8; NONCE_SIZE] = nonce_bytes.try_into().map_err(|_| {
+            TransferError::Decryption("nonce 长度不正确".to_string())
+        })?;
+        let nonce = Nonce::from(nonce_array);
 
         self.cipher
-            .decrypt(nonce, ciphertext)
+            .decrypt(&nonce, ciphertext)
             .map_err(|e| TransferError::Decryption(format!("解密失败: {}", e)))
     }
 
@@ -169,7 +172,7 @@ fn get_encryption_lock() -> &'static std::sync::RwLock<bool> {
 
 /// 获取加密是否启用
 pub fn is_encryption_enabled() -> bool {
-    get_encryption_lock().read().map(|v| *v).unwrap_or(true)
+    get_encryption_lock().read().ok().map(|v| *v).unwrap_or(true)
 }
 
 /// 设置加密启用状态

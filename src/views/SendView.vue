@@ -913,9 +913,8 @@ function handleThumbnailLoaded(path: string, thumbnail: ThumbnailInfo) {
     selectedFiles.updateThumbnail(path, thumbnail)
 }
 
-function handleThumbnailError(_path: string, _error: string): void {
-    void _path
-    void _error
+function handleThumbnailError(): void {
+    // Thumbnail error is handled silently
 }
 
 function handlePeerSelect(peerId: string) {

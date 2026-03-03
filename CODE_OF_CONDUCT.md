@@ -38,4 +38,4 @@
 
 ## 归属
 
-本行为准则改编自 [贡献者公约](https://www.contributor-covenant.org)，版本 1.4，可从 https://www.contributor-covenant.org/zh-cn/version/1/4/code-of-conduct.html 获得
+本行为准则改编自 [贡献者公约](https://www.contributor-covenant.org)，版本 1.4，可从 <https://www.contributor-covenant.org/zh-cn/version/1/4/code-of-conduct.html> 获得

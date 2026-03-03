@@ -39,8 +39,8 @@ impl FileMetadata {
 
     /// 根据文件扩展名推断 MIME 类型
     pub fn infer_mime_type(filename: &str) -> String {
-        let extension = filename.rsplit('.').next().unwrap_or("").to_lowercase();
-        match extension.as_str() {
+        let extension = filename.rsplit('.').next().unwrap_or("");
+        match extension.to_lowercase().as_str() {
             // 文本类型
             "txt" => "text/plain".to_string(),
             "md" => "text/markdown".to_string(),

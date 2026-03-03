@@ -7,6 +7,8 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-03
+
 ### Added
 
 - 添加 MIT 开源许可证
@@ -15,6 +17,26 @@
 - 添加 GitHub Issue 模板（Bug 报告、功能请求）
 - 添加 GitHub Pull Request 模板
 - 完善 package.json 元数据
+- 添加云存储传输功能（阿里云 OSS、阿里云盘）
+- 添加 Web 上传接收功能
+- 添加传输加密（AES-256-GCM + P-256 ECDH）
+- 添加动态压缩（zstd 算法）
+- 添加断点续传和分块传输
+- 添加传输历史记录持久化
+- 添加网络自适应（自动检测网络变化）
+- 添加多 IP 支持
+- 添加 PIN 码保护 Web 下载链接
+- 添加 Tab 栏布局配置和字体大小调节
+- 添加 VitePress 文档站点
+- 添加英文文档支持
+
+### Changed
+
+- 代码库全面优化（性能、可读性、可维护性、健壮性、安全性）
+- 更新技术栈：Vuetify 4、Pinia 3、TypeScript ~5.9、rolldown-vite
+- 优化 Rust 后端错误处理和并发安全性
+- 优化文件传输性能和内存使用
+- 更新文档与代码实现同步
 
 ## [0.1.0] - 2025-02-18
 
@@ -30,5 +52,6 @@
 
 ---
 
-[Unreleased]: https://github.com/z-only/puresend/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/z-only/puresend/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/z-only/puresend/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/z-only/puresend/releases/tag/v0.1.0

@@ -9,6 +9,7 @@ use aes_gcm::{
 };
 use async_trait::async_trait;
 use hkdf::Hkdf;
+use rand::rngs::OsRng;
 use rand::RngCore;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -54,8 +55,6 @@ pub struct CloudAccount {
     pub name: String,
     /// 云盘类型
     pub cloud_type: CloudType,
-    /// 默认上传/下载目录
-    pub default_directory: String,
     /// 连接状态
     pub status: CloudAccountStatus,
     /// 创建时间（Unix 毫秒时间戳）
@@ -82,6 +81,32 @@ pub struct CloudAccountCredentials {
     pub refresh_token_hint: Option<String>,
 }
 
+/// 统一的凭证枚举
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum CloudCredentials {
+    WebDAV {
+        #[serde(rename = "serverUrl")]
+        server_url: String,
+        username: String,
+        password: String,
+    },
+    AliyunOSS {
+        bucket: String,
+        region: String,
+        #[serde(rename = "accessKeyId")]
+        access_key_id: String,
+        #[serde(rename = "accessKeySecret")]
+        access_key_secret: String,
+        #[serde(rename = "customDomain")]
+        custom_domain: Option<String>,
+    },
+    AliyunDrive {
+        #[serde(rename = "refreshToken")]
+        refresh_token: String,
+    },
+}
+
 /// 云盘文件/目录项
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -98,51 +123,6 @@ pub struct CloudFileItem {
     pub modified: Option<u64>,
 }
 
-/// WebDAV 凭证
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WebDAVCredentials {
-    /// 服务器地址（如 https://dav.jianguoyun.com/dav/）
-    pub server_url: String,
-    /// 用户名
-    pub username: String,
-    /// 密码/应用密码
-    pub password: String,
-}
-
-/// 阿里云 OSS 凭证
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AliyunOSSCredentials {
-    /// Bucket 名称
-    pub bucket: String,
-    /// Region ID（如 oss-cn-hangzhou）
-    pub region: String,
-    /// AccessKey ID
-    pub access_key_id: String,
-    /// AccessKey Secret
-    pub access_key_secret: String,
-    /// 自定义域名（可选）
-    pub custom_domain: Option<String>,
-}
-
-/// 阿里云盘凭证
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AliyunDriveCredentials {
-    /// Refresh Token
-    pub refresh_token: String,
-}
-
-/// 统一的凭证枚举
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", content = "data", rename_all = "camelCase")]
-pub enum CloudCredentials {
-    WebDAV(WebDAVCredentials),
-    AliyunOSS(AliyunOSSCredentials),
-    AliyunDrive(AliyunDriveCredentials),
-}
-
 /// 添加/更新云盘账号的输入
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -153,8 +133,8 @@ pub struct CloudAccountInput {
     pub cloud_type: CloudType,
     /// 凭证信息（统一格式）
     pub credentials: CloudCredentials,
-    /// 默认目录
-    pub default_directory: String,
+    /// 初始状态（添加/编辑账号时如果测试连接通过可设置为 connected）
+    pub initial_status: Option<CloudAccountStatus>,
 }
 
 /// 连接测试输入
@@ -218,8 +198,10 @@ struct StoredAccountData {
     /// 用户名（WebDAV/OSS）
     username: Option<String>,
     /// 加密后的密码/密钥（Base64 编码）
+    #[serde(default)]
     encrypted_secret: String,
     /// 加密随机数（Base64 编码）
+    #[serde(default)]
     secret_nonce: String,
     /// OSS Bucket 名称
     bucket: Option<String>,
@@ -237,7 +219,7 @@ struct StoredAccountData {
 
 /// 云盘操作接口
 ///
-/// 所有云盘类型都需要实现此 trait，提供统一的文件操作接口。
+/// 所有云盘类型都需要实现此 tram mit，提供统一的文件操作接口。
 #[async_trait]
 pub trait CloudProvider: Send + Sync {
     /// 测试连接是否可用
@@ -867,11 +849,11 @@ fn encrypt_password(password: &str) -> Result<(String, String), CloudError> {
         .map_err(|e| CloudError::Encryption(format!("创建加密器失败: {}", e)))?;
 
     let mut nonce_bytes = [0u8; 12];
-    rand::thread_rng().fill_bytes(&mut nonce_bytes);
-    let nonce = Nonce::from_slice(&nonce_bytes);
+    OsRng.fill_bytes(&mut nonce_bytes);
+    let nonce = Nonce::from(nonce_bytes);
 
     let ciphertext = cipher
-        .encrypt(nonce, password.as_bytes())
+        .encrypt(&nonce, password.as_bytes())
         .map_err(|e| CloudError::Encryption(format!("加密失败: {}", e)))?;
 
     let encrypted_base64 = base64::Engine::encode(
@@ -890,31 +872,44 @@ fn encrypt_password(password: &str) -> Result<(String, String), CloudError> {
 fn decrypt_password(encrypted_base64: &str, nonce_base64: &str) -> Result<String, CloudError> {
     let key = derive_encryption_key()?;
     let cipher = Aes256Gcm::new_from_slice(&key)
-        .map_err(|e| CloudError::Encryption(format!("创建解密器失败: {}", e)))?;
+        .map_err(|e| CloudError::Encryption(format!("创建解密器失败：{}", e)))?;
+
+    // 处理空字符串或无效的加密数据
+    if encrypted_base64.is_empty() || nonce_base64.is_empty() {
+        return Err(CloudError::Encryption(
+            "加密数据或 nonce 为空，可能是数据损坏或未正确保存。请尝试重新添加云盘账号".to_string()
+        ));
+    }
 
     let ciphertext = base64::Engine::decode(
         &base64::engine::general_purpose::STANDARD,
         encrypted_base64,
     )
-    .map_err(|e| CloudError::Encryption(format!("Base64 解码密文失败: {}", e)))?;
+    .map_err(|e| CloudError::Encryption(format!("Base64 解码密文失败：{}", e)))?;
 
     let nonce_bytes = base64::Engine::decode(
         &base64::engine::general_purpose::STANDARD,
         nonce_base64,
     )
-    .map_err(|e| CloudError::Encryption(format!("Base64 解码 nonce 失败: {}", e)))?;
+    .map_err(|e| CloudError::Encryption(format!("Base64 解码 nonce 失败：{}", e)))?;
 
+    // 检查 nonce 长度（AES-256-GCM 要求 12 字节）
     if nonce_bytes.len() != 12 {
-        return Err(CloudError::Encryption("无效的 nonce 长度".to_string()));
+        return Err(CloudError::Encryption(format!(
+            "无效的 nonce 长度：期望 12 字节，实际 {} 字节。可能是数据损坏或使用了不兼容的加密版本，请尝试重新添加云盘账号",
+            nonce_bytes.len()
+        )));
     }
 
-    let nonce = Nonce::from_slice(&nonce_bytes);
+    let nonce_array: [u8; 12] = nonce_bytes.try_into()
+        .map_err(|_| CloudError::Encryption("无效的 nonce 长度".to_string()))?;
+    let nonce = Nonce::from(nonce_array);
     let plaintext = cipher
-        .decrypt(nonce, ciphertext.as_ref())
-        .map_err(|e| CloudError::Encryption(format!("解密失败: {}", e)))?;
+        .decrypt(&nonce, ciphertext.as_ref())
+        .map_err(|e| CloudError::Encryption(format!("解密失败：{}", e)))?;
 
     String::from_utf8(plaintext)
-        .map_err(|e| CloudError::Encryption(format!("UTF-8 解码失败: {}", e)))
+        .map_err(|e| CloudError::Encryption(format!("UTF-8 解码失败：{}", e)))
 }
 
 // ============ 存储管理 ============
@@ -974,20 +969,20 @@ impl CloudState {
             id: uuid::Uuid::new_v4().to_string(),
             name: input.name,
             cloud_type: input.cloud_type.clone(),
-            default_directory: input.default_directory,
-            status: CloudAccountStatus::Disconnected,
+            // 根据 initial_status 设置状态，如果没有提供则默认为 Disconnected
+            status: input.initial_status.unwrap_or(CloudAccountStatus::Disconnected),
             created_at: now,
             updated_at: now,
         };
 
         // 根据凭证类型提取并加密敏感信息
         let stored = match &input.credentials {
-            CloudCredentials::WebDAV(creds) => {
-                let (encrypted_secret, secret_nonce) = encrypt_password(&creds.password)?;
+            CloudCredentials::WebDAV { server_url, username, password } => {
+                let (encrypted_secret, secret_nonce) = encrypt_password(password)?;
                 StoredAccountData {
                     account: account.clone(),
-                    server_url: Some(creds.server_url.clone()),
-                    username: Some(creds.username.clone()),
+                    server_url: Some(server_url.clone()),
+                    username: Some(username.clone()),
                     encrypted_secret,
                     secret_nonce,
                     bucket: None,
@@ -997,23 +992,23 @@ impl CloudState {
                     refresh_token_nonce: None,
                 }
             }
-            CloudCredentials::AliyunOSS(creds) => {
-                let (encrypted_secret, secret_nonce) = encrypt_password(&creds.access_key_secret)?;
+            CloudCredentials::AliyunOSS { bucket, region, access_key_id, access_key_secret, custom_domain } => {
+                let (encrypted_secret, secret_nonce) = encrypt_password(access_key_secret)?;
                 StoredAccountData {
                     account: account.clone(),
                     server_url: None,
-                    username: Some(creds.access_key_id.clone()),
+                    username: Some(access_key_id.clone()),
                     encrypted_secret,
                     secret_nonce,
-                    bucket: Some(creds.bucket.clone()),
-                    region: Some(creds.region.clone()),
-                    custom_domain: creds.custom_domain.clone(),
+                    bucket: Some(bucket.clone()),
+                    region: Some(region.clone()),
+                    custom_domain: custom_domain.clone(),
                     encrypted_refresh_token: None,
                     refresh_token_nonce: None,
                 }
             }
-            CloudCredentials::AliyunDrive(creds) => {
-                let (encrypted_refresh_token, refresh_token_nonce) = encrypt_password(&creds.refresh_token)?;
+            CloudCredentials::AliyunDrive { refresh_token } => {
+                let (encrypted_refresh_token, refresh_token_nonce) = encrypt_password(refresh_token)?;
                 StoredAccountData {
                     account: account.clone(),
                     server_url: None,
@@ -1057,16 +1052,16 @@ impl CloudState {
 
         stored.account.name = input.name;
         stored.account.cloud_type = input.cloud_type.clone();
-        stored.account.default_directory = input.default_directory;
-        stored.account.status = CloudAccountStatus::Disconnected;
+        // 根据 initial_status 设置状态，如果没有提供则默认为 Disconnected
+        stored.account.status = input.initial_status.unwrap_or(CloudAccountStatus::Disconnected);
         stored.account.updated_at = now;
 
         // 根据凭证类型更新存储数据
         match &input.credentials {
-            CloudCredentials::WebDAV(creds) => {
-                let (encrypted_secret, secret_nonce) = encrypt_password(&creds.password)?;
-                stored.server_url = Some(creds.server_url.clone());
-                stored.username = Some(creds.username.clone());
+            CloudCredentials::WebDAV { server_url, username, password } => {
+                let (encrypted_secret, secret_nonce) = encrypt_password(password)?;
+                stored.server_url = Some(server_url.clone());
+                stored.username = Some(username.clone());
                 stored.encrypted_secret = encrypted_secret;
                 stored.secret_nonce = secret_nonce;
                 stored.bucket = None;
@@ -1075,20 +1070,20 @@ impl CloudState {
                 stored.encrypted_refresh_token = None;
                 stored.refresh_token_nonce = None;
             }
-            CloudCredentials::AliyunOSS(creds) => {
-                let (encrypted_secret, secret_nonce) = encrypt_password(&creds.access_key_secret)?;
+            CloudCredentials::AliyunOSS { bucket, region, access_key_id, access_key_secret, custom_domain } => {
+                let (encrypted_secret, secret_nonce) = encrypt_password(access_key_secret)?;
                 stored.server_url = None;
-                stored.username = Some(creds.access_key_id.clone());
+                stored.username = Some(access_key_id.clone());
                 stored.encrypted_secret = encrypted_secret;
                 stored.secret_nonce = secret_nonce;
-                stored.bucket = Some(creds.bucket.clone());
-                stored.region = Some(creds.region.clone());
-                stored.custom_domain = creds.custom_domain.clone();
+                stored.bucket = Some(bucket.clone());
+                stored.region = Some(region.clone());
+                stored.custom_domain = custom_domain.clone();
                 stored.encrypted_refresh_token = None;
                 stored.refresh_token_nonce = None;
             }
-            CloudCredentials::AliyunDrive(creds) => {
-                let (encrypted_refresh_token, refresh_token_nonce) = encrypt_password(&creds.refresh_token)?;
+            CloudCredentials::AliyunDrive { refresh_token } => {
+                let (encrypted_refresh_token, refresh_token_nonce) = encrypt_password(refresh_token)?;
                 stored.server_url = None;
                 stored.username = None;
                 stored.encrypted_secret = String::new();
@@ -1150,7 +1145,7 @@ impl CloudState {
                 let username = stored.username.as_ref()
                     .ok_or_else(|| CloudError::Internal("缺少 WebDAV 用户名".to_string()))?;
                 let password = decrypt_password(&stored.encrypted_secret, &stored.secret_nonce)?;
-                Ok(Box::new(WebDAVProvider::new(server_url, username, &password)))
+                Ok(Box::new(WebDAVProvider::new(server_url, username, &password)) as Box<dyn CloudProvider>)
             }
             CloudType::AliyunOSS => {
                 let bucket = stored.bucket.as_ref()
@@ -1161,7 +1156,7 @@ impl CloudState {
                     .ok_or_else(|| CloudError::Internal("缺少 AccessKey ID".to_string()))?;
                 let access_key_secret = decrypt_password(&stored.encrypted_secret, &stored.secret_nonce)?;
                 
-                let credentials = crate::cloud_providers::AliyunOSSProvider::new(
+                let provider = crate::cloud_providers::AliyunOSSProvider::new(
                     crate::cloud_providers::OSSCredentials {
                         bucket: bucket.clone(),
                         region: region.clone(),
@@ -1170,7 +1165,7 @@ impl CloudState {
                         custom_domain: stored.custom_domain.clone(),
                     },
                 );
-                Ok(Box::new(credentials))
+                Ok(Box::new(provider) as Box<dyn CloudProvider>)
             }
             CloudType::AliyunDrive => {
                 let encrypted_token = stored.encrypted_refresh_token.as_ref()
@@ -1184,7 +1179,7 @@ impl CloudState {
                         refresh_token,
                     },
                 );
-                Ok(Box::new(provider))
+                Ok(Box::new(provider) as Box<dyn CloudProvider>)
             }
         }
     }
@@ -1249,12 +1244,12 @@ async fn load_accounts_from_store(
 ) -> Result<Vec<StoredAccountData>, CloudError> {
     let store = app_handle
         .store(CLOUD_STORE_FILE)
-        .map_err(|e| CloudError::Storage(format!("打开存储失败: {}", e)))?;
+        .map_err(|e| CloudError::Storage(format!("打开存储失败：{}", e)))?;
 
     match store.get(CLOUD_STORE_KEY) {
         Some(value) => {
             let accounts: Vec<StoredAccountData> = serde_json::from_value(value)
-                .map_err(|e| CloudError::Storage(format!("解析存储数据失败: {}", e)))?;
+                .map_err(|e| CloudError::Storage(format!("解析存储数据失败：{}", e)))?;
             Ok(accounts)
         }
         None => Ok(Vec::new()),
@@ -1268,15 +1263,15 @@ async fn save_accounts_to_store(
 ) -> Result<(), CloudError> {
     let store = app_handle
         .store(CLOUD_STORE_FILE)
-        .map_err(|e| CloudError::Storage(format!("打开存储失败: {}", e)))?;
+        .map_err(|e| CloudError::Storage(format!("打开存储失败：{}", e)))?;
 
     let value = serde_json::to_value(accounts)
-        .map_err(|e| CloudError::Storage(format!("序列化数据失败: {}", e)))?;
+        .map_err(|e| CloudError::Storage(format!("序列化数据失败：{}", e)))?;
 
     store.set(CLOUD_STORE_KEY, value);
     store
         .save()
-        .map_err(|e| CloudError::Storage(format!("保存存储失败: {}", e)))?;
+        .map_err(|e| CloudError::Storage(format!("保存存储失败：{}", e)))?;
 
     Ok(())
 }
@@ -1372,25 +1367,25 @@ pub async fn test_cloud_connection_with_credentials(
     input: CloudConnectionTestInput,
 ) -> Result<bool, String> {
     match (&input.cloud_type, &input.credentials) {
-        (CloudType::WebDAV, CloudCredentials::WebDAV(creds)) => {
+        (CloudType::WebDAV, CloudCredentials::WebDAV { server_url, username, password }) => {
             let provider = WebDAVProvider::new(
-                &creds.server_url,
-                &creds.username,
-                &creds.password,
+                server_url,
+                username,
+                password,
             );
             provider
                 .test_connection()
                 .await
                 .map_err(|e| e.to_string())
         }
-        (CloudType::AliyunOSS, CloudCredentials::AliyunOSS(creds)) => {
+        (CloudType::AliyunOSS, CloudCredentials::AliyunOSS { bucket, region, access_key_id, access_key_secret, custom_domain }) => {
             let provider = crate::cloud_providers::AliyunOSSProvider::new(
                 crate::cloud_providers::OSSCredentials {
-                    bucket: creds.bucket.clone(),
-                    region: creds.region.clone(),
-                    access_key_id: creds.access_key_id.clone(),
-                    access_key_secret: creds.access_key_secret.clone(),
-                    custom_domain: creds.custom_domain.clone(),
+                    bucket: bucket.clone(),
+                    region: region.clone(),
+                    access_key_id: access_key_id.clone(),
+                    access_key_secret: access_key_secret.clone(),
+                    custom_domain: custom_domain.clone(),
                 },
             );
             provider
@@ -1398,10 +1393,10 @@ pub async fn test_cloud_connection_with_credentials(
                 .await
                 .map_err(|e| e.to_string())
         }
-        (CloudType::AliyunDrive, CloudCredentials::AliyunDrive(creds)) => {
+        (CloudType::AliyunDrive, CloudCredentials::AliyunDrive { refresh_token }) => {
             let provider = crate::cloud_providers::AliyunDriveProvider::new(
                 crate::cloud_providers::DriveCredentials {
-                    refresh_token: creds.refresh_token.clone(),
+                    refresh_token: refresh_token.clone(),
                 },
             );
             provider

@@ -15,6 +15,7 @@ export default defineConfig([
             '*.d.ts',
             'auto-imports.d.ts',
             'components.d.ts',
+            'docs/.vitepress/**',
         ],
     },
     {

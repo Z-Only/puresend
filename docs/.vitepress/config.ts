@@ -5,14 +5,22 @@ export default defineConfig({
   description: '跨平台文件传输应用',
   base: '/puresend/',
 
-  head: [['link', { rel: 'icon', href: '/puresend/favicon.ico' }]],
+  head: [
+    // Favicon - 多格式多尺寸适配
+    ['link', { rel: 'icon', type: 'image/x-icon', href: '/puresend/favicon.ico' }],
+    ['link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/puresend/favicon-32x32.png' }],
+    ['link', { rel: 'icon', type: 'image/png', sizes: '128x128', href: '/puresend/favicon-128x128.png' }],
+    ['link', { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/puresend/favicon-192x192.png' }],
+    // Apple Touch Icon
+    ['link', { rel: 'apple-touch-icon', href: '/puresend/logo.png' }],
+  ],
 
   locales: {
     root: {
       label: '简体中文',
       lang: 'zh-CN',
       themeConfig: {
-        logo: '/logo.svg',
+        logo: '/logo.png',
 
         nav: [
           { text: '首页', link: '/' },
@@ -21,6 +29,7 @@ export default defineConfig({
             text: '功能',
             items: [
               { text: '文件传输', link: '/features/file-transfer' },
+              { text: '云盘中转', link: '/features/cloud-storage' },
               { text: 'Web 下载', link: '/features/web-download' },
               { text: 'Web 上传', link: '/features/web-upload' },
               { text: '传输安全', link: '/features/security' },
@@ -48,6 +57,7 @@ export default defineConfig({
               collapsed: false,
               items: [
                 { text: '文件传输', link: '/features/file-transfer' },
+                { text: '云盘中转', link: '/features/cloud-storage' },
                 { text: 'Web 下载', link: '/features/web-download' },
                 { text: 'Web 上传', link: '/features/web-upload' },
                 { text: '传输安全', link: '/features/security' },
@@ -74,7 +84,7 @@ export default defineConfig({
       label: 'English',
       lang: 'en-US',
       themeConfig: {
-        logo: '/logo.svg',
+        logo: '/logo.png',
 
         nav: [
           { text: 'Home', link: '/en/' },
@@ -83,6 +93,7 @@ export default defineConfig({
             text: 'Features',
             items: [
               { text: 'File Transfer', link: '/en/features/file-transfer' },
+              { text: 'Cloud Storage', link: '/en/features/cloud-storage' },
               { text: 'Web Download', link: '/en/features/web-download' },
               { text: 'Web Upload', link: '/en/features/web-upload' },
               { text: 'Transfer Security', link: '/en/features/security' },
@@ -110,6 +121,7 @@ export default defineConfig({
               collapsed: false,
               items: [
                 { text: 'File Transfer', link: '/en/features/file-transfer' },
+                { text: 'Cloud Storage', link: '/en/features/cloud-storage' },
                 { text: 'Web Download', link: '/en/features/web-download' },
                 { text: 'Web Upload', link: '/en/features/web-upload' },
                 { text: 'Transfer Security', link: '/en/features/security' },

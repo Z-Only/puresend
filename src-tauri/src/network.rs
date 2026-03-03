@@ -19,25 +19,31 @@ pub fn get_local_ips() -> Vec<String> {
     let mut ips: Vec<(String, u8)> = Vec::new();
 
     // 枚举所有网络接口
-    if let Ok(network_interfaces) = list_afinet_netifas() {
-        for (_, ip_addr) in network_interfaces {
-            // 只处理 IPv4 地址
-            if let std::net::IpAddr::V4(ipv4) = ip_addr {
-                // 过滤掉回环地址（127.x.x.x）
-                if ipv4.is_loopback() {
-                    continue;
-                }
+    let network_interfaces = match list_afinet_netifas() {
+        Ok(interfaces) => interfaces,
+        Err(_) => return vec!["127.0.0.1".to_string()],
+    };
 
-                // 过滤掉 link-local 地址（169.254.x.x）
-                if is_link_local(ipv4) {
-                    continue;
-                }
+    for (_, ip_addr) in network_interfaces {
+        // 只处理 IPv4 地址
+        let ipv4 = match ip_addr {
+            std::net::IpAddr::V4(v4) => v4,
+            std::net::IpAddr::V6(_) => continue,
+        };
 
-                // 根据优先级分配权重
-                let priority = get_ip_priority(ipv4);
-                ips.push((ipv4.to_string(), priority));
-            }
+        // 过滤掉回环地址（127.x.x.x）
+        if ipv4.is_loopback() {
+            continue;
         }
+
+        // 过滤掉 link-local 地址（169.254.x.x）
+        if is_link_local(ipv4) {
+            continue;
+        }
+
+        // 根据优先级分配权重
+        let priority = get_ip_priority(ipv4);
+        ips.push((ipv4.to_string(), priority));
     }
 
     // 按优先级排序（权重越小优先级越高）
@@ -56,7 +62,8 @@ pub fn get_local_ips() -> Vec<String> {
 
 /// 判断是否为 link-local 地址（169.254.x.x）
 fn is_link_local(ip: Ipv4Addr) -> bool {
-    ip.octets()[0] == 169 && ip.octets()[1] == 254
+    let octets = ip.octets();
+    octets[0] == 169 && octets[1] == 254
 }
 
 /// 获取 IP 地址的优先级权重
@@ -209,56 +216,54 @@ impl NetworkWatcher {
                 }
 
                 // 检查防抖窗口是否应该触发
-                if let (Some(first_change), Some(last_change)) =
-                    (debounce_first_change, debounce_last_change)
-                {
-                    let now = Instant::now();
-                    let since_last = now.duration_since(last_change);
-                    let since_first = now.duration_since(first_change);
+                let (first_change, last_change) = match (debounce_first_change, debounce_last_change) {
+                    (Some(fc), Some(lc)) => (fc, lc),
+                    _ => continue,
+                };
 
-                    // 防抖窗口结束（距最后一次变化超过 2 秒）或达到最大等待时间（10 秒）
-                    if since_last >= DEBOUNCE_WINDOW || since_first >= DEBOUNCE_MAX_WAIT {
-                        // 重新获取当前最新 IP 以确保准确
-                        let final_ips = get_local_ips();
+                let now = Instant::now();
+                let since_last = now.duration_since(last_change);
+                let since_first = now.duration_since(first_change);
 
-                        // 判断网络是否断开（仅有回环地址）
-                        let is_disconnected =
-                            final_ips.len() == 1 && final_ips[0] == "127.0.0.1";
-                        let was_disconnected =
-                            ips_before_debounce.len() == 1
-                                && ips_before_debounce[0] == "127.0.0.1";
+                // 防抖窗口结束（距最后一次变化超过 2 秒）或达到最大等待时间（10 秒）
+                if since_last >= DEBOUNCE_WINDOW || since_first >= DEBOUNCE_MAX_WAIT {
+                    // 重新获取当前最新 IP 以确保准确
+                    let final_ips = get_local_ips();
 
-                        let change_type = if is_disconnected {
-                            NetworkChangeType::Disconnected
-                        } else if was_disconnected {
-                            NetworkChangeType::Reconnected
-                        } else {
-                            NetworkChangeType::IpChanged
-                        };
+                    // 判断网络是否断开（仅有回环地址）
+                    let is_disconnected = final_ips.len() == 1 && final_ips[0] == "127.0.0.1";
+                    let was_disconnected = ips_before_debounce.len() == 1 && ips_before_debounce[0] == "127.0.0.1";
 
-                        let payload = NetworkChangedPayload {
-                            change_type,
-                            ip_addresses: final_ips.clone(),
-                            previous_ip_addresses: ips_before_debounce.clone(),
-                        };
+                    let change_type = if is_disconnected {
+                        NetworkChangeType::Disconnected
+                    } else if was_disconnected {
+                        NetworkChangeType::Reconnected
+                    } else {
+                        NetworkChangeType::IpChanged
+                    };
 
-                        // 发送 Tauri 事件通知前端
-                        let _ = app_handle.emit("network-changed", &payload);
+                    let payload = NetworkChangedPayload {
+                        change_type,
+                        ip_addresses: final_ips.clone(),
+                        previous_ip_addresses: ips_before_debounce.clone(),
+                    };
 
-                        // 调用外部回调（mDNS 重启等）
-                        {
-                            let cb_guard = on_change_callback.lock().await;
-                            if let Some(ref callback) = *cb_guard {
-                                callback(payload);
-                            }
+                    // 发送 Tauri 事件通知前端
+                    let _ = app_handle.emit("network-changed", &payload);
+
+                    // 调用外部回调（mDNS 重启等）
+                    {
+                        let cb_guard = on_change_callback.lock().await;
+                        if let Some(ref callback) = *cb_guard {
+                            callback(payload);
                         }
-
-                        // 重置防抖状态
-                        last_ips = final_ips;
-                        debounce_first_change = None;
-                        debounce_last_change = None;
-                        ips_before_debounce = Vec::new();
                     }
+
+                    // 重置防抖状态
+                    last_ips = final_ips;
+                    debounce_first_change = None;
+                    debounce_last_change = None;
+                    ips_before_debounce = Vec::new();
                 }
             }
         });

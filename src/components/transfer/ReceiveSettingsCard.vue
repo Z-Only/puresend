@@ -318,7 +318,6 @@ async function handleWebUploadChange(value: boolean | null) {
         webUploadLoading.value = false
     }
 }
-
 </script>
 
 <style scoped>

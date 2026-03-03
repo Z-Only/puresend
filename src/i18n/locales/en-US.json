@@ -1,797 +1,795 @@
 {
-  "nav": {
-    "send": "Send",
-    "receive": "Receive",
-    "cloud": "Cloud",
-    "history": "History",
-    "settings": "Settings"
-  },
-  "common": {
-    "cancel": "Cancel",
-    "delete": "Delete",
-    "remove": "Remove",
-    "confirm": "Confirm",
-    "enabled": "Enabled",
-    "disabled": "Disabled",
-    "apply": "Apply",
-    "add": "Add",
-    "edit": "Edit",
-    "browse": "Browse",
-    "justNow": "Just now",
-    "minutesAgo": "{count} min ago",
-    "hoursAgo": "{count} hr ago",
-    "daysAgo": "{count} days ago"
-  },
-  "settings": {
-    "title": "Settings",
-    "advanced": {
-      "showLabel": "Advanced Settings"
+    "nav": {
+        "send": "Send",
+        "receive": "Receive",
+        "cloud": "Cloud",
+        "history": "History",
+        "settings": "Settings"
     },
-    "device": {
-      "title": "Device",
-      "deviceName": {
-        "label": "Device Name",
-        "description": "Other devices will see this name",
-        "placeholder": "Enter device name",
-        "reset": "Reset to Default"
-      }
-    },
-    "appearance": "Appearance",
-    "tabLayout": {
-      "label": "Tab Layout",
-      "horizontalTop": "Horizontal (Top)",
-      "horizontalBottom": "Horizontal (Bottom)",
-      "verticalLeft": "Vertical (Left)",
-      "verticalRight": "Vertical (Right)"
-    },
-    "theme": {
-      "label": "Theme",
-      "light": "Light",
-      "dark": "Dark",
-      "system": "System"
-    },
-    "language": {
-      "label": "Language",
-      "zhCN": "中文",
-      "enUS": "English",
-      "system": "System"
-    },
-    "fontSize": {
-      "label": "Font Size",
-      "mode": {
-        "system": "System",
-        "preset": "Preset",
-        "custom": "Custom"
-      },
-      "preset": {
-        "small": "Small",
-        "medium": "Medium",
-        "large": "Large",
-        "xlarge": "Extra Large"
-      },
-      "custom": {
-        "label": "Custom Scale",
-        "min": "80%",
-        "max": "150%"
-      }
-    },
-    "history": {
-      "title": "History",
-      "recordHistory": {
-        "label": "Record Transfer History",
-        "description": "Automatically record transfers to history list after completion"
-      },
-      "privacy": {
-        "label": "Privacy Mode",
-        "description": "Hide sensitive information in history",
-        "hideFileName": "Hide File Names",
-        "hidePeerName": "Hide Device Names",
-        "hideIp": "Hide IP Addresses"
-      },
-      "autoCleanup": {
-        "label": "Auto Cleanup",
-        "description": "Automatically clean up old history records",
-        "strategy": {
-          "disabled": "Disabled",
-          "byTime": "By Time",
-          "byCount": "By Count"
-        },
-        "retentionDays": "Retention Days",
-        "maxCount": "Max Records",
-        "daysUnit": "days",
-        "countUnit": "records"
-      },
-      "currentCount": "Current records: {count}",
-      "cleanupNow": "Cleanup Now"
-    },
-    "transferEnhancement": {
-      "title": "Transfer Enhancement",
-      "encryption": {
-        "label": "Transfer Encryption",
-        "description": "Protect transfer data with AES-256 encryption (local network transfer only)",
+    "common": {
+        "cancel": "Cancel",
+        "delete": "Delete",
+        "remove": "Remove",
+        "confirm": "Confirm",
         "enabled": "Enabled",
-        "disabled": "Disabled"
-      },
-      "compression": {
-        "label": "Dynamic Compression",
-        "description": "Automatically compress data before transfer to improve efficiency (local network transfer only)",
-        "mode": {
-          "label": "Compression Mode",
-          "smart": "Smart Compression",
-          "smartDescription": "Automatically adjust compression strategy based on file type (local network transfer only)",
-          "manual": "Manual Compression Level"
+        "disabled": "Disabled",
+        "apply": "Apply",
+        "add": "Add",
+        "edit": "Edit",
+        "browse": "Browse",
+        "justNow": "Just now",
+        "minutesAgo": "{count} min ago",
+        "hoursAgo": "{count} hr ago",
+        "daysAgo": "{count} days ago"
+    },
+    "settings": {
+        "title": "Settings",
+        "advanced": {
+            "showLabel": "Advanced Settings"
         },
-        "level": {
-          "label": "Compression Level",
-          "low": "Low",
-          "high": "High"
+        "device": {
+            "title": "Device",
+            "deviceName": {
+                "label": "Device Name",
+                "description": "Other devices will see this name",
+                "placeholder": "Enter device name",
+                "reset": "Reset to Default"
+            }
+        },
+        "appearance": "Appearance",
+        "tabLayout": {
+            "label": "Tab Layout",
+            "horizontalTop": "Horizontal (Top)",
+            "horizontalBottom": "Horizontal (Bottom)",
+            "verticalLeft": "Vertical (Left)",
+            "verticalRight": "Vertical (Right)"
+        },
+        "theme": {
+            "label": "Theme",
+            "light": "Light",
+            "dark": "Dark",
+            "system": "System"
+        },
+        "language": {
+            "label": "Language",
+            "zhCN": "中文",
+            "enUS": "English",
+            "system": "System"
+        },
+        "fontSize": {
+            "label": "Font Size",
+            "mode": {
+                "system": "System",
+                "preset": "Preset",
+                "custom": "Custom"
+            },
+            "preset": {
+                "small": "Small",
+                "medium": "Medium",
+                "large": "Large",
+                "xlarge": "Extra Large"
+            },
+            "custom": {
+                "label": "Custom Scale",
+                "min": "80%",
+                "max": "150%"
+            }
+        },
+        "history": {
+            "title": "History",
+            "recordHistory": {
+                "label": "Record Transfer History",
+                "description": "Automatically record transfers to history list after completion"
+            },
+            "privacy": {
+                "label": "Privacy Mode",
+                "description": "Hide sensitive information in history",
+                "hideFileName": "Hide File Names",
+                "hidePeerName": "Hide Device Names",
+                "hideIp": "Hide IP Addresses"
+            },
+            "autoCleanup": {
+                "label": "Auto Cleanup",
+                "description": "Automatically clean up old history records",
+                "strategy": {
+                    "disabled": "Disabled",
+                    "byTime": "By Time",
+                    "byCount": "By Count"
+                },
+                "retentionDays": "Retention Days",
+                "maxCount": "Max Records",
+                "daysUnit": "days",
+                "countUnit": "records"
+            },
+            "currentCount": "Current records: {count}",
+            "cleanupNow": "Cleanup Now"
+        },
+        "transferEnhancement": {
+            "title": "Transfer Enhancement",
+            "encryption": {
+                "label": "Transfer Encryption",
+                "description": "Protect transfer data with AES-256 encryption (local network transfer only)",
+                "enabled": "Enabled",
+                "disabled": "Disabled"
+            },
+            "compression": {
+                "label": "Dynamic Compression",
+                "description": "Automatically compress data before transfer to improve efficiency (local network transfer only)",
+                "mode": {
+                    "label": "Compression Mode",
+                    "smart": "Smart Compression",
+                    "smartDescription": "Automatically adjust compression strategy based on file type (local network transfer only)",
+                    "manual": "Manual Compression Level"
+                },
+                "level": {
+                    "label": "Compression Level",
+                    "low": "Low",
+                    "high": "High"
+                }
+            }
+        },
+        "developer": {
+            "title": "Developer",
+            "devTools": {
+                "label": "Developer Tools",
+                "description": "Enable in-app Developer Tools (DevTools)",
+                "androidHint": "Android devices require remote debugging via Chrome DevTools"
+            },
+            "portRange": {
+                "label": "Service Port Range",
+                "hint": "Set to 0 for automatic port assignment. Custom port range must be between 1024-65535",
+                "transfer": "File Transfer Server",
+                "webUpload": "Web Upload Server",
+                "share": "Web Download Server",
+                "minPort": "Min Port",
+                "maxPort": "Max Port"
+            }
+        },
+        "about": {
+            "title": "About",
+            "version": "Version",
+            "changelog": "Changelog",
+            "homepage": "Homepage",
+            "github": "GitHub Project",
+            "collapse": "Collapse",
+            "expand": "Expand"
         }
-      }
-    },
-    "developer": {
-      "title": "Developer",
-      "devTools": {
-        "label": "Developer Tools",
-        "description": "Enable in-app Developer Tools (DevTools)",
-        "androidHint": "Android devices require remote debugging via Chrome DevTools"
-      },
-      "portRange": {
-        "label": "Service Port Range",
-        "hint": "Set to 0 for automatic port assignment. Custom port range must be between 1024-65535",
-        "transfer": "File Transfer Server",
-        "webUpload": "Web Upload Server",
-        "share": "Web Download Server",
-        "minPort": "Min Port",
-        "maxPort": "Max Port"
-      }
-    },
-    "about": {
-      "title": "About",
-      "version": "Version",
-      "changelog": "Changelog",
-      "homepage": "Homepage",
-      "github": "GitHub Project",
-      "collapse": "Collapse",
-      "expand": "Expand"
-    }
-  },
-  "transfer": {
-    "selectFile": "Select File",
-    "dragDropHint": "Drag and drop files here",
-    "send": "Send",
-    "receive": "Receive",
-    "completed": "Completed",
-    "failed": "Failed",
-    "cancelled": "Cancelled",
-    "mode": {
-      "title": "Transfer Mode",
-      "local": {
-        "title": "Local Network",
-        "description": "Direct transfer via LAN, fast speed"
-      },
-      "cloud": {
-        "title": "Cloud Relay",
-        "description": "Transfer via cloud, cross-network"
-      },
-      "noDeviceHint": "No available devices found. Please ensure the target device has PureSend open",
-      "cloudComingSoon": "Cloud relay feature coming soon"
-    },
-    "status": {
-      "pending": "Pending",
-      "transferring": "Transferring",
-      "completed": "Completed",
-      "failed": "Failed",
-      "cancelled": "Cancelled",
-      "interrupted": "Interrupted"
-    },
-    "progress": {
-      "transferred": "Transferred",
-      "speed": "Speed",
-      "timeRemaining": "Time Remaining",
-      "mode": "Transfer Mode",
-      "localNetwork": "Local Network",
-      "cloudTransfer": "Cloud Relay",
-      "cancelTransfer": "Cancel Transfer",
-      "retry": "Retry",
-      "remove": "Remove",
-      "unknownFile": "Unknown File",
-      "resumed": "Transfer Resumed",
-      "encrypted": "Encrypted Transfer",
-      "compressionRatio": "Compression Ratio {ratio}%",
-      "interrupted": "Transfer interrupted, waiting to resume",
-      "degradedEncryption": "Peer does not support encryption, downgraded to plaintext",
-      "degradedCompression": "Peer does not support compression, using raw data"
-    },
-    "time": {
-      "seconds": "{count} seconds",
-      "minutesSeconds": "{minutes} min {seconds} sec",
-      "hoursMinutes": "{hours} hr {minutes} min"
-    }
-  },
-  "history": {
-    "title": "Transfer History",
-    "empty": "No transfer history",
-    "emptyHint": "Completed transfers will appear here",
-    "clear": "Clear History",
-    "unknownDevice": "Unknown Device",
-    "noResults": "No matching records",
-    "recordCount": "{count} records total",
-    "selectAll": "Select All",
-    "deleteSelected": "Delete Selected ({count})",
-    "direction": {
-      "send": "Send",
-      "receive": "Receive"
-    },
-    "filter": {
-      "direction": "Direction",
-      "status": "Status",
-      "all": "All"
-    },
-    "sort": {
-      "field": "Sort By",
-      "order": "Order",
-      "fields": {
-        "time": "Time",
-        "fileName": "File Name",
-        "fileSize": "File Size"
-      },
-      "orders": {
-        "asc": "Ascending",
-        "desc": "Descending"
-      }
-    },
-    "deleteConfirm": {
-      "title": "Delete Record",
-      "message": "Are you sure you want to delete the transfer record for \"{name}\"?"
-    },
-    "batchDeleteConfirm": {
-      "title": "Batch Delete",
-      "message": "Are you sure you want to delete {count} selected records?"
-    },
-    "clearConfirm": {
-      "title": "Clear History",
-      "message": "Are you sure you want to clear all transfer history? This action cannot be undone."
-    },
-    "privacy": {
-      "hiddenFileName": "****",
-      "hiddenPeerName": "***",
-      "hiddenPeerIp": "***"
-    }
-  },
-  "peer": {
-    "nearbyDevices": "Nearby Devices",
-    "noDevices": "No devices found",
-    "noDevicesHint": "Please ensure the target device has PureSend open",
-    "addManual": "Add Device Manually",
-    "addDevice": "Add Device",
-    "ipAddress": "IP Address",
-    "port": "Port",
-    "status": {
-      "available": "Online",
-      "busy": "Busy",
-      "offline": "Offline"
-    },
-    "deviceType": {
-      "desktop": "Desktop",
-      "mobile": "Mobile",
-      "web": "Web",
-      "unknown": "Unknown"
-    },
-    "validation": {
-      "enterIp": "Please enter an IP address",
-      "invalidIp": "Please enter a valid IP address"
-    }
-  },
-  "content": {
-    "type": {
-      "file": {
-        "label": "File",
-        "description": "Select a single file to transfer"
-      },
-      "folder": {
-        "label": "Folder",
-        "description": "Select an entire folder to transfer"
-      },
-      "clipboard": {
-        "label": "Clipboard",
-        "description": "Import text content from clipboard"
-      },
-      "text": {
-        "label": "Text",
-        "description": "Enter or paste text content"
-      },
-      "media": {
-        "label": "Media",
-        "description": "Select images, videos, or audio files"
-      },
-      "app": {
-        "label": "App",
-        "description": "Select installed applications"
-      }
-    },
-    "filter": {
-      "media": "Media Files",
-      "app": "Applications"
-    }
-  },
-  "selectedFiles": {
-    "title": "Selected Files",
-    "count": "{count} files",
-    "stats": "{count} files selected, total {size}",
-    "mediaCount": "{count} media files",
-    "empty": "No files selected. Please select files to send",
-    "clearAll": "Clear All",
-    "tempFile": "Temp File",
-    "limitReached": "File limit reached ({limit} files)",
-    "added": "{count} file(s) added",
-    "duplicate": "File already exists, skipped",
-    "duplicates": "{count} file(s) already exist, skipped",
-    "limitExceeded": "{count} file(s) exceeded limit, not added",
-    "noFilesAdded": "No files were added"
-  },
-  "send": {
-    "title": "Send",
-    "selectFiles": "Select Files",
-    "sending": "Sending...",
-    "noPeers": "No nearby devices found",
-    "peerDisconnected": "Device disconnected",
-    "tasks": "Send Tasks",
-    "noTasks": "No send tasks",
-    "selectFileToStart": "Select files to start sending",
-    "cleanup": "Cleanup Completed",
-    "settings": {
-      "title": "Send Settings",
-      "webDownload": "Web Download",
-      "webDownloadHint": "Start HTTP server to allow other devices to download files via browser",
-      "webDownloadLink": "Download Link",
-      "webDownloadQrcode": "Scan to Download",
-      "webDownloadStartFailed": "Failed to start Web Download: {error}",
-      "webDownloadStopFailed": "Failed to stop Web Download: {error}"
-    },
-    "task": {
-      "fileCount": "{count} file(s)",
-      "approval": {
-        "pending": "Pending",
-        "accepted": "Accepted",
-        "rejected": "Rejected",
-        "waitingResponse": "Waiting for response"
-      },
-      "moreFiles": "{count} more file(s)",
-      "collapseFiles": "Collapse file list",
-      "expand": "Expand All",
-      "collapse": "Collapse",
-      "clearAll": "Clear All",
-      "removeConfirm": {
-        "title": "Remove Task",
-        "message": "Are you sure you want to remove this send task?"
-      },
-      "clearAllConfirm": {
-        "title": "Clear All Tasks",
-        "message": "Are you sure you want to remove all {count} send tasks?"
-      },
-      "acceptError": "Failed to accept request: {error}",
-      "rejectError": "Failed to reject request: {error}",
-      "fileStatus": {
-        "pending": "Pending",
-        "transferring": "Transferring",
-        "completed": "Completed",
-        "failed": "Failed",
-        "cancelled": "Cancelled",
-        "interrupted": "Interrupted"
-      }
-    }
-  },
-  "receiveMode": {
-    "label": "Transfer Mode",
-    "local": {
-      "label": "Local Network",
-      "description": "Direct transfer via LAN, fast speed"
-    },
-    "cloud": {
-      "label": "Cloud Relay",
-      "description": "Transfer via cloud, cross-network",
-      "comingSoon": "Cloud relay feature coming soon"
-    }
-  },
-  "receive": {
-    "networkInfo": "Network Info",
-    "viewNetworkInfo": "View Network Info",
-    "clickToViewNetwork": "Click \"View Network Info\" to get network information",
-    "mode": "Receive Mode",
-    "localNetwork": "Local Network",
-    "cloudTransferDev": "Cloud Transfer (Dev)",
-    "receiveDirectory": "Receive Directory",
-    "saveLocation": "File Save Location",
-    "startReceiving": "Start Receiving",
-    "stopReceiving": "Stop Receiving",
-    "tasks": "Receive Tasks",
-    "noTasks": "No receive tasks",
-    "waitingForSender": "Waiting for sender to connect",
-    "clickToStart": "Click start receiving to wait for connection",
-    "getNetworkInfoFailed": "Failed to get network info: {error}",
-    "startFailed": "Failed to start receiving: {error}",
-    "stopFailed": "Failed to stop receiving: {error}",
-    "notReceiving": "Not Receiving",
-    "hideNetworkInfo": "Hide Network Info",
-    "retryNotSupported": "Retry is not supported for receive tasks",
-    "selectDirectory": "Select Receive Directory",
-    "selectDirectoryFailed": "Failed to select directory: {error}",
-    "settings": {
-      "title": "Receive Settings",
-      "autoReceive": "Auto Receive",
-      "autoReceiveHint": "Automatically accept receive requests without manual confirmation",
-      "fileOverwrite": "File Overwrite",
-      "fileOverwriteHint": "Overwrite existing files with the same name, or auto-rename if disabled",
-      "webUpload": "Web Upload",
-      "webUploadHint": "Start HTTP server to allow other devices to upload files via browser",
-      "webUploadLink": "Upload Link",
-      "webUploadQrcode": "Scan to Upload",
-      "webUploadStartFailed": "Failed to start Web Upload: {error}",
-      "webUploadStopFailed": "Failed to stop Web Upload: {error}"
-    },
-    "task": {
-      "fileCount": "{count} file(s)",
-      "from": "From {sender}",
-      "approval": {
-        "pending": "Pending",
-        "accepted": "Accepted",
-        "rejected": "Rejected",
-        "expired": "Expired"
-      },
-      "expandFiles": "Expand file list",
-      "collapseFiles": "Collapse file list",
-      "moreFiles": "{count} more file(s)",
-      "expand": "Expand All",
-      "collapse": "Collapse",
-      "clearAll": "Clear All",
-      "removeConfirm": {
-        "title": "Remove Task",
-        "message": "Are you sure you want to remove this receive task?"
-      },
-      "clearAllConfirm": {
-        "title": "Clear All Tasks",
-        "message": "Are you sure you want to remove all {count} receive tasks?"
-      },
-      "acceptError": "Failed to accept request: {error}",
-      "rejectError": "Failed to reject request: {error}",
-      "fileStatus": {
-        "pending": "Pending",
-        "transferring": "Transferring",
-        "completed": "Completed",
-        "failed": "Failed",
-        "cancelled": "Cancelled",
-        "interrupted": "Interrupted"
-      }
-    },
-    "webUpload": {
-      "requests": "Upload Requests",
-      "noRequests": "No upload requests",
-      "waitingForUpload": "Waiting for browser file upload",
-      "accept": "Accept",
-      "reject": "Reject",
-      "fileCount": "{count} file(s)",
-      "fromIp": "From {ip}",
-      "status": {
-        "pending": "Pending",
-        "accepted": "Accepted",
-        "rejected": "Rejected",
-        "expired": "Expired"
-      },
-      "progress": {
-        "title": "Upload Progress",
-        "moreRecords": "{count} more upload records",
-        "expand": "Expand All",
-        "collapse": "Collapse",
-        "noRecords": "No upload records"
-      },
-      "acceptError": "Failed to accept upload request: {error}",
-      "rejectError": "Failed to reject upload request: {error}"
-    }
-  },
-  "network": {
-    "title": "Network Info",
-    "deviceName": "Device Name",
-    "ipAddress": "IP Address",
-    "port": "Port",
-    "listeningAddress": "Listening Address",
-    "scanToConnect": "Scan to Connect",
-    "connectionHint": "Other devices can connect to your device by scanning the QR code or entering the IP address and port",
-    "connectionHintInactive": "Click \"Start Receiving\" to start the receive service, then other devices can connect",
-    "copiedToClipboard": "Copied to clipboard",
-    "qrCodeAlt": "Connection QR Code",
-    "notReceivingHint": "Not receiving. Network info will be available after starting the receive service.",
-    "qrCodeUnavailable": "QR Code Unavailable"
-  },
-  "fileSelector": {
-    "releaseToUpload": "Release to upload",
-    "dragDropHint": "Drag and drop files here",
-    "orClickToSelect": "or click to select files",
-    "selectFile": "Select File",
-    "noFileDetected": "No file detected from drag",
-    "handleDragFailed": "Failed to handle dragged file: {error}",
-    "selectFileToTransfer": "Select a file to transfer",
-    "openDialogFailed": "Failed to open file dialog: {error}"
-  },
-  "sendMode": {
-    "label": "Send Mode",
-    "p2p": {
-      "label": "P2P Direct",
-      "description": "Send directly to nearby devices"
-    },
-    "link": {
-      "label": "Link Share",
-      "description": "Generate share link and QR code",
-      "selectFileHint": "Please select files to share first"
-    }
-  },
-  "share": {
-    "backToSend": "Back",
-    "startError": "Failed to start sharing: {error}",
-    "stopError": "Failed to stop sharing: {error}",
-    "acceptError": "Failed to accept request: {error}",
-    "rejectError": "Failed to reject request: {error}",
-    "noRequests": "No access requests",
-    "link": {
-      "title": "Share Link",
-      "copy": "Copy Link",
-      "copied": "Copied",
-      "warning": "This link is for trusted networks only, do not share publicly"
-    },
-    "qrcode": {
-      "title": "QR Code",
-      "generating": "Generating..."
-    },
-    "info": {
-      "files": "Files",
-      "created": "Created",
-      "status": "Status"
-    },
-    "status": {
-      "active": "Sharing"
-    },
-    "pin": {
-      "enabled": "PIN protection enabled"
-    },
-    "requests": {
-      "title": "Access Requests",
-      "accept": "Accept",
-      "reject": "Reject",
-      "clearAll": "Clear All",
-      "status": {
-        "pending": "Waiting",
-        "accepted": "Accepted",
-        "rejected": "Rejected"
-      }
-    },
-    "removeConfirm": {
-      "title": "Remove Request",
-      "message": "Are you sure you want to remove this access request?"
-    },
-    "clearAllConfirm": {
-      "title": "Clear All Requests",
-      "message": "Are you sure you want to remove all {count} access requests?"
-    },
-    "removeError": "Failed to remove request: {error}",
-    "clearAllError": "Failed to clear requests: {error}",
-    "uploads": {
-      "title": "Upload Progress",
-      "fileCount": "{count} file(s)",
-      "moreRecords": "{count} more upload records",
-      "expand": "Expand All",
-      "collapse": "Collapse",
-      "noRecords": "No upload records"
     },
     "transfer": {
-      "transferring": "Transferring",
-      "completed": "Completed",
-      "failed": "Failed",
-      "cancelled": "Cancelled",
-      "idle": "Idle"
+        "selectFile": "Select File",
+        "dragDropHint": "Drag and drop files here",
+        "send": "Send",
+        "receive": "Receive",
+        "completed": "Completed",
+        "failed": "Failed",
+        "cancelled": "Cancelled",
+        "mode": {
+            "title": "Transfer Mode",
+            "local": {
+                "title": "Local Network",
+                "description": "Direct transfer via LAN, fast speed"
+            },
+            "cloud": {
+                "title": "Cloud Relay",
+                "description": "Transfer via cloud, cross-network"
+            },
+            "noDeviceHint": "No available devices found. Please ensure the target device has PureSend open",
+            "cloudComingSoon": "Cloud relay feature coming soon"
+        },
+        "status": {
+            "pending": "Pending",
+            "transferring": "Transferring",
+            "completed": "Completed",
+            "failed": "Failed",
+            "cancelled": "Cancelled",
+            "interrupted": "Interrupted"
+        },
+        "progress": {
+            "transferred": "Transferred",
+            "speed": "Speed",
+            "timeRemaining": "Time Remaining",
+            "mode": "Transfer Mode",
+            "localNetwork": "Local Network",
+            "cloudTransfer": "Cloud Relay",
+            "cancelTransfer": "Cancel Transfer",
+            "retry": "Retry",
+            "remove": "Remove",
+            "unknownFile": "Unknown File",
+            "resumed": "Transfer Resumed",
+            "encrypted": "Encrypted Transfer",
+            "compressionRatio": "Compression Ratio {ratio}%",
+            "interrupted": "Transfer interrupted, waiting to resume",
+            "degradedEncryption": "Peer does not support encryption, downgraded to plaintext",
+            "degradedCompression": "Peer does not support compression, using raw data"
+        },
+        "time": {
+            "seconds": "{count} seconds",
+            "minutesSeconds": "{minutes} min {seconds} sec",
+            "hoursMinutes": "{hours} hr {minutes} min"
+        }
     },
-    "actions": {
-      "stop": "Stop Sharing"
+    "history": {
+        "title": "Transfer History",
+        "empty": "No transfer history",
+        "emptyHint": "Completed transfers will appear here",
+        "clear": "Clear History",
+        "unknownDevice": "Unknown Device",
+        "noResults": "No matching records",
+        "recordCount": "{count} records total",
+        "selectAll": "Select All",
+        "deleteSelected": "Delete Selected ({count})",
+        "direction": {
+            "send": "Send",
+            "receive": "Receive"
+        },
+        "filter": {
+            "direction": "Direction",
+            "status": "Status",
+            "all": "All"
+        },
+        "sort": {
+            "field": "Sort By",
+            "order": "Order",
+            "fields": {
+                "time": "Time",
+                "fileName": "File Name",
+                "fileSize": "File Size"
+            },
+            "orders": {
+                "asc": "Ascending",
+                "desc": "Descending"
+            }
+        },
+        "deleteConfirm": {
+            "title": "Delete Record",
+            "message": "Are you sure you want to delete the transfer record for \"{name}\"?"
+        },
+        "batchDeleteConfirm": {
+            "title": "Batch Delete",
+            "message": "Are you sure you want to delete {count} selected records?"
+        },
+        "clearConfirm": {
+            "title": "Clear History",
+            "message": "Are you sure you want to clear all transfer history? This action cannot be undone."
+        },
+        "privacy": {
+            "hiddenFileName": "****",
+            "hiddenPeerName": "***",
+            "hiddenPeerIp": "***"
+        }
     },
-    "inactive": {
-      "waiting": "Waiting to start sharing..."
+    "peer": {
+        "nearbyDevices": "Nearby Devices",
+        "noDevices": "No devices found",
+        "noDevicesHint": "Please ensure the target device has PureSend open",
+        "addManual": "Add Device Manually",
+        "addDevice": "Add Device",
+        "ipAddress": "IP Address",
+        "port": "Port",
+        "status": {
+            "available": "Online",
+            "busy": "Busy",
+            "offline": "Offline"
+        },
+        "deviceType": {
+            "desktop": "Desktop",
+            "mobile": "Mobile",
+            "web": "Web",
+            "unknown": "Unknown"
+        },
+        "validation": {
+            "enterIp": "Please enter an IP address",
+            "invalidIp": "Please enter a valid IP address"
+        }
     },
-    "settings": {
-      "title": "Share Settings",
-      "autoAccept": "Auto Accept",
-      "pinEnabled": "PIN Protection",
-      "pinSet": "Set",
-      "pinNotSet": "Not Set",
-      "currentPin": "Current PIN",
-      "configure": "Configure",
-      "pinEnabledHint": "PIN required when accessing share link",
-      "autoAcceptHint": "Auto accept all access requests"
+    "content": {
+        "type": {
+            "file": {
+                "label": "File",
+                "description": "Select a single file to transfer"
+            },
+            "folder": {
+                "label": "Folder",
+                "description": "Select an entire folder to transfer"
+            },
+            "clipboard": {
+                "label": "Clipboard",
+                "description": "Import text content from clipboard"
+            },
+            "text": {
+                "label": "Text",
+                "description": "Enter or paste text content"
+            },
+            "media": {
+                "label": "Media",
+                "description": "Select images, videos, or audio files"
+            },
+            "app": {
+                "label": "App",
+                "description": "Select installed applications"
+            }
+        },
+        "filter": {
+            "media": "Media Files",
+            "app": "Applications"
+        }
     },
-    "settingsUpdateError": "Failed to update share settings: {error}",
-    "pinConfig": {
-      "title": "Configure PIN",
-      "pinLabel": "PIN Code",
-      "pinHint": "Used to protect access to shared links",
-      "pinPlaceholder": "Enter or generate PIN",
-      "refresh": "Generate New PIN",
-      "tips": "Default generates 6 random numbers, you can modify to any length and type combination"
+    "selectedFiles": {
+        "title": "Selected Files",
+        "count": "{count} files",
+        "stats": "{count} files selected, total {size}",
+        "mediaCount": "{count} media files",
+        "empty": "No files selected. Please select files to send",
+        "clearAll": "Clear All",
+        "tempFile": "Temp File",
+        "limitReached": "File limit reached ({limit} files)",
+        "added": "{count} file(s) added",
+        "duplicate": "File already exists, skipped",
+        "duplicates": "{count} file(s) already exist, skipped",
+        "limitExceeded": "{count} file(s) exceeded limit, not added",
+        "noFilesAdded": "No files were added"
+    },
+    "send": {
+        "title": "Send",
+        "selectFiles": "Select Files",
+        "sending": "Sending...",
+        "noPeers": "No nearby devices found",
+        "peerDisconnected": "Device disconnected",
+        "tasks": "Send Tasks",
+        "noTasks": "No send tasks",
+        "selectFileToStart": "Select files to start sending",
+        "cleanup": "Cleanup Completed",
+        "settings": {
+            "title": "Send Settings",
+            "webDownload": "Web Download",
+            "webDownloadHint": "Start HTTP server to allow other devices to download files via browser",
+            "webDownloadLink": "Download Link",
+            "webDownloadQrcode": "Scan to Download",
+            "webDownloadStartFailed": "Failed to start Web Download: {error}",
+            "webDownloadStopFailed": "Failed to stop Web Download: {error}"
+        },
+        "task": {
+            "fileCount": "{count} file(s)",
+            "approval": {
+                "pending": "Pending",
+                "accepted": "Accepted",
+                "rejected": "Rejected",
+                "waitingResponse": "Waiting for response"
+            },
+            "moreFiles": "{count} more file(s)",
+            "collapseFiles": "Collapse file list",
+            "expand": "Expand All",
+            "collapse": "Collapse",
+            "clearAll": "Clear All",
+            "removeConfirm": {
+                "title": "Remove Task",
+                "message": "Are you sure you want to remove this send task?"
+            },
+            "clearAllConfirm": {
+                "title": "Clear All Tasks",
+                "message": "Are you sure you want to remove all {count} send tasks?"
+            },
+            "acceptError": "Failed to accept request: {error}",
+            "rejectError": "Failed to reject request: {error}",
+            "fileStatus": {
+                "pending": "Pending",
+                "transferring": "Transferring",
+                "completed": "Completed",
+                "failed": "Failed",
+                "cancelled": "Cancelled",
+                "interrupted": "Interrupted"
+            }
+        }
+    },
+    "receiveMode": {
+        "label": "Transfer Mode",
+        "local": {
+            "label": "Local Network",
+            "description": "Direct transfer via LAN, fast speed"
+        },
+        "cloud": {
+            "label": "Cloud Relay",
+            "description": "Transfer via cloud, cross-network",
+            "comingSoon": "Cloud relay feature coming soon"
+        }
+    },
+    "receive": {
+        "networkInfo": "Network Info",
+        "viewNetworkInfo": "View Network Info",
+        "clickToViewNetwork": "Click \"View Network Info\" to get network information",
+        "mode": "Receive Mode",
+        "localNetwork": "Local Network",
+        "cloudTransferDev": "Cloud Transfer (Dev)",
+        "receiveDirectory": "Receive Directory",
+        "saveLocation": "File Save Location",
+        "startReceiving": "Start Receiving",
+        "stopReceiving": "Stop Receiving",
+        "tasks": "Receive Tasks",
+        "noTasks": "No receive tasks",
+        "waitingForSender": "Waiting for sender to connect",
+        "clickToStart": "Click start receiving to wait for connection",
+        "getNetworkInfoFailed": "Failed to get network info: {error}",
+        "startFailed": "Failed to start receiving: {error}",
+        "stopFailed": "Failed to stop receiving: {error}",
+        "notReceiving": "Not Receiving",
+        "hideNetworkInfo": "Hide Network Info",
+        "retryNotSupported": "Retry is not supported for receive tasks",
+        "selectDirectory": "Select Receive Directory",
+        "selectDirectoryFailed": "Failed to select directory: {error}",
+        "settings": {
+            "title": "Receive Settings",
+            "autoReceive": "Auto Receive",
+            "autoReceiveHint": "Automatically accept receive requests without manual confirmation",
+            "fileOverwrite": "File Overwrite",
+            "fileOverwriteHint": "Overwrite existing files with the same name, or auto-rename if disabled",
+            "webUpload": "Web Upload",
+            "webUploadHint": "Start HTTP server to allow other devices to upload files via browser",
+            "webUploadLink": "Upload Link",
+            "webUploadQrcode": "Scan to Upload",
+            "webUploadStartFailed": "Failed to start Web Upload: {error}",
+            "webUploadStopFailed": "Failed to stop Web Upload: {error}"
+        },
+        "task": {
+            "fileCount": "{count} file(s)",
+            "from": "From {sender}",
+            "approval": {
+                "pending": "Pending",
+                "accepted": "Accepted",
+                "rejected": "Rejected",
+                "expired": "Expired"
+            },
+            "expandFiles": "Expand file list",
+            "collapseFiles": "Collapse file list",
+            "moreFiles": "{count} more file(s)",
+            "expand": "Expand All",
+            "collapse": "Collapse",
+            "clearAll": "Clear All",
+            "removeConfirm": {
+                "title": "Remove Task",
+                "message": "Are you sure you want to remove this receive task?"
+            },
+            "clearAllConfirm": {
+                "title": "Clear All Tasks",
+                "message": "Are you sure you want to remove all {count} receive tasks?"
+            },
+            "acceptError": "Failed to accept request: {error}",
+            "rejectError": "Failed to reject request: {error}",
+            "fileStatus": {
+                "pending": "Pending",
+                "transferring": "Transferring",
+                "completed": "Completed",
+                "failed": "Failed",
+                "cancelled": "Cancelled",
+                "interrupted": "Interrupted"
+            }
+        },
+        "webUpload": {
+            "requests": "Upload Requests",
+            "noRequests": "No upload requests",
+            "waitingForUpload": "Waiting for browser file upload",
+            "accept": "Accept",
+            "reject": "Reject",
+            "fileCount": "{count} file(s)",
+            "fromIp": "From {ip}",
+            "status": {
+                "pending": "Pending",
+                "accepted": "Accepted",
+                "rejected": "Rejected",
+                "expired": "Expired"
+            },
+            "progress": {
+                "title": "Upload Progress",
+                "moreRecords": "{count} more upload records",
+                "expand": "Expand All",
+                "collapse": "Collapse",
+                "noRecords": "No upload records"
+            },
+            "acceptError": "Failed to accept upload request: {error}",
+            "rejectError": "Failed to reject upload request: {error}"
+        }
+    },
+    "network": {
+        "title": "Network Info",
+        "deviceName": "Device Name",
+        "ipAddress": "IP Address",
+        "port": "Port",
+        "listeningAddress": "Listening Address",
+        "scanToConnect": "Scan to Connect",
+        "connectionHint": "Other devices can connect to your device by scanning the QR code or entering the IP address and port",
+        "connectionHintInactive": "Click \"Start Receiving\" to start the receive service, then other devices can connect",
+        "copiedToClipboard": "Copied to clipboard",
+        "qrCodeAlt": "Connection QR Code",
+        "notReceivingHint": "Not receiving. Network info will be available after starting the receive service.",
+        "qrCodeUnavailable": "QR Code Unavailable"
+    },
+    "fileSelector": {
+        "releaseToUpload": "Release to upload",
+        "dragDropHint": "Drag and drop files here",
+        "orClickToSelect": "or click to select files",
+        "selectFile": "Select File",
+        "noFileDetected": "No file detected from drag",
+        "handleDragFailed": "Failed to handle dragged file: {error}",
+        "selectFileToTransfer": "Select a file to transfer",
+        "openDialogFailed": "Failed to open file dialog: {error}"
+    },
+    "sendMode": {
+        "label": "Send Mode",
+        "p2p": {
+            "label": "P2P Direct",
+            "description": "Send directly to nearby devices"
+        },
+        "link": {
+            "label": "Link Share",
+            "description": "Generate share link and QR code",
+            "selectFileHint": "Please select files to share first"
+        }
+    },
+    "share": {
+        "backToSend": "Back",
+        "startError": "Failed to start sharing: {error}",
+        "stopError": "Failed to stop sharing: {error}",
+        "acceptError": "Failed to accept request: {error}",
+        "rejectError": "Failed to reject request: {error}",
+        "noRequests": "No access requests",
+        "link": {
+            "title": "Share Link",
+            "copy": "Copy Link",
+            "copied": "Copied",
+            "warning": "This link is for trusted networks only, do not share publicly"
+        },
+        "qrcode": {
+            "title": "QR Code",
+            "generating": "Generating..."
+        },
+        "info": {
+            "files": "Files",
+            "created": "Created",
+            "status": "Status"
+        },
+        "status": {
+            "active": "Sharing"
+        },
+        "pin": {
+            "enabled": "PIN protection enabled"
+        },
+        "requests": {
+            "title": "Access Requests",
+            "accept": "Accept",
+            "reject": "Reject",
+            "clearAll": "Clear All",
+            "status": {
+                "pending": "Waiting",
+                "accepted": "Accepted",
+                "rejected": "Rejected"
+            }
+        },
+        "removeConfirm": {
+            "title": "Remove Request",
+            "message": "Are you sure you want to remove this access request?"
+        },
+        "clearAllConfirm": {
+            "title": "Clear All Requests",
+            "message": "Are you sure you want to remove all {count} access requests?"
+        },
+        "removeError": "Failed to remove request: {error}",
+        "clearAllError": "Failed to clear requests: {error}",
+        "uploads": {
+            "title": "Upload Progress",
+            "fileCount": "{count} file(s)",
+            "moreRecords": "{count} more upload records",
+            "expand": "Expand All",
+            "collapse": "Collapse",
+            "noRecords": "No upload records"
+        },
+        "transfer": {
+            "transferring": "Transferring",
+            "completed": "Completed",
+            "failed": "Failed",
+            "cancelled": "Cancelled",
+            "idle": "Idle"
+        },
+        "actions": {
+            "stop": "Stop Sharing"
+        },
+        "inactive": {
+            "waiting": "Waiting to start sharing..."
+        },
+        "settings": {
+            "title": "Share Settings",
+            "autoAccept": "Auto Accept",
+            "pinEnabled": "PIN Protection",
+            "pinSet": "Set",
+            "pinNotSet": "Not Set",
+            "currentPin": "Current PIN",
+            "configure": "Configure",
+            "pinEnabledHint": "PIN required when accessing share link",
+            "autoAcceptHint": "Auto accept all access requests"
+        },
+        "settingsUpdateError": "Failed to update share settings: {error}",
+        "pinConfig": {
+            "title": "Configure PIN",
+            "pinLabel": "PIN Code",
+            "pinHint": "Used to protect access to shared links",
+            "pinPlaceholder": "Enter or generate PIN",
+            "refresh": "Generate New PIN",
+            "tips": "Default generates 6 random numbers, you can modify to any length and type combination"
+        }
+    },
+    "folderPicker": {
+        "title": "Select Folder",
+        "description": "Select an entire folder to transfer, including all subfolders",
+        "selectFolder": "Select Folder",
+        "emptyFolder": "Folder is empty",
+        "selectFailed": "Failed to select folder: {error}"
+    },
+    "mediaPicker": {
+        "title": "Select Media Files",
+        "description": "Select images, videos, or audio files",
+        "selectMedia": "Select Media",
+        "selectFailed": "Failed to select media files: {error}"
+    },
+    "appPicker": {
+        "title": "Select Application",
+        "description": "Select installed applications",
+        "selectApp": "Select App",
+        "selectFailed": "Failed to select application: {error}"
+    },
+    "clipboardImporter": {
+        "title": "Import from Clipboard",
+        "preview": "Preview",
+        "charCount": "{count} characters",
+        "reRead": "Re-read",
+        "readClipboard": "Read Clipboard",
+        "confirmImport": "Confirm Import",
+        "clipboardEmpty": "Clipboard is empty",
+        "readFailed": "Failed to read clipboard: {error}",
+        "saveFailed": "Failed to save clipboard content: {error}",
+        "content": "Clipboard Content"
+    },
+    "textInput": {
+        "title": "Text Input",
+        "placeholder": "Enter or paste text content here...",
+        "charCount": "{count} characters",
+        "addToSend": "Add to Send List",
+        "content": "Text Content"
+    },
+    "menu": {
+        "puresend": {
+            "about": "About PureSend",
+            "quit": "Quit"
+        },
+        "file": {
+            "title": "File",
+            "sendFile": "Send File"
+        },
+        "edit": {
+            "title": "Edit",
+            "undo": "Undo",
+            "redo": "Redo",
+            "cut": "Cut",
+            "copy": "Copy",
+            "paste": "Paste",
+            "selectAll": "Select All"
+        },
+        "view": {
+            "title": "View",
+            "toggleFullscreen": "Toggle Fullscreen"
+        },
+        "window": {
+            "title": "Window",
+            "minimize": "Minimize",
+            "zoom": "Zoom"
+        },
+        "help": {
+            "title": "Help",
+            "github": "GitHub Repository",
+            "docs": "Online Documentation"
+        }
+    },
+    "cloudAccount": {
+        "title": "Cloud Accounts",
+        "add": "Add Account",
+        "edit": "Edit Account",
+        "delete": "Delete",
+        "name": "Account Name",
+        "namePlaceholder": "Please enter account name",
+        "type": "Cloud Type",
+        "serverUrl": "Server URL",
+        "serverUrlPlaceholder": "Please enter a valid server URL",
+        "username": "Username",
+        "usernamePlaceholder": "Please enter username",
+        "password": "Password",
+        "passwordPlaceholder": "Please enter password",
+        "testConnection": "Test Connection",
+        "testSuccess": "Connection successful",
+        "testFailed": "Connection failed",
+        "saveError": "Failed to save account",
+        "noAccounts": "No cloud accounts",
+        "noAccountsHint": "Add a cloud account to use cloud relay feature",
+        "aliyunOSS": "Aliyun OSS",
+        "aliyunDrive": "Aliyun Drive",
+        "bucket": "Bucket Name",
+        "bucketPlaceholder": "Please enter bucket name",
+        "region": "Region",
+        "regionPlaceholder": "Please select region",
+        "accessKeyId": "AccessKey ID",
+        "accessKeyIdPlaceholder": "Please enter AccessKey ID",
+        "accessKeySecret": "AccessKey Secret",
+        "accessKeySecretPlaceholder": "Please enter AccessKey Secret",
+        "customDomain": "Custom Domain",
+        "customDomainPlaceholder": "Optional, e.g. https://cdn.example.com",
+        "customDomainHint": "Use custom domain to access OSS, leave empty for default domain",
+        "refreshToken": "Refresh Token",
+        "refreshTokenPlaceholder": "Please enter refresh token",
+        "refreshTokenHint": "Get from Aliyun Drive web version for API authorization",
+        "deleteConfirm": {
+            "title": "Delete Account",
+            "message": "Are you sure you want to delete account \"{name}\"? This action cannot be undone."
+        },
+        "status": {
+            "connected": "Connected",
+            "disconnected": "Disconnected",
+            "invalid": "Invalid"
+        }
+    },
+    "cloudTransfer": {
+        "selectAccount": "Select Cloud Account",
+        "noAccounts": "Please add a cloud account in Settings first",
+        "targetDirectory": "Target Directory",
+        "sourceDirectory": "Source Directory",
+        "browse": "Browse",
+        "refreshFiles": "Refresh Files",
+        "downloadSelected": "Download Selected",
+        "noFilesSelected": "No files available",
+        "downloading": "Downloading",
+        "downloadSuccess": "Download Complete",
+        "downloadFailed": "Download Failed",
+        "uploadToCloud": "Upload to Cloud",
+        "uploading": "Uploading",
+        "uploadSuccess": "Upload Complete",
+        "uploadFailed": "Upload Failed",
+        "uploadSelected": "Upload Selected",
+        "downloadFromCloud": "Download from Cloud",
+        "noAccountSelected": "Please select a cloud account",
+        "uploadTasks": "Upload Tasks",
+        "downloadTasks": "Download Tasks",
+        "noUploadTasks": "No upload tasks",
+        "noDownloadTasks": "No download tasks",
+        "selectFileToUpload": "Select files to start uploading",
+        "browseFilesToStart": "Browse files to start downloading",
+        "downloadDirectory": "Download Directory",
+        "selectDownloadDirectory": "Select Download Directory",
+        "fileCount": "{count} file(s)",
+        "moreFiles": "{count} more file(s)",
+        "collapseFiles": "Collapse file list",
+        "expand": "Expand All",
+        "collapse": "Collapse",
+        "status": {
+            "pending": "Pending",
+            "uploading": "Uploading",
+            "completed": "Completed",
+            "failed": "Failed"
+        },
+        "fileStatus": {
+            "pending": "Pending",
+            "uploading": "Uploading",
+            "completed": "Completed",
+            "failed": "Failed"
+        },
+        "directoryBrowser": {
+            "title": "Browse Cloud Directory",
+            "currentPath": "Root",
+            "parentDirectory": "Parent Directory",
+            "newFolder": "New Folder",
+            "newFolderName": "Folder Name",
+            "newFolderPlaceholder": "Enter folder name",
+            "empty": "Directory is empty",
+            "loadError": "Failed to load directory",
+            "createFolderError": "Failed to create folder"
+        },
+        "uploadSettings": "Upload Settings",
+        "overwriteFiles": "Overwrite Files with Same Name",
+        "overwriteHint": "When enabled, files with the same name will be overwritten",
+        "renameHint": "When disabled, files with the same name will be auto-renamed"
     }
-  },
-  "folderPicker": {
-    "title": "Select Folder",
-    "description": "Select an entire folder to transfer, including all subfolders",
-    "selectFolder": "Select Folder",
-    "emptyFolder": "Folder is empty",
-    "selectFailed": "Failed to select folder: {error}"
-  },
-  "mediaPicker": {
-    "title": "Select Media Files",
-    "description": "Select images, videos, or audio files",
-    "selectMedia": "Select Media",
-    "selectFailed": "Failed to select media files: {error}"
-  },
-  "appPicker": {
-    "title": "Select Application",
-    "description": "Select installed applications",
-    "selectApp": "Select App",
-    "selectFailed": "Failed to select application: {error}"
-  },
-  "clipboardImporter": {
-    "title": "Import from Clipboard",
-    "preview": "Preview",
-    "charCount": "{count} characters",
-    "reRead": "Re-read",
-    "readClipboard": "Read Clipboard",
-    "confirmImport": "Confirm Import",
-    "clipboardEmpty": "Clipboard is empty",
-    "readFailed": "Failed to read clipboard: {error}",
-    "saveFailed": "Failed to save clipboard content: {error}",
-    "content": "Clipboard Content"
-  },
-  "textInput": {
-    "title": "Text Input",
-    "placeholder": "Enter or paste text content here...",
-    "charCount": "{count} characters",
-    "addToSend": "Add to Send List",
-    "content": "Text Content"
-  },
-  "menu": {
-    "puresend": {
-      "about": "About PureSend",
-      "quit": "Quit"
-    },
-    "file": {
-      "title": "File",
-      "sendFile": "Send File"
-    },
-    "edit": {
-      "title": "Edit",
-      "undo": "Undo",
-      "redo": "Redo",
-      "cut": "Cut",
-      "copy": "Copy",
-      "paste": "Paste",
-      "selectAll": "Select All"
-    },
-    "view": {
-      "title": "View",
-      "toggleFullscreen": "Toggle Fullscreen"
-    },
-    "window": {
-      "title": "Window",
-      "minimize": "Minimize",
-      "zoom": "Zoom"
-    },
-    "help": {
-      "title": "Help",
-      "github": "GitHub Repository",
-      "docs": "Online Documentation"
-    }
-  },
-  "cloudAccount": {
-    "title": "Cloud Accounts",
-    "add": "Add Account",
-    "edit": "Edit Account",
-    "delete": "Delete",
-    "name": "Account Name",
-    "namePlaceholder": "Please enter account name",
-    "type": "Cloud Type",
-    "serverUrl": "Server URL",
-    "serverUrlPlaceholder": "Please enter a valid server URL",
-    "username": "Username",
-    "usernamePlaceholder": "Please enter username",
-    "password": "Password",
-    "passwordPlaceholder": "Please enter password",
-    "defaultDirectory": "Default Directory",
-    "defaultDirectoryPlaceholder": "Please enter default directory path",
-    "testConnection": "Test Connection",
-    "testSuccess": "Connection successful",
-    "testFailed": "Connection failed",
-    "saveError": "Failed to save account",
-    "noAccounts": "No cloud accounts",
-    "noAccountsHint": "Add a cloud account to use cloud relay feature",
-    "aliyunOSS": "Aliyun OSS",
-    "aliyunDrive": "Aliyun Drive",
-    "bucket": "Bucket Name",
-    "bucketPlaceholder": "Please enter bucket name",
-    "region": "Region",
-    "regionPlaceholder": "Please select region",
-    "accessKeyId": "AccessKey ID",
-    "accessKeyIdPlaceholder": "Please enter AccessKey ID",
-    "accessKeySecret": "AccessKey Secret",
-    "accessKeySecretPlaceholder": "Please enter AccessKey Secret",
-    "customDomain": "Custom Domain",
-    "customDomainPlaceholder": "Optional, e.g. https://cdn.example.com",
-    "customDomainHint": "Use custom domain to access OSS, leave empty for default domain",
-    "refreshToken": "Refresh Token",
-    "refreshTokenPlaceholder": "Please enter refresh token",
-    "refreshTokenHint": "Get from Aliyun Drive web version for API authorization",
-    "deleteConfirm": {
-      "title": "Delete Account",
-      "message": "Are you sure you want to delete account \"{name}\"? This action cannot be undone."
-    },
-    "status": {
-      "connected": "Connected",
-      "disconnected": "Disconnected",
-      "invalid": "Invalid"
-    }
-  },
-  "cloudTransfer": {
-    "selectAccount": "Select Cloud Account",
-    "noAccounts": "Please add a cloud account in Settings first",
-    "targetDirectory": "Target Directory",
-    "sourceDirectory": "Source Directory",
-    "browse": "Browse",
-    "refreshFiles": "Refresh Files",
-    "downloadSelected": "Download Selected",
-    "noFilesSelected": "No files available",
-    "downloading": "Downloading",
-    "downloadSuccess": "Download Complete",
-    "downloadFailed": "Download Failed",
-    "uploadToCloud": "Upload to Cloud",
-    "uploading": "Uploading",
-    "uploadSuccess": "Upload Complete",
-    "uploadFailed": "Upload Failed",
-    "uploadSelected": "Upload Selected",
-    "downloadFromCloud": "Download from Cloud",
-    "noAccountSelected": "Please select a cloud account",
-    "uploadTasks": "Upload Tasks",
-    "downloadTasks": "Download Tasks",
-    "noUploadTasks": "No upload tasks",
-    "noDownloadTasks": "No download tasks",
-    "selectFileToUpload": "Select files to start uploading",
-    "browseFilesToStart": "Browse files to start downloading",
-    "downloadDirectory": "Download Directory",
-    "selectDownloadDirectory": "Select Download Directory",
-    "fileCount": "{count} file(s)",
-    "moreFiles": "{count} more file(s)",
-    "collapseFiles": "Collapse file list",
-    "expand": "Expand All",
-    "collapse": "Collapse",
-    "status": {
-      "pending": "Pending",
-      "uploading": "Uploading",
-      "completed": "Completed",
-      "failed": "Failed"
-    },
-    "fileStatus": {
-      "pending": "Pending",
-      "uploading": "Uploading",
-      "completed": "Completed",
-      "failed": "Failed"
-    },
-    "directoryBrowser": {
-      "title": "Browse Cloud Directory",
-      "currentPath": "Root",
-      "parentDirectory": "Parent Directory",
-      "newFolder": "New Folder",
-      "newFolderName": "Folder Name",
-      "newFolderPlaceholder": "Enter folder name",
-      "empty": "Directory is empty",
-      "loadError": "Failed to load directory",
-      "createFolderError": "Failed to create folder"
-    },
-    "uploadSettings": "Upload Settings",
-    "overwriteFiles": "Overwrite Files with Same Name",
-    "overwriteHint": "When enabled, files with the same name will be overwritten",
-    "renameHint": "When disabled, files with the same name will be auto-renamed"
-  }
 }

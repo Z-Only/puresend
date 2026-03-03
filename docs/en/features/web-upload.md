@@ -38,6 +38,12 @@ The Web Upload feature allows other devices to upload files to your PureSend app
 - **Progress Display**: Real-time upload progress on both browser and app sides
 - **File Overwrite**: Configurable overwrite policy for files with the same name
 
+## Network Adaptation
+
+- When network environment changes (e.g., Wi-Fi switching, IP change), upload link and QR code automatically update to new IP address
+- Server binds to `0.0.0.0`, no need to restart upload service after network switch
+- Sender needs to use updated link to re-access
+
 ## Notes
 
 - Receiver and sender need to be on the same LAN or mutually accessible network

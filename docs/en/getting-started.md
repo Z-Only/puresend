@@ -93,5 +93,5 @@ chmod +x puresend_*.AppImage
 
 ## Next Steps
 
-- Learn more about [File Transfer](/features/file-transfer)
-- Check out the [Development Guide](/development/setup)
+- Learn more about [File Transfer](/en/features/file-transfer)
+- Check out the [Development Guide](/en/development/setup)

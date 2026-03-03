@@ -819,9 +819,8 @@ async function autoStopReceiving() {
     // 无活跃任务，关闭服务器
     try {
         await transferStore.stopReceiving()
-    } catch (error) {
+    } catch {
         // 静默处理错误，不影响页面离开
-        console.error('停止接收失败:', error)
     }
 }
 </script>

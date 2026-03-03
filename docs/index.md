@@ -17,6 +17,9 @@ features:
   - icon: 🚀
     title: 快速传输
     details: 基于 HTTP/TCP 直连技术，在局域网内实现高速点对点文件传输
+  - icon: ☁️
+    title: 云盘中转
+    details: 支持 WebDAV、阿里云 OSS、阿里云盘，实现跨网络文件传输
   - icon: 🔒
     title: 安全可靠
     details: 局域网直连传输，文件不经过外部服务器，保护您的隐私

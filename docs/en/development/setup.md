@@ -72,12 +72,13 @@ pnpm tauri dev
 ```
 
 This will start:
+
 - Vite development server (frontend hot reload)
 - Tauri app window (Rust backend)
 
 ## Project Structure
 
-```
+```text
 puresend/
 ├── src/                    # Vue frontend code
 │   ├── components/         # Vue components
@@ -96,9 +97,9 @@ puresend/
 
 ## Tech Stack
 
-- **Frontend**: Vue 3 + TypeScript + Vuetify 3 + Pinia
+- **Frontend**: Vue 3 + TypeScript + Vuetify 4 + Pinia 3
 - **Backend**: Tauri 2 (Rust)
-- **Build Tool**: Vite 7
+- **Build Tool**: rolldown-vite
 - **Documentation**: VitePress
 
 ## Common Commands
@@ -161,5 +162,5 @@ pnpm tauri android build --release
 
 ## Next Steps
 
-- Learn about [File Transfer Features](/features/file-transfer)
+- Learn about [File Transfer Features](/en/features/file-transfer)
 - Read the [Contributing Guide](https://github.com/Z-Only/puresend/blob/main/CONTRIBUTING.md)

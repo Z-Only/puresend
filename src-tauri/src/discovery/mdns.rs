@@ -67,6 +67,7 @@ impl MdnsDiscovery {
         // 由于 mdns_sd 库还未添加到依赖，这里使用简化的 UDP 广播实现
         // 实际生产环境应使用专业的 mDNS 库
         *running = true;
+        drop(running);
 
         // 启动广播和监听任务
         self.start_broadcast_task().await;
@@ -91,7 +92,6 @@ impl MdnsDiscovery {
         let running = self.running.clone();
 
         tokio::spawn(async move {
-            // 创建 UDP socket
             let socket = match tokio::net::UdpSocket::bind("0.0.0.0:0").await {
                 Ok(s) => s,
                 Err(_) => return,
@@ -100,7 +100,6 @@ impl MdnsDiscovery {
             let broadcast_addr =
                 SocketAddr::new(IpAddr::V4(Ipv4Addr::new(255, 255, 255, 255)), MDNS_PORT);
 
-            // 构造广播消息
             let message = DiscoveryMessage {
                 device_name: device_name.clone(),
                 port: listen_port,
@@ -117,7 +116,6 @@ impl MdnsDiscovery {
                     break;
                 }
 
-                // 发送广播
                 if socket
                     .send_to(&message_bytes, broadcast_addr)
                     .await
@@ -126,7 +124,6 @@ impl MdnsDiscovery {
                     // 发送失败，可能网络不可用，继续尝试
                 }
 
-                // 每 3 秒广播一次
                 tokio::time::sleep(BROADCAST_INTERVAL).await;
             }
         });
@@ -139,11 +136,9 @@ impl MdnsDiscovery {
         let running = self.running.clone();
 
         tokio::spawn(async move {
-            // 创建 UDP socket 监听广播
             let socket = match tokio::net::UdpSocket::bind(format!("0.0.0.0:{}", MDNS_PORT)).await {
                 Ok(s) => s,
                 Err(_) => {
-                    // 端口可能被占用，尝试使用其他端口
                     match tokio::net::UdpSocket::bind("0.0.0.0:0").await {
                         Ok(s) => s,
                         Err(_) => return,
@@ -159,10 +154,8 @@ impl MdnsDiscovery {
                     break;
                 }
 
-                // 接收消息
                 match socket.recv_from(&mut buf).await {
                     Ok((len, addr)) => {
-                        // 解析消息
                         if let Ok(message) = serde_json::from_slice::<DiscoveryMessage>(&buf[..len])
                         {
                             let now = std::time::SystemTime::now()
@@ -181,7 +174,6 @@ impl MdnsDiscovery {
                                 status: PeerStatus::Available,
                             };
 
-                            // 更新设备列表
                             let mut peers_guard = peers.lock().await;
                             let event_type = if peers_guard.contains_key(&peer.id) {
                                 PeerEventType::Updated
@@ -190,8 +182,8 @@ impl MdnsDiscovery {
                             };
 
                             peers_guard.insert(peer.id.clone(), peer.clone());
+                            drop(peers_guard);
 
-                            // 发送事件
                             let _ = event_sender.send(PeerDiscoveryEvent { event_type, peer });
                         }
                     }
@@ -214,16 +206,14 @@ impl MdnsDiscovery {
                     break;
                 }
 
-                // 每 5 秒清理一次
                 tokio::time::sleep(CLEANUP_INTERVAL).await;
 
-                let mut peers_guard = peers.lock().await;
+                let peers_guard = peers.lock().await;
                 let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
                     .as_millis() as u64;
 
-                // 找出过期设备
                 let expired: Vec<String> = peers_guard
                     .iter()
                     .filter(|(_, peer)| {
@@ -232,9 +222,12 @@ impl MdnsDiscovery {
                     .map(|(id, _)| id.clone())
                     .collect();
 
-                // 移除过期设备并发送事件
+                drop(peers_guard);
+
                 for id in expired {
+                    let mut peers_guard = peers.lock().await;
                     if let Some(peer) = peers_guard.remove(&id) {
+                        drop(peers_guard);
                         let _ = event_sender.send(PeerDiscoveryEvent {
                             event_type: PeerEventType::Offline,
                             peer,
@@ -259,7 +252,7 @@ impl MdnsDiscovery {
     pub async fn add_peer_manual(&self, ip: String, port: u16) -> PeerInfo {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_millis() as u64;
 
         let peer = PeerInfo {
@@ -275,6 +268,7 @@ impl MdnsDiscovery {
 
         let mut peers = self.peers.lock().await;
         peers.insert(peer.id.clone(), peer.clone());
+        drop(peers);
 
         let _ = self.event_sender.send(PeerDiscoveryEvent {
             event_type: PeerEventType::Discovered,

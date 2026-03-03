@@ -16,8 +16,6 @@ export interface CloudAccount {
     name: string
     /** 云盘类型 */
     cloudType: CloudType
-    /** 默认上传/下载目录 */
-    defaultDirectory: string
     /** 连接状态 */
     status: CloudAccountStatus
     /** 创建时间（Unix 毫秒时间戳） */
@@ -32,13 +30,11 @@ export interface CloudAccountInput {
     name: string
     /** 云盘类型 */
     cloudType: CloudType
-    /** 凭证信息（根据 cloudType 选择对应的凭证类型） */
+    /** 凭证信息（扁平化结构，符合后端序列化格式） */
     credentials:
         | WebDAVCredentials
         | AliyunOSSCredentials
         | AliyunDriveCredentials
-    /** 默认目录 */
-    defaultDirectory: string
     /** 初始状态（添加账号时如果测试连接通过可设置为 connected） */
     initialStatus?: CloudAccountStatus
 }
@@ -47,7 +43,7 @@ export interface CloudAccountInput {
 export interface CloudConnectionTestInput {
     /** 云盘类型 */
     cloudType: CloudType
-    /** 凭证信息 */
+    /** 凭证信息（扁平化结构，符合后端序列化格式） */
     credentials:
         | WebDAVCredentials
         | AliyunOSSCredentials

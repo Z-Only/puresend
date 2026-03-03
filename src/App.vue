@@ -104,7 +104,7 @@ watch(
         try {
             await invoke('update_menu_language', { lang: newLang })
         } catch {
-            // 非 macOS 平台或 Tauri 不可用时忽略
+            // Ignore on non-macOS platforms or when Tauri is unavailable
         }
     }
 )
@@ -134,7 +134,7 @@ onMounted(async () => {
             lang: settingsStore.actualLanguage,
         })
     } catch {
-        // 非 macOS 平台或 Tauri 不可用时忽略
+        // Ignore on non-macOS platforms or when Tauri is unavailable
     }
 
     // 监听菜单事件
@@ -150,7 +150,7 @@ onMounted(async () => {
             }
         })
     } catch {
-        // Tauri 不可用时忽略
+        // Ignore when Tauri is unavailable
     }
 })
 

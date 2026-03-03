@@ -90,35 +90,16 @@ impl CloudTransport {
     /// # Returns
     /// * `TransferResult<TransferProgress>` - 传输进度
     async fn upload_to_cloud(&self, _task: &TransferTask) -> TransferResult<TransferProgress> {
-        match self.config.provider {
-            CloudProvider::AliyunOss => {
-                // TODO: 实现阿里云 OSS 上传
-                Err(TransferError::UnsupportedOperation(
-                    "阿里云 OSS 传输尚未实现".to_string(),
-                ))
-            }
-            CloudProvider::TencentCos => {
-                // TODO: 实现腾讯云 COS 上传
-                Err(TransferError::UnsupportedOperation(
-                    "腾讯云 COS 传输尚未实现".to_string(),
-                ))
-            }
-            CloudProvider::Qiniu => {
-                // TODO: 实现七牛云上传
-                Err(TransferError::UnsupportedOperation(
-                    "七牛云传输尚未实现".to_string(),
-                ))
-            }
-            CloudProvider::AwsS3 => {
-                // TODO: 实现 AWS S3 上传
-                Err(TransferError::UnsupportedOperation(
-                    "AWS S3 传输尚未实现".to_string(),
-                ))
-            }
-            CloudProvider::Unknown => Err(TransferError::UnsupportedOperation(
-                "未知的云服务提供商".to_string(),
-            )),
-        }
+        let provider_name = match self.config.provider {
+            CloudProvider::AliyunOss => "阿里云 OSS",
+            CloudProvider::TencentCos => "腾讯云 COS",
+            CloudProvider::Qiniu => "七牛云",
+            CloudProvider::AwsS3 => "AWS S3",
+            CloudProvider::Unknown => "未知的云服务提供商",
+        };
+        Err(TransferError::UnsupportedOperation(
+            format!("{} 传输尚未实现", provider_name),
+        ))
     }
 
     /// 从云盘下载文件（预留接口）
@@ -129,35 +110,16 @@ impl CloudTransport {
     /// # Returns
     /// * `TransferResult<TransferProgress>` - 传输进度
     async fn download_from_cloud(&self, _task: &TransferTask) -> TransferResult<TransferProgress> {
-        match self.config.provider {
-            CloudProvider::AliyunOss => {
-                // TODO: 实现阿里云 OSS 下载
-                Err(TransferError::UnsupportedOperation(
-                    "阿里云 OSS 传输尚未实现".to_string(),
-                ))
-            }
-            CloudProvider::TencentCos => {
-                // TODO: 实现腾讯云 COS 下载
-                Err(TransferError::UnsupportedOperation(
-                    "腾讯云 COS 传输尚未实现".to_string(),
-                ))
-            }
-            CloudProvider::Qiniu => {
-                // TODO: 实现七牛云下载
-                Err(TransferError::UnsupportedOperation(
-                    "七牛云传输尚未实现".to_string(),
-                ))
-            }
-            CloudProvider::AwsS3 => {
-                // TODO: 实现 AWS S3 下载
-                Err(TransferError::UnsupportedOperation(
-                    "AWS S3 传输尚未实现".to_string(),
-                ))
-            }
-            CloudProvider::Unknown => Err(TransferError::UnsupportedOperation(
-                "未知的云服务提供商".to_string(),
-            )),
-        }
+        let provider_name = match self.config.provider {
+            CloudProvider::AliyunOss => "阿里云 OSS",
+            CloudProvider::TencentCos => "腾讯云 COS",
+            CloudProvider::Qiniu => "七牛云",
+            CloudProvider::AwsS3 => "AWS S3",
+            CloudProvider::Unknown => "未知的云服务提供商",
+        };
+        Err(TransferError::UnsupportedOperation(
+            format!("{} 传输尚未实现", provider_name),
+        ))
     }
 
     /// 生成分享链接（预留接口）

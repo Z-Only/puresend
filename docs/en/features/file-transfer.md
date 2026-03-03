@@ -50,6 +50,13 @@ PureSend supports three transfer modes:
 - **mDNS Auto-Discovery**: Automatically discover PureSend devices on the same LAN
 - **Manual Add**: Support adding devices manually via IP address
 
+### Network Adaptation
+
+- **Automatic Network Change Detection**: Real-time monitoring of Wi-Fi switching, wired/wireless switching, IP address changes, etc.
+- **Automatic Link Update**: When network changes, Web download and Web upload share links and QR codes automatically update to new IP addresses
+- **Automatic Device Discovery Restart**: Automatically restarts mDNS device discovery service when network changes to ensure discoverability on the new network
+- **Seamless Experience**: Server binds to `0.0.0.0`, no need to restart service after network switch, only updates display layer information
+
 ## Security
 
 ### Transfer Encryption
@@ -80,7 +87,7 @@ PureSend supports three transfer modes:
 
 ## Tips
 
-### Improving Transfer Speed
+### Improve Transfer Speed
 
 1. Ensure devices are on the same LAN
 2. Turn off VPN and proxy

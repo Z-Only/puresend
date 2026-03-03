@@ -26,13 +26,11 @@ const HKDF_INFO: &[u8] = b"puresend-http-encryption";
 pub struct HttpCryptoSession {
     cipher: Aes256Gcm,
     nonce_counter: u64,
-    #[allow(dead_code)]
-    pub client_ip: String,
     created_at: Instant,
 }
 
 impl HttpCryptoSession {
-    fn new(shared_secret: &[u8], client_ip: String) -> Result<Self, String> {
+    fn new(shared_secret: &[u8]) -> Result<Self, String> {
         let hk = Hkdf::<Sha256>::new(None, shared_secret);
         let mut key = [0u8; 32];
         hk.expand(HKDF_INFO, &mut key)
@@ -44,7 +42,6 @@ impl HttpCryptoSession {
         Ok(Self {
             cipher,
             nonce_counter: 0,
-            client_ip,
             created_at: Instant::now(),
         })
     }
@@ -55,17 +52,17 @@ impl HttpCryptoSession {
 
     pub fn encrypt(&mut self, plaintext: &[u8]) -> Result<Vec<u8>, String> {
         let nonce_bytes = self.next_nonce();
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        let nonce = Nonce::from(nonce_bytes);
 
-        let ciphertext = self
-            .cipher
-            .encrypt(nonce, plaintext)
-            .map_err(|e| format!("加密失败: {}", e))?;
-
-        let mut output = Vec::with_capacity(NONCE_SIZE + ciphertext.len());
-        output.extend_from_slice(&nonce_bytes);
-        output.extend_from_slice(&ciphertext);
-        Ok(output)
+        self.cipher
+            .encrypt(&nonce, plaintext)
+            .map_err(|e| format!("加密失败: {}", e))
+            .map(|ciphertext| {
+                let mut output = Vec::with_capacity(NONCE_SIZE + ciphertext.len());
+                output.extend_from_slice(&nonce_bytes);
+                output.extend_from_slice(&ciphertext);
+                output
+            })
     }
 
     pub fn decrypt(&self, encrypted_data: &[u8]) -> Result<Vec<u8>, String> {
@@ -74,10 +71,11 @@ impl HttpCryptoSession {
         }
 
         let (nonce_bytes, ciphertext) = encrypted_data.split_at(NONCE_SIZE);
-        let nonce = Nonce::from_slice(nonce_bytes);
+        let nonce_array: [u8; NONCE_SIZE] = nonce_bytes.try_into().map_err(|_| "nonce 长度不正确".to_string())?;
+        let nonce = Nonce::from(nonce_array);
 
         self.cipher
-            .decrypt(nonce, ciphertext)
+            .decrypt(&nonce, ciphertext)
             .map_err(|e| format!("解密失败: {}", e))
     }
 
@@ -128,7 +126,6 @@ impl HttpCryptoSessionManager {
     pub fn handshake(
         &mut self,
         client_public_key_b64: &str,
-        client_ip: String,
     ) -> Result<(String, String), String> {
         let b64 = base64::engine::general_purpose::STANDARD;
 
@@ -145,7 +142,7 @@ impl HttpCryptoSessionManager {
         let shared_secret = server_secret.diffie_hellman(&client_public);
 
         let session =
-            HttpCryptoSession::new(shared_secret.raw_secret_bytes().as_slice(), client_ip)?;
+            HttpCryptoSession::new(shared_secret.raw_secret_bytes().as_ref())?;
 
         let session_id = uuid::Uuid::new_v4().to_string();
         let server_pub_b64 = b64.encode(server_public.to_sec1_bytes());

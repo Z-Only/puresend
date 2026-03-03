@@ -664,12 +664,8 @@ async function initializeDownloadDirectory(): Promise<void> {
 async function initializePanel(): Promise<void> {
     if (!props.accountId) return
 
-    const account = cloudStore.getAccountById(props.accountId)
-    if (account && account.defaultDirectory) {
-        sourceDirectory.value = account.defaultDirectory
-    } else {
-        sourceDirectory.value = '/'
-    }
+    // 默认目录为云盘根目录
+    sourceDirectory.value = '/'
     selectedFiles.value = []
     await refreshFiles()
 }

@@ -11,7 +11,8 @@ export function usePlatform() {
         try {
             const { platform } = await import('@tauri-apps/plugin-os')
             const currentPlatform = await platform()
-            isMobile.value = currentPlatform === 'android' || currentPlatform === 'ios'
+            isMobile.value =
+                currentPlatform === 'android' || currentPlatform === 'ios'
             isMacOS.value = currentPlatform === 'macos'
         } catch {
             // 降级：通过 userAgent 判断

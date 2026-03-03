@@ -31,7 +31,7 @@ impl PeerInfo {
     pub fn new(name: String, ip: String, port: u16) -> Self {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_millis() as u64;
 
         Self {
@@ -50,7 +50,7 @@ impl PeerInfo {
     pub fn is_online(&self) -> bool {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .unwrap()
+            .unwrap_or_default()
             .as_millis() as u64;
         now.saturating_sub(self.last_seen) < 5000
     }

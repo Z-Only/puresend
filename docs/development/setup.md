@@ -72,12 +72,13 @@ pnpm tauri dev
 ```
 
 这将同时启动：
+
 - Vite 开发服务器（前端热更新）
 - Tauri 应用窗口（Rust 后端）
 
 ## 项目结构
 
-```
+```text
 puresend/
 ├── src/                    # Vue 前端代码
 │   ├── components/         # Vue 组件
@@ -96,9 +97,9 @@ puresend/
 
 ## 技术栈
 
-- **前端**: Vue 3 + TypeScript + Vuetify 3 + Pinia
+- **前端**: Vue 3 + TypeScript + Vuetify 4 + Pinia 3
 - **后端**: Tauri 2 (Rust)
-- **构建工具**: Vite 7
+- **构建工具**: rolldown-vite
 - **文档**: VitePress
 
 ## 常用命令
@@ -161,5 +162,5 @@ pnpm tauri android build --release
 
 ## 下一步
 
-- 了解 [文件传输功能](/features/file-transfer)
-- 阅读 [贡献指南](https://github.com/Z-Only/puresend/blob/main/CONTRIBUTING.md)
+- 了解[文件传输功能](/features/file-transfer)
+- 阅读[贡献指南](https://github.com/Z-Only/puresend/blob/main/CONTRIBUTING.md)

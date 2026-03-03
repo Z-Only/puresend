@@ -45,3 +45,6 @@ bench/**/src-tauri/gen
 
 # docs
 docs/
+
+# github
+.github/

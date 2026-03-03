@@ -8,27 +8,33 @@
 
 **跨平台文件传输应用**，基于 Tauri 2 + Vue 3 + TypeScript 构建。支持 macOS、Windows、Linux 和 Android 平台，实现设备间快速、安全的文件传输。
 
-📚 **文档站点**: https://z-only.github.io/puresend/
+📚 **文档站点**: <https://z-only.github.io/puresend/>
 
 ## 功能特性
 
 ### 传输方式
+
 - 🚀 **P2P 直连传输** - 局域网内设备间高速直连传输，支持自动设备发现（mDNS）
 - 🌐 **Web 下载** - 生成下载链接/二维码，任何浏览器可直接下载文件
 - 📤 **Web 上传** - 通过浏览器向应用上传文件，支持按 IP 审批
+- ☁️ **云盘中转** - 支持 WebDAV、阿里云 OSS、阿里云盘，实现跨网络文件传输
 
 ### 传输能力
+
 - 📦 **多内容类型** - 支持文件、文件夹、剪贴板、文本、媒体、应用等 6 种内容类型
 - 🔄 **断点续传** - 传输中断后可从断点恢复，无需重新传输
 - ⚡ **分块传输** - 大文件自动分块，支持并行传输
 - 🗜️ **动态压缩** - 基于 zstd 算法的智能压缩，自动判断是否压缩以优化传输速度
 
 ### 安全与隐私
+
 - 🔒 **传输加密** - AES-256-GCM 端到端加密，P-256 ECDH 密钥交换
 - 🔑 **PIN 保护** - Web 下载链接可设置 PIN 码访问保护
 - 👁️ **隐私模式** - 可关闭传输历史记录
+- 🔐 **凭证加密** - 云盘账号凭证使用 AES-256-GCM 加密存储，保护敏感信息
 
 ### 用户体验
+
 - 📱 **跨平台** - 支持 macOS、Windows、Linux 和 Android
 - 📋 **传输历史** - 记录传输历史，支持筛选和排序
 - 🌍 **多语言** - 支持中文、英文，跟随系统语言
@@ -68,6 +74,7 @@ pnpm tauri build
 1. **Android Studio** - 安装 Android SDK 和 NDK
 2. **JDK 17+** - Java 开发工具包
 3. **Rust Android 目标** - 运行以下命令安装：
+
    ```bash
    rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
    ```
@@ -106,6 +113,7 @@ pnpm tauri android build --release
 ### 触发构建
 
 **方式一：推送 Tag**
+
 ```bash
 # 创建并推送版本标签，自动触发构建
 git tag v1.0.0
@@ -113,6 +121,7 @@ git push origin v1.0.0
 ```
 
 **方式二：手动触发**
+
 1. 进入 GitHub 仓库的 **Actions** 页面
 2. 选择 **Build and Release** 工作流
 3. 点击 **Run workflow**，选择构建选项
@@ -142,6 +151,6 @@ git push origin v1.0.0
 
 ## 技术栈
 
-- **前端**: Vue 3 + TypeScript + Vuetify 3 + Pinia
+- **前端**: Vue 3 + TypeScript + Vuetify 4 + Pinia 3
 - **后端**: Tauri 2 (Rust)
-- **构建工具**: Vite 7
+- **构建工具**: rolldown-vite

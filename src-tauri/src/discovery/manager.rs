@@ -35,26 +35,28 @@ impl DiscoveryManager {
 
     /// 启动发现服务
     pub async fn start(&self) -> DiscoveryResult<()> {
-        let mut started = self.started.lock().await;
+        let started = self.started.lock().await;
         if *started {
             return Ok(());
         }
+        drop(started);
 
         self.mdns.start().await?;
-        *started = true;
+        *self.started.lock().await = true;
 
         Ok(())
     }
 
     /// 停止发现服务
     pub async fn stop(&self) -> DiscoveryResult<()> {
-        let mut started = self.started.lock().await;
+        let started = self.started.lock().await;
         if !*started {
             return Ok(());
         }
+        drop(started);
 
         self.mdns.stop().await?;
-        *started = false;
+        *self.started.lock().await = false;
 
         Ok(())
     }
@@ -66,15 +68,16 @@ impl DiscoveryManager {
     pub async fn restart(&self) -> DiscoveryResult<()> {
         let mut started = self.started.lock().await;
 
-        // 如果正在运行，先停止
         if *started {
+            drop(started);
             self.mdns.stop().await?;
+            started = self.started.lock().await;
             *started = false;
+            drop(started);
         }
 
-        // 重新启动
         self.mdns.start().await?;
-        *started = true;
+        *self.started.lock().await = true;
 
         Ok(())
     }

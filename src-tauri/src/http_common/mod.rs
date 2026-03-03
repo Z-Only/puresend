@@ -91,7 +91,7 @@ pub async fn favicon_handler() -> impl IntoResponse {
 }
 
 pub async fn crypto_handshake_handler<S: HasCryptoSessions + Send + Sync + 'static>(
-    ConnectInfo(client_addr): ConnectInfo<SocketAddr>,
+    ConnectInfo(_client_addr): ConnectInfo<SocketAddr>,
     AxumState(state): AxumState<Arc<S>>,
     Json(payload): Json<HandshakeRequest>,
 ) -> Json<HandshakeResponse> {
@@ -103,10 +103,9 @@ pub async fn crypto_handshake_handler<S: HasCryptoSessions + Send + Sync + 'stat
         });
     }
 
-    let client_ip = client_addr.ip().to_string();
     let mut crypto_sessions = state.crypto_sessions().lock().await;
 
-    match crypto_sessions.handshake(&payload.client_public_key, client_ip) {
+    match crypto_sessions.handshake(&payload.client_public_key) {
         Ok((session_id, server_pub_key)) => Json(HandshakeResponse {
             encryption: true,
             server_public_key: Some(server_pub_key),
@@ -207,8 +206,7 @@ pub fn parse_user_agent(ua: &str) -> &'static str {
 
     let platform = if ua_lower.contains("android") {
         "Android"
-    } else if ua_lower.contains("iphone") || ua_lower.contains("ipad") || ua_lower.contains("ipod")
-    {
+    } else if ua_lower.contains("iphone") || ua_lower.contains("ipad") || ua_lower.contains("ipod") {
         "iOS"
     } else if ua_lower.contains("mac") || ua_lower.contains("macos") {
         "macOS"

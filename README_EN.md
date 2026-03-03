@@ -8,7 +8,7 @@
 
 **Cross-platform file transfer application** built with Tauri 2 + Vue 3 + TypeScript. Supports macOS, Windows, Linux, and Android platforms for fast and secure file transfers between devices.
 
-📚 **Documentation Site**: https://z-only.github.io/puresend/
+📚 **Documentation Site**: <https://z-only.github.io/puresend/>
 
 ## Features
 
@@ -17,6 +17,7 @@
 - 🚀 **P2P Direct Transfer** - High-speed direct transfer between devices on the same LAN with automatic device discovery (mDNS)
 - 🌐 **Web Download (Link Sharing)** - Generate download links/QR codes for direct browser downloads
 - 📤 **Web Upload** - Upload files to the app via browser with per-IP approval
+- ☁️ **Cloud Storage Transfer** - Support WebDAV, Aliyun OSS, and Aliyun Drive for cross-network file transfer
 
 ### Transfer Capabilities
 
@@ -30,6 +31,7 @@
 - 🔒 **Transfer Encryption** - AES-256-GCM end-to-end encryption with P-256 ECDH key exchange
 - 🔑 **PIN Protection** - Protect Web download links with PIN code access
 - 👁️ **Privacy Mode** - Option to disable transfer history recording
+- 🔐 **Credential Encryption** - Cloud account credentials encrypted with AES-256-GCM for secure storage
 
 ### User Experience
 
@@ -72,6 +74,7 @@ pnpm tauri build
 1. **Android Studio** - Install Android SDK and NDK
 2. **JDK 17+** - Java Development Kit
 3. **Rust Android Targets** - Install by running:
+
     ```bash
     rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
     ```
@@ -148,6 +151,6 @@ After build completion, artifacts can be downloaded from:
 
 ## Tech Stack
 
-- **Frontend**: Vue 3 + TypeScript + Vuetify 3 + Pinia
+- **Frontend**: Vue 3 + TypeScript + Vuetify 4 + Pinia 3
 - **Backend**: Tauri 2 (Rust)
-- **Build Tool**: Vite 7
+- **Build Tool**: rolldown-vite

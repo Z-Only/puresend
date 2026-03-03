@@ -295,7 +295,6 @@ export const useShareStore = defineStore('share', () => {
      * 处理上传开始事件
      */
     async function handleUploadStart(payload: UploadStartPayload) {
-        console.log('上传开始:', payload)
         const request = Array.from(accessRequests.value.values()).find(
             (r) => r.ip === payload.client_ip
         )
@@ -346,8 +345,6 @@ export const useShareStore = defineStore('share', () => {
      * 处理上传完成事件
      */
     async function handleUploadComplete(payload: UploadCompletePayload) {
-        console.log('上传完成:', payload)
-
         let matchedRequestId: string | null = null
 
         for (const [requestId, request] of accessRequests.value.entries()) {

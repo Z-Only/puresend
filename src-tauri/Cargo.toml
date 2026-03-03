@@ -1,7 +1,7 @@
 ## Here's my code: 
 [package]
 name = "puresend"
-version = "0.1.0"
+version = "0.2.0"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -45,9 +45,9 @@ qrcode = "0.14"
 urlencoding = "2.1"
 async-trait = "0.1.89"
 hostname = "0.4.2"
-reqwest = { version = "0.12", features = ["stream", "json"] }
+reqwest = { version = "0.13", features = ["stream", "json"] }
 tauri-plugin-os = "2"
-tauri-plugin-android-fs = "=26.1.0"
+tauri-plugin-android-fs = "=27.0.0"
 open = "5"
 x25519-dalek = { version = "2", features = ["static_secrets"] }
 aes-gcm = "0.10"

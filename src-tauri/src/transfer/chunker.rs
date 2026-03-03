@@ -67,8 +67,8 @@ impl FileChunker {
         let mut file = File::open(file_path)?;
         file.seek(SeekFrom::Start(chunk.offset))?;
 
-        let mut buffer = vec![0u8; chunk.size as usize];
-        file.read_exact(&mut buffer)?;
+        let mut buffer = Vec::with_capacity(chunk.size as usize);
+        (&mut file).take(chunk.size).read_to_end(&mut buffer)?;
 
         Ok(buffer)
     }
@@ -132,7 +132,7 @@ impl FileChunker {
         let file = File::open(file_path)?;
         let mut reader = BufReader::new(file);
         let mut hasher = Sha256::new();
-        let mut buffer = vec![0u8; 8192];
+        let mut buffer = [0u8; 8192];
 
         loop {
             let bytes_read = reader.read(&mut buffer)?;

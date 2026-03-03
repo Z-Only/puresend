@@ -187,7 +187,8 @@ fn get_compression_lock() -> &'static std::sync::RwLock<CompressionConfig> {
 pub fn get_compression_config() -> CompressionConfig {
     get_compression_lock()
         .read()
-        .map(|v| v.clone())
+        .ok()
+        .and_then(|v| Some(v.clone()))
         .unwrap_or_default()
 }
 

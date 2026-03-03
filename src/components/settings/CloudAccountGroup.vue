@@ -185,13 +185,6 @@ onMounted(() => {
                                     account.cloudType
                                 }}
                             </div>
-                            <div
-                                v-if="account.defaultDirectory"
-                                class="text-body-2 text-grey mt-1"
-                            >
-                                {{ t('cloudAccount.defaultDirectory') }}:
-                                {{ account.defaultDirectory }}
-                            </div>
                         </div>
 
                         <div class="account-actions">

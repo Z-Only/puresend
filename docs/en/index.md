@@ -8,15 +8,18 @@ hero:
   actions:
     - theme: brand
       text: Get Started
-      link: /getting-started
+      link: /en/getting-started
     - theme: alt
       text: GitHub
-      link: https://github.com/Z-Only/puresend
+      link: <https://github.com/Z-Only/puresend>
 
 features:
   - icon: 🚀
     title: Fast Transfer
     details: High-speed peer-to-peer file transfer within LAN using HTTP/TCP direct connection technology
+  - icon: ☁️
+    title: Cloud Storage
+    details: Support WebDAV, Aliyun OSS, and Aliyun Drive for cross-network file transfer
   - icon: 🔒
     title: Secure & Reliable
     details: LAN direct connection transfer, files never pass through external servers, protecting your privacy

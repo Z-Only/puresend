@@ -259,11 +259,9 @@ onMounted(async () => {
     await cloudStore.loadAccounts()
     if (cloudStore.hasAccounts) {
         selectedAccountId.value = cloudStore.accounts[0].id
-        const account = cloudStore.getAccountById(selectedAccountId.value)
-        if (account) {
-            sourceDirectory.value = account.defaultDirectory
-            await refreshFiles()
-        }
+        // 默认目录为云盘根目录
+        sourceDirectory.value = '/'
+        await refreshFiles()
     }
     setupDownloadProgressListener()
 })
@@ -298,11 +296,9 @@ async function setupDownloadProgressListener(): Promise<void> {
     }
 }
 
-function handleAccountChange(accountId: string): void {
-    const account = cloudStore.getAccountById(accountId)
-    if (account) {
-        sourceDirectory.value = account.defaultDirectory
-    }
+function handleAccountChange(): void {
+    // 切换账号时，默认目录为云盘根目录
+    sourceDirectory.value = '/'
     selectedFiles.value = []
     refreshFiles()
 }

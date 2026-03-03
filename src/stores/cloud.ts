@@ -32,17 +32,6 @@ import {
 } from '@/services/cloudService'
 import { addHistoryItem } from '@/stores/transfer/history'
 
-// ============ 存储键名 ============
-const CLOUD_TASKS_STORAGE_KEY = 'cloud-tasks'
-const CLOUD_TASKS_STORAGE_VERSION = 1
-
-/** 云盘任务存储格式 */
-interface CloudTasksStorage {
-    version: number
-    uploadTasks: CloudUploadTask[]
-    downloadTasks: CloudDownloadTask[]
-}
-
 /** 上传任务 */
 export interface CloudUploadTask {
     id: string
@@ -148,51 +137,6 @@ export const useCloudStore = defineStore('cloud', () => {
     const pendingDownloadTasks = computed(() =>
         downloadTasks.value.filter((t) => t.transferStatus === 'downloading')
     )
-
-    // ============ 存储方法 ============
-
-    /**
-     * 从 localStorage 加载任务列表
-     */
-    function loadTasksFromStorage(): void {
-        try {
-            const data = localStorage.getItem(CLOUD_TASKS_STORAGE_KEY)
-            if (!data) return
-
-            const parsed = JSON.parse(data) as CloudTasksStorage
-            if (parsed.version !== CLOUD_TASKS_STORAGE_VERSION) {
-                // 版本不匹配，清空存储
-                localStorage.removeItem(CLOUD_TASKS_STORAGE_KEY)
-                return
-            }
-
-            // 加载所有任务（包括已完成和失败的），直到应用关闭前都保留
-            uploadTasks.value = parsed.uploadTasks || []
-            downloadTasks.value = (parsed.downloadTasks ||
-                []) as CloudDownloadTask[]
-        } catch (error) {
-            console.error('[CloudStore] 加载任务列表失败:', error)
-        }
-    }
-
-    /**
-     * 保存任务列表到 localStorage
-     */
-    function saveTasksToStorage(): void {
-        try {
-            const storageData: CloudTasksStorage = {
-                version: CLOUD_TASKS_STORAGE_VERSION,
-                uploadTasks: uploadTasks.value,
-                downloadTasks: downloadTasks.value,
-            }
-            localStorage.setItem(
-                CLOUD_TASKS_STORAGE_KEY,
-                JSON.stringify(storageData)
-            )
-        } catch (error) {
-            console.error('[CloudStore] 保存任务列表失败:', error)
-        }
-    }
 
     /**
      * 同步上传任务到传输历史
@@ -405,7 +349,6 @@ export const useCloudStore = defineStore('cloud', () => {
         } else {
             uploadTasks.value.unshift(task)
         }
-        saveTasksToStorage()
 
         // 如果任务已完成或失败，同步到历史记录
         if (task.status === 'completed' || task.status === 'failed') {
@@ -423,7 +366,6 @@ export const useCloudStore = defineStore('cloud', () => {
         } else {
             downloadTasks.value.unshift(task)
         }
-        saveTasksToStorage()
 
         // 如果任务已完成或失败，同步到历史记录
         if (
@@ -441,7 +383,6 @@ export const useCloudStore = defineStore('cloud', () => {
         const index = uploadTasks.value.findIndex((t) => t.id === taskId)
         if (index !== -1) {
             uploadTasks.value.splice(index, 1)
-            saveTasksToStorage()
         }
     }
 
@@ -452,7 +393,6 @@ export const useCloudStore = defineStore('cloud', () => {
         const index = downloadTasks.value.findIndex((t) => t.id === taskId)
         if (index !== -1) {
             downloadTasks.value.splice(index, 1)
-            saveTasksToStorage()
         }
     }
 
@@ -468,7 +408,6 @@ export const useCloudStore = defineStore('cloud', () => {
                 t.transferStatus !== 'completed' &&
                 t.transferStatus !== 'failed'
         )
-        saveTasksToStorage()
     }
 
     /**
@@ -476,7 +415,6 @@ export const useCloudStore = defineStore('cloud', () => {
      */
     async function initialize(): Promise<void> {
         await loadAccounts()
-        loadTasksFromStorage()
     }
 
     return {

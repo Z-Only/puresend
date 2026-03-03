@@ -43,6 +43,12 @@ The Web Download feature allows you to share files via HTTP links. Recipients ca
 - File data is transmitted only within the local network
 - Download links become invalid immediately after sharing is stopped
 
+## Network Adaptation
+
+- When network environment changes (e.g., Wi-Fi switching, IP change), download link and QR code automatically update to new IP address
+- Server binds to `0.0.0.0`, no need to restart sharing service after network switch
+- Receiver needs to use updated link to re-access
+
 ## Notes
 
 - Sender and receiver need to be on the same LAN or mutually accessible network

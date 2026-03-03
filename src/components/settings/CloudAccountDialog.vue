@@ -311,9 +311,10 @@ async function handleTestConnection() {
 
     try {
         const credentials = buildCredentials()
+        // 构建符合后端期望的扁平化凭证格式
         const success = await cloudStore.testConnectionWithCredentials({
             cloudType: formData.value.cloudType,
-            credentials,
+            credentials: credentials,
         })
 
         connectionTestPassed.value = success
@@ -338,13 +339,20 @@ async function handleSave() {
 
     try {
         const credentials = buildCredentials()
+        // 构建符合后端期望的扁平化凭证格式
         const accountInput: CloudAccountInput = {
             name: formData.value.name.trim(),
             cloudType: formData.value.cloudType,
-            credentials,
-            defaultDirectory: '/',
-            // 如果测试连接通过，设置初始状态为 connected
-            initialStatus: connectionTestPassed.value ? 'connected' : undefined,
+            credentials: credentials,
+            // 根据测试连接结果设置初始状态：
+            // - 测试通过 → 'connected'
+            // - 测试失败 → 'invalid'
+            // - 未测试 → undefined (后端会设置为 'disconnected')
+            initialStatus: connectionTestPassed.value
+                ? 'connected'
+                : testResultMessage.value
+                  ? 'invalid'
+                  : undefined,
         }
 
         if (isEditMode.value && props.account) {
